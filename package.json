@@ -1,0 +1,30 @@
+{
+  "name": "awesome-pdf",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A browser-based PDF editor inspired by PDF-XChange Editor",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p . && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.10.38",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.7.3",
+    "vite": "6.0.11",
+    "vitest": "3.0.5"
+  }
+}
