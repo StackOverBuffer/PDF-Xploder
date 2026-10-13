@@ -4,6 +4,8 @@ import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, Fo
 import { useStore, type SidebarTab } from './store/store';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
+import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
+import { addBookmarkAt } from './store/contentActions';
 import { Viewer } from './components/Viewer';
 import { Thumbnails } from './components/Thumbnails';
 import { Outline } from './components/Outline';
@@ -30,7 +32,7 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
 ];
 
 const TOOL_KEYS: Record<string, Tool> = {
-  v: 'select', x: 'selectText', g: 'snapshot', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
+  v: 'select', x: 'selectText', g: 'snapshot', z: 'zoom', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
   l: 'line', a: 'arrow', t: 'text', n: 'note', s: 'stamp',
 };
 
@@ -61,6 +63,10 @@ function useShortcuts() {
         if (k === '-') return run(() => s.setScale(s.scale / 1.2));
         if (k === '0') return run(() => s.setScale(s.scale, 'width'));
         if (typing) return;
+        const box = useTextBox.getState().sel;
+        if (k === 'c' && box && s.tool === 'selectText') return run(copyBoxText);
+        if (k === 'a' && s.tool === 'selectText') return run(() => selectAllText(s.currentPage));
+        if (k === 'b' && e.shiftKey) return run(() => addBookmarkAt(box?.page ?? s.currentPage, undefined, box?.text.split('\n')[0] ?? ''));
         if (k === 'z' && !e.shiftKey) return run(() => s.run('Undoing…', () => s.undo()));
         if (k === 'y' || (k === 'z' && e.shiftKey)) return run(() => s.run('Redoing…', () => s.redo()));
         return;
@@ -72,6 +78,8 @@ function useShortcuts() {
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) {
         e.preventDefault();
         s.deleteAnnotation(s.selected.pageId, s.selected.id);
+      } else if (e.key === 'Escape' && useTextBox.getState().sel) {
+        useTextBox.setState({ sel: null });
       } else if (e.key === 'Escape') {
         if (s.selectedField) useStore.setState({ selectedField: null });
         s.select(null);
@@ -84,7 +92,7 @@ function useShortcuts() {
         s.goToPage(s.currentPage - 1);
       } else if (!e.altKey && TOOL_KEYS[e.key]) {
         const tool = TOOL_KEYS[e.key];
-        if (['select', 'selectText', 'hand'].includes(tool) || (tool === 'snapshot' ? can('copy') : can('annotate'))) s.setTool(tool);
+        if (['select', 'selectText', 'hand', 'zoom'].includes(tool) || (tool === 'snapshot' ? can('copy') : can('annotate'))) s.setTool(tool);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -141,6 +149,11 @@ export function App() {
   const busy = useStore((s) => s.busy);
   const dirty = useStore((s) => s.dirty);
   const [showProps, setShowProps] = useState(true);
+  useEffect(() => {
+    const show = () => setShowProps(true);
+    window.addEventListener('awesome-pdf:show-properties', show);
+    return () => window.removeEventListener('awesome-pdf:show-properties', show);
+  }, []);
   useShortcuts();
   useFormFields();
 

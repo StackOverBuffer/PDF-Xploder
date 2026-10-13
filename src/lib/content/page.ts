@@ -10,6 +10,9 @@ import {
   PDFNumber,
   PDFPage,
   PDFRawStream,
+  PDFRef,
+  PDFString,
+  PDFHexString,
   PDFStream,
   StandardFonts,
   decodePDFRawStream,
@@ -55,6 +58,8 @@ const n = (o: unknown): number | undefined => (o instanceof PDFNumber ? o.asNumb
 export interface PageContent {
   objects: ContentObject[];
   fonts: Map<string, FontInfo>;
+  /** /Properties resource names that refer to optional content groups, with the group's reference. */
+  layers: Map<string, string>;
   /** Operators that were not understood. */
   unknown: string[];
 }
@@ -97,7 +102,10 @@ export function readPage(page: PDFPage): PageContent {
     },
     { x: mb.x, y: mb.y, w: mb.width, h: mb.height },
   );
-  return { objects, fonts, unknown };
+  const layers = new Map<string, string>();
+  const props = sub('Properties');
+  if (props instanceof PDFDict) for (const [k, v] of props.entries()) if (v instanceof PDFRef) layers.set(k.decodeText(), v.toString());
+  return { objects, fonts, unknown, layers };
 }
 
 export function writePage(page: PDFPage, objects: ContentObject[]) {
@@ -127,7 +135,11 @@ export type ContentEdit =
   | { type: 'replaceImage'; id: number; image: ImageData }
   | { type: 'addText'; at: { x: number; y: number }; text: string; size: number; color: string; font: FontChoice }
   | { type: 'addImage'; rect: Rect; image: ImageData }
-  | { type: 'addShape'; shape: 'rect' | 'ellipse' | 'line'; rect: Rect; stroke: string | null; fill: string | null; width: number };
+  | { type: 'addShape'; shape: 'rect' | 'ellipse' | 'line'; rect: Rect; stroke: string | null; fill: string | null; width: number }
+  /** Draw a Form XObject (already in this document) with matrix `m`; `bbox` is its bounds on the page. */
+  | { type: 'addForm'; ref: PDFRef; m: M; bbox: Rect }
+  /** Put objects on an optional content group (layer), or take them off any layer with null. */
+  | { type: 'layer'; ids: number[]; ocg: PDFRef | null };
 
 const rgb = (hex: string, op: 'rg' | 'RG'): Op => ({ op, args: [...hexToRgbTuple(hex)] });
 
@@ -379,11 +391,166 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
         selection = [obj];
         break;
       }
+      case 'addForm': {
+        const key = page.node.newXObject('Fm', e.ref).toString().slice(1);
+        const obj: ContentObject = { kind: 'form', state: freshState({ ctm: e.m }), mc: [], ops: [{ op: 'Do', args: [nm(key)] }], runs: [], user: IDENTITY, bbox: e.bbox };
+        list.push(obj);
+        selection = [obj];
+        break;
+      }
+      case 'layer': {
+        const key = e.ocg ? propertiesKey(page, e.ocg) : null;
+        selection = pick(e.ids).map((o) => {
+          const mc = o.mc.filter((m) => !isOcMarker(m));
+          if (key) mc.push({ op: 'BDC', args: [nm('OC'), nm(key)] });
+          return replace(o, { ...o, mc });
+        });
+        break;
+      }
     }
   }
   const final = list.filter((o): o is ContentObject => !!o);
   writePage(page, final);
   return selection.map((o) => final.indexOf(o)).filter((i) => i >= 0);
+}
+
+const isOcMarker = (m: Op) => m.op === 'BDC' && typeof m.args[0] === 'object' && m.args[0] !== null && 't' in m.args[0] && m.args[0].t === 'name' && m.args[0].v === 'OC';
+
+/** The page's /Properties name for an optional content group, adding one if needed. */
+function propertiesKey(page: PDFPage, ocg: PDFRef): string {
+  const ctx = page.doc.context;
+  let res = page.node.Resources();
+  if (!res) {
+    res = ctx.obj({});
+    page.node.set(PDFName.of('Resources'), res);
+  }
+  let props = res.lookup(PDFName.of('Properties'));
+  if (!(props instanceof PDFDict)) {
+    props = ctx.obj({});
+    res.set(PDFName.of('Properties'), props as PDFDict);
+  }
+  const dict = props as PDFDict;
+  for (const [k, v] of dict.entries()) if (v instanceof PDFRef && v.toString() === ocg.toString()) return k.decodeText();
+  let i = 1;
+  while (dict.has(PDFName.of(`OC${i}`))) i++;
+  dict.set(PDFName.of(`OC${i}`), ocg);
+  return `OC${i}`;
+}
+
+// ---------------------------------------------------------------- layers
+
+export interface LayerInfo {
+  /** Reference of the optional content group, e.g. "12 0 R". */
+  ref: string;
+  name: string;
+}
+
+const textOf = (o: unknown) => (o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : '');
+
+/** The document's optional content groups (layers). */
+export function listLayers(doc: PDFDocument): LayerInfo[] {
+  const oc = doc.catalog.lookup(PDFName.of('OCProperties'));
+  const ocgs = oc instanceof PDFDict ? oc.lookup(PDFName.of('OCGs')) : undefined;
+  if (!(ocgs instanceof PDFArray)) return [];
+  return ocgs.asArray().flatMap((r) => {
+    const d = doc.context.lookup(r);
+    return r instanceof PDFRef && d instanceof PDFDict ? [{ ref: r.toString(), name: textOf(d.lookup(PDFName.of('Name'))) || r.toString() }] : [];
+  });
+}
+
+export function findLayer(doc: PDFDocument, ref: string): PDFRef | undefined {
+  const oc = doc.catalog.lookup(PDFName.of('OCProperties'));
+  const ocgs = oc instanceof PDFDict ? oc.lookup(PDFName.of('OCGs')) : undefined;
+  return ocgs instanceof PDFArray ? (ocgs.asArray().find((r) => r instanceof PDFRef && r.toString() === ref) as PDFRef | undefined) : undefined;
+}
+
+/** Create a visible layer and list it in the viewer's layer order. */
+export function createLayer(doc: PDFDocument, name: string): PDFRef {
+  const ctx = doc.context;
+  const ref = ctx.register(ctx.obj({ Type: 'OCG', Name: PDFString.of(name) }));
+  let oc = doc.catalog.lookup(PDFName.of('OCProperties'));
+  if (!(oc instanceof PDFDict)) {
+    oc = ctx.obj({ OCGs: [], D: { Order: [] } });
+    doc.catalog.set(PDFName.of('OCProperties'), oc as PDFDict);
+  }
+  const ocp = oc as PDFDict;
+  let ocgs = ocp.lookup(PDFName.of('OCGs'));
+  if (!(ocgs instanceof PDFArray)) {
+    ocgs = ctx.obj([]);
+    ocp.set(PDFName.of('OCGs'), ocgs as PDFArray);
+  }
+  (ocgs as PDFArray).push(ref);
+  let d = ocp.lookup(PDFName.of('D'));
+  if (!(d instanceof PDFDict)) {
+    d = ctx.obj({});
+    ocp.set(PDFName.of('D'), d as PDFDict);
+  }
+  const order = (d as PDFDict).lookup(PDFName.of('Order'));
+  if (order instanceof PDFArray) order.push(ref);
+  else (d as PDFDict).set(PDFName.of('Order'), ctx.obj([ref]));
+  return ref;
+}
+
+// ---------------------------------------------------------------- isolating objects
+
+/**
+ * A one-page PDF holding only some objects of a page. With `nativeImage`, the
+ * single image object fills the page at one point per pixel, so rendering it
+ * at scale 1 gives the image's own pixels. Otherwise the page is the
+ * objects' bounding box and the objects keep their positions.
+ */
+export async function isolateObjects(bytes: Uint8Array, pageIndex: number, ids: number[], opts: { nativeImage?: boolean } = {}): Promise<{ bytes: Uint8Array; box: Rect; width: number; height: number; encodedSize?: number }> {
+  const src = await loadForEditing(bytes);
+  const page = src.getPage(pageIndex);
+  const pc = readPage(page);
+  let objs = ids.map((i) => pc.objects[i]).filter(Boolean);
+  if (!objs.length) throw new Error('Nothing selected');
+  const boxes = objs.map(objectBounds);
+  const x0 = Math.min(...boxes.map((b) => b.x));
+  const y0 = Math.min(...boxes.map((b) => b.y));
+  let box: Rect = { x: x0, y: y0, w: Math.max(...boxes.map((b) => b.x + b.w)) - x0, h: Math.max(...boxes.map((b) => b.y + b.h)) - y0 };
+  let width = box.w;
+  let height = box.h;
+  let encodedSize: number | undefined;
+  if (opts.nativeImage) {
+    const o = objs[0];
+    if (o.kind !== 'image') throw new Error('Not an image');
+    const px = imagePixels(page, o);
+    encodedSize = px.encodedSize;
+    width = px.width;
+    height = px.height;
+    // Clips, the edit transform and soft masks from ExtGStates are dropped: just the image.
+    const params = Object.fromEntries(Object.entries(o.state.params).filter(([, v]) => 'op' in v));
+    objs = [{ ...o, user: IDENTITY, mc: [], state: { ...o.state, ctm: [width, 0, 0, height, 0, 0], clips: [], params } }];
+    box = { x: 0, y: 0, w: width, h: height };
+  }
+  writePage(page, objs);
+  page.node.delete(PDFName.of('Annots'));
+  page.node.delete(PDFName.of('Rotate'));
+  page.setMediaBox(box.x, box.y, box.w, box.h);
+  page.setCropBox(box.x, box.y, box.w, box.h);
+  const out = await PDFDocument.create();
+  const [copy] = await out.copyPages(src, [pageIndex]);
+  out.addPage(copy);
+  return { bytes: await out.save(), box, width, height, encodedSize };
+}
+
+/** Pixel size of an image object (XObject or inline). */
+function imagePixels(page: PDFPage, o: ContentObject): { width: number; height: number; encodedSize?: number } {
+  const op = o.ops[0];
+  if (op?.op === 'BI' && op.inline) {
+    const num = (...keys: string[]) => keys.map((k) => op.inline!.dict.get(k)).find((v) => typeof v === 'number') as number | undefined;
+    return { width: num('W', 'Width') ?? 1, height: num('H', 'Height') ?? 1, encodedSize: op.inline.data.length };
+  }
+  const key = op?.args[0] && typeof op.args[0] === 'object' && 't' in op.args[0] && op.args[0].t === 'name' ? op.args[0].v : '';
+  const xobjs = resourcesOf(page)?.lookup(PDFName.of('XObject'));
+  const x = xobjs instanceof PDFDict ? xobjs.lookup(PDFName.of(key)) : undefined;
+  if (!(x instanceof PDFStream)) return { width: 1, height: 1 };
+  return {
+    width: n(x.dict.lookup(PDFName.of('Width'))) ?? 1,
+    height: n(x.dict.lookup(PDFName.of('Height'))) ?? 1,
+    encodedSize: x instanceof PDFRawStream ? x.contents.length : undefined,
+  };
 }
 
 /** Summary of an object for the editing UI. */
@@ -402,6 +569,8 @@ export interface ObjectInfo {
   Tz?: number;
   Ts?: number;
   clipped: boolean;
+  /** Reference of the layer (optional content group) the object is on, if any. */
+  layer?: string;
   /** Can the line's text be re-encoded in its own font? (checked per character on commit) */
   fontKey?: string;
 }
@@ -428,6 +597,9 @@ function colorOf(ops: Op[]): string | undefined {
 export function describeObjects(pc: PageContent): ObjectInfo[] {
   return pc.objects.map((o, id) => {
     const info: ObjectInfo = { id, kind: o.kind, bbox: objectBounds(o), clipped: o.state.clips.length > 0 };
+    const oc = [...o.mc].reverse().find(isOcMarker);
+    const key = oc?.args[1] && typeof oc.args[1] === 'object' && 't' in oc.args[1] && oc.args[1].t === 'name' ? oc.args[1].v : undefined;
+    if (key && pc.layers.has(key)) info.layer = pc.layers.get(key);
     if (o.kind === 'text') {
       const r = o.runs[0];
       info.text = o.runs.map((x) => x.text).join('');

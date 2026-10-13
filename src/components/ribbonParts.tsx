@@ -83,7 +83,7 @@ export const Row = ({ children }: { children: ReactNode }) => <div className="rr
 
 /** Which permission a tool needs, or null when it only views. */
 export function toolPermission(tool: Tool) {
-  if (tool === 'select' || tool === 'selectText' || tool === 'hand' || tool === 'content') return null;
+  if (tool === 'select' || tool === 'selectText' || tool === 'hand' || tool === 'content' || tool === 'zoom') return null;
   if (tool === 'snapshot') return 'copy' as const;
   if (tool === 'sign') return 'fillForms' as const;
   if (tool.startsWith('field')) return 'designForms' as const;

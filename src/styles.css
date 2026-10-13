@@ -378,3 +378,19 @@ select.widget { padding: 0; }
   .props { display: none; }
   .sidebar { width: 180px; }
 }
+/* Select Text tool: rectangle selection */
+.textbox-layer { position: absolute; inset: 0; z-index: 2; cursor: crosshair; }
+.textbox-layer svg { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.textbox-hit { fill: rgba(0, 90, 255, 0.28); }
+.textbox-marquee { fill: rgba(30, 136, 229, 0.06); stroke: #1e88e5; stroke-width: 1; stroke-dasharray: 4 3; }
+.textbox-note { position: absolute; left: 8px; top: 8px; background: var(--panel); border: 1px solid var(--border); padding: 2px 6px; font-size: 11px; border-radius: 3px; }
+.annot-layer.drawing.tool-zoom { cursor: zoom-in; }
+/* Menus: submenus and disabled entries */
+.rmenu button.is-disabled { opacity: 0.45; cursor: default; }
+.rmenu button.open { background: var(--accent-soft); }
+.rmenu-arrow { margin-left: 12px; color: var(--muted); }
+.rmenu-label b { font-weight: 600; }
+.barcodes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.barcodes li { display: flex; align-items: center; gap: 8px; }
+.barcodes code { flex: 1; word-break: break-all; }
+.stamp-thumb { width: 16px; height: 16px; object-fit: contain; }

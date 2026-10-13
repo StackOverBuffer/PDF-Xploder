@@ -5,6 +5,9 @@ import { useCan } from '../store/permissions';
 import { pdfRectToView, pdfToView, viewToPdf, type VRect } from '../lib/geometry';
 import { IDENTITY, about, apply, inv, mul, rotate, scale as scaleM, translate, type M } from '../lib/content/matrix';
 import type { ObjectInfo } from '../lib/content/page';
+import { useContextMenu } from './Menu';
+import { objectMenu } from './contextMenus';
+import * as ca from '../store/contentActions';
 import type { PageGeom, Pt } from '../lib/types';
 
 interface Props {
@@ -78,6 +81,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
   const [hover, setHover] = useState<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useContextMenu();
 
   useEffect(() => {
     let live = true;
@@ -204,6 +208,21 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
     applyContentEdits(index, [{ type: 'transform', ids: selection, m: toUser(geom, d.t) }]);
   };
 
+  const onContextMenu = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (tool !== 'content' || !objects) return;
+    const p = pt(e);
+    const ev = { clientX: e.clientX, clientY: e.clientY, preventDefault() {} };
+    const hit = [...visible].reverse().find((o) => contains(vbox(o), p));
+    let ids = selection ?? [];
+    if (hit && !ids.includes(hit.id)) ids = [hit.id];
+    if (!hit) ids = selBox && contains(selBox, p) ? ids : [];
+    select(ids);
+    const layers = await ca.documentLayers().catch(() => []);
+    menu.open(ev, objectMenu(index, geom, objects.filter((o) => ids.includes(o.id)), layers, p));
+  };
+
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== 'content' || !canEdit) return;
     const p = pt(e);
@@ -224,7 +243,25 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
         select(visible.map((o) => o.id));
         return;
       }
-      if (!sel || sel.page !== index || !canEdit) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'v' && s.currentPage === index && ca.hasObjectClipboard()) {
+        e.preventDefault();
+        ca.pasteObjects(index, { inPlace: e.shiftKey });
+        return;
+      }
+      if (!sel || sel.page !== index) return;
+      if (mod && key === 'c' && !e.shiftKey && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        ca.copyObjects();
+        return;
+      }
+      if (!canEdit) return;
+      if (mod && key === 'x') {
+        e.preventDefault();
+        ca.cutObjects();
+        return;
+      }
       const step = e.shiftKey ? 10 : 1;
       const nudge: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
       if (nudge[e.key]) {
@@ -266,6 +303,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       onPointerCancel={() => setDrag(null)}
       onPointerLeave={() => setHover(null)}
       onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
     >
       {drag && !isArea(drag) && drag.ghost && drag.moved && (
         <img
@@ -312,6 +350,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
         )}
       </svg>
       {editing && <InlineTextEditor index={index} geom={geom} scale={S} objects={objects ?? []} editing={editing} />}
+      {menu.element}
     </div>
   );
 });

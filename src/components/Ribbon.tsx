@@ -18,7 +18,8 @@ import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
 import { goToHit } from './SearchPanel';
 import { OrganizeTab } from './OrganizeTab';
-import { useLang, useT } from '../lib/i18n';
+import { customStamps, deleteCustomStamp, placeCustomStamp } from '../store/contentActions';
+import { tr, useLang, useT } from '../lib/i18n';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
 type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility';
@@ -237,7 +238,17 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <ToolBtn tool="note" icon={<StickyNote size={L} />} label="Note" />
             </Group>
             <Group label="Stamp">
-              <ToolBtn tool="stamp" icon={<Stamp size={L} />} label="Stamp" menu={STAMPS.map((l) => ({ label: l, checked: stampLabel === l, onClick: () => { S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } }))} />
+              <ToolBtn tool="stamp" icon={<Stamp size={L} />} label="Stamp" menu={() => {
+                const custom = customStamps();
+                return [
+                  ...STAMPS.map((l): MenuItem => ({ label: l, checked: stampLabel === l, onClick: () => { S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } })),
+                  null,
+                  ...(custom.length
+                    ? custom.map((c): MenuItem => ({ label: c.name, icon: <img className="stamp-thumb" src={c.src} alt="" />, disabled: !canAnnotate, onClick: () => placeCustomStamp(c) }))
+                    : [{ label: 'No custom stamps yet', disabled: true, hint: 'Right-click objects → New Stamp from Selection' } as MenuItem]),
+                  ...(custom.length ? [{ label: 'Delete custom stamp', submenu: custom.map((c): MenuItem => ({ label: c.name, onClick: () => confirm(`${tr('Delete')} “${c.name}”?`) && deleteCustomStamp(c.id) })) } as MenuItem] : []),
+                ];
+              }} />
               <Stack>
                 <Btn size="small" icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
                 <Btn size="small" icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />

@@ -11,7 +11,7 @@ const PAD = 24;
 const MARKUP: TextMarkupKind[] = ['highlight', 'underline', 'strikeout'];
 
 /** Merge the client rects of a text selection into one rect per line run. */
-function mergeLineRects(rects: VRect[]): VRect[] {
+export function mergeLineRects(rects: VRect[]): VRect[] {
   const sorted = [...rects].sort((a, b) => a.top - b.top || a.left - b.left);
   const out: VRect[] = [];
   for (const r of sorted) {

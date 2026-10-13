@@ -67,13 +67,24 @@ export function SearchPanel() {
 
   const go = goToHit;
 
-  const submit = async (matchCase = search.matchCase) => {
+  const submit = async (matchCase = search.matchCase, q = query) => {
     setRunning(true);
-    const hits = await runSearch(query, matchCase);
+    const hits = await runSearch(q, matchCase);
     setRunning(false);
-    useStore.getState().setSearch({ query, hits, index: -1, matchCase });
+    useStore.getState().setSearch({ query: q, hits, index: -1, matchCase });
     if (hits.length) go(0);
   };
+
+  // "Search for selected text" from a context menu.
+  useEffect(() => {
+    const onRun = (e: Event) => {
+      const q = (e as CustomEvent<string>).detail;
+      setQuery(q);
+      submit(useStore.getState().search.matchCase, q);
+    };
+    window.addEventListener('awesome-pdf:run-search', onRun);
+    return () => window.removeEventListener('awesome-pdf:run-search', onRun);
+  });
 
   // Re-run the search when the document changes.
   useEffect(() => {

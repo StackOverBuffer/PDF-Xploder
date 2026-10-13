@@ -44,6 +44,8 @@ interface Props {
   root?: boolean;
 }
 
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
 export function Menu({ anchor, items, onClose, side, root = true }: Props) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -114,7 +116,26 @@ export function Menu({ anchor, items, onClose, side, root = true }: Props) {
   };
 
   return createPortal(
-    <div ref={ref} className="rmenu" role="menu" style={pos} onKeyDown={onKeyDown} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={ref}
+      className="rmenu"
+      role="menu"
+      style={pos}
+      onKeyDown={onKeyDown}
+      // React events bubble out of portals to the component that opened the menu
+      // (e.g. a page layer that would start a drag): keep them inside.
+      onPointerDown={stop}
+      onPointerUp={stop}
+      onPointerMove={stop}
+      onMouseDown={stop}
+      onMouseUp={stop}
+      onClick={stop}
+      onDoubleClick={stop}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       {items.map((it, i) => {
         if (it === null) return <div key={i} className="rmenu-sep" role="separator" />;
         const disabled = it.disabled || !!it.unavailable;

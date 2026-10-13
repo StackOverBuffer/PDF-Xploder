@@ -7,9 +7,10 @@ import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
 import { fixAccessibility, runAccessibilityCheck } from '../store/extras';
 import type { CheckResult } from '../lib/accessibility';
+import { BarcodesDialog, RecompressDialog } from './ContentDialogs';
 import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility';
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes';
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -356,6 +357,8 @@ export function Dialogs() {
     case 'security': return <SecurityDialog close={close} />;
     case 'permissions': return <PermissionsDialog close={close} />;
     case 'accessibility': return <AccessibilityDialog close={close} />;
+    case 'recompress': return <RecompressDialog close={close} />;
+    case 'barcodes': return <BarcodesDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     default: return null;
   }

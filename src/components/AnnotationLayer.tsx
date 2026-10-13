@@ -8,6 +8,7 @@ import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
 import { addField } from '../store/commands';
 import { snapshotRegion } from '../store/extras';
+import { zoomAt, zoomToBox } from '../store/viewActions';
 import type { NewFieldKind } from '../lib/forms';
 
 interface Props {
@@ -22,7 +23,7 @@ interface Props {
 const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
   fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
 };
-const DRAW_TOOLS: Tool[] = ['snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
+const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
 
 type Draft =
@@ -50,8 +51,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const svgRef = useRef<SVGSVGElement>(null);
   const [draft, setDraft] = useState<Draft>(null);
   const drag = useRef<Drag>(null);
+  const zoomOut = useRef(false);
 
-  const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : tool === 'snapshot' ? canCopy : editable);
+  const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : tool === 'snapshot' ? canCopy : tool === 'zoom' ? true : editable);
 
   /** Pointer position in view space (scale 1). */
   const viewPt = (e: { clientX: number; clientY: number }): Pt => {
@@ -65,6 +67,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     e.preventDefault();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const p = viewPt(e);
+    zoomOut.current = e.altKey;
     if (tool === 'ink') setDraft({ kind: 'ink', points: [p] });
     else if (tool === 'note') createNote(p);
     else setDraft({ kind: 'box', start: p, end: p });
@@ -121,6 +124,11 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20], sign: [200, 60],
       fieldText: [180, 22], fieldCheckbox: [14, 14], fieldRadio: [14, 14], fieldDropdown: [140, 22], fieldList: [140, 60],
     };
+    if (tool === 'zoom') {
+      if (click) zoomAt(index, d.start, zoomOut.current ? 1 / 1.25 : 1.25);
+      else zoomToBox(index, { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy });
+      return;
+    }
     if (tool === 'snapshot') {
       // The tool stays active, as in PDF-XChange, so several regions can be copied in a row.
       if (!click) snapshotRegion(index, viewRectToPdf(geom, { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy }));

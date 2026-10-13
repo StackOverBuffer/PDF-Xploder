@@ -6,6 +6,9 @@ import { AnnotationLayer } from './AnnotationLayer';
 import { WidgetLayer } from './WidgetLayer';
 import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
+import { TextBoxLayer } from './TextBoxSelect';
+import { useContextMenu } from './Menu';
+import { pageMenu } from './contextMenus';
 
 interface Props {
   index: number;
@@ -20,6 +23,8 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   const pageId = useStore((s) => s.pageIds[index]);
   const scale = useStore((s) => s.scale);
   const contentTool = useStore((s) => s.tool.startsWith('content'));
+  const textBoxTool = useStore((s) => s.tool === 'selectText');
+  const menu = useContextMenu();
   const canvasHost = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const rendered = useRef<string>('');
@@ -81,13 +86,25 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   }, [pdf, docVersion, index, scale, visible, geom.rotation]);
 
   return (
-    <div className="page" data-index={index} style={{ width: w, height: h }}>
+    <div
+      className="page"
+      data-index={index}
+      style={{ width: w, height: h }}
+      onContextMenu={(e) => {
+        // Layers with their own menus (objects, text box selection) handle it first.
+        if (e.defaultPrevented || (e.target as Element).closest('input, textarea, select, .widget')) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        menu.open(e, pageMenu(index, geom, { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }));
+      }}
+    >
       <div className="canvas-host" ref={canvasHost} />
       <div className="textLayer" ref={textRef} />
       {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
       {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}
+      {visible && textBoxTool && <TextBoxLayer index={index} geom={geom} scale={scale} />}
       {visible && contentTool && <ContentLayer index={index} geom={geom} scale={scale} width={w} height={h} />}
       <div className="page-label">{index + 1}</div>
+      {menu.element}
     </div>
   );
 });
