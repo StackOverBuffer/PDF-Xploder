@@ -3,6 +3,9 @@
  * to translations and fall back to English for anything missing.
  */
 import { create } from 'zustand';
+import DE_ORGANIZE from '../locales/de/organize';
+import DE_CONTEXT from '../locales/de/context';
+import DE_UI from '../locales/de/ui';
 
 export type Lang = 'en' | 'de';
 
@@ -64,7 +67,7 @@ const DE: Record<string, string> = {
   'Stop reading': 'Vorlesen beenden', Display: 'Anzeige', 'Invert colours': 'Farben umkehren',
 };
 
-const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: DE };
+const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE } };
 
 function initialLang(): Lang {
   try {
@@ -90,6 +93,11 @@ export const useLang = create<{ lang: Lang; setLang(l: Lang): void }>()((set) =>
 
 export function translate(lang: Lang, s: string): string {
   return TABLES[lang][s] ?? s;
+}
+
+/** Translate outside React (store messages, prompts); components should prefer useT(). */
+export function tr(s: string): string {
+  return translate(useLang.getState().lang, s);
 }
 
 /** Translation function for the current interface language. */

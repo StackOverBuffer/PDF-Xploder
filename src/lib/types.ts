@@ -126,6 +126,8 @@ export type Tool =
   | 'hand'
   /** Drag a box to copy that part of the page as an image. */
   | 'snapshot'
+  /** Click to zoom in (Alt+click out), drag a box to zoom to it. */
+  | 'zoom'
   | 'highlight'
   | 'underline'
   | 'strikeout'
