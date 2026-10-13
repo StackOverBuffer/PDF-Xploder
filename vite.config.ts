@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  // Served from a sub-path on GitHub Pages (e.g. /awesome-pdf/); see .github/workflows/pages.yml.
+  base: process.env.BASE_PATH || '/',
   plugins: [react()],
   resolve: {
     alias: {

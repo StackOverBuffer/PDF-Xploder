@@ -12,6 +12,14 @@ npm run build      # production build in dist/
 
 Click **Try a sample** on the start screen for a document with text, a form and bookmarks.
 
+### Publishing to GitHub Pages
+
+`.github/workflows/pages.yml` builds the app and deploys it to GitHub Pages whenever the
+repository's default branch is pushed (or when run manually from the Actions tab). One-time
+setup: in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**. The site
+is then served at `https://<owner>.github.io/<repo>/`; the build picks up that sub-path through
+the `BASE_PATH` environment variable (`BASE_PATH=/awesome-pdf/ npm run build` reproduces it locally).
+
 ## Architecture
 
 | Layer | Where | What |
@@ -76,17 +84,20 @@ created at, and turn with the page like printed content would.
 ### Forms
 - ✅ Fill text fields, checkboxes, radio buttons, dropdowns and list boxes directly on the page or in the Form fields pane (undoable, saved with the document; Unicode values supported)
 - ✅ Highlight fillable fields, flatten forms
-- ⬜ Design forms (create/edit fields), JavaScript actions, calculations
+- ✅ Form design: create text fields, check boxes, radio buttons, dropdowns and list boxes; move, resize, rename and delete fields
+- ✅ Field properties: read only, required, value locked, excluded from export, **locked** (no moving, resizing, deleting or changing until unlocked), visibility (hidden, no-print, print-only), tooltip; text alignment, font size, max length, multi-line, password, comb, scrolling, spell checking; choice options, custom text, sorting, multiple selection
+- ⬜ Calculations, validation and formatting scripts (JavaScript actions), tab order, buttons
 
 ### Protect & sign
 - ✅ Secure redaction: marked pages are flattened and rasterised so the underlying text and graphics are really removed
 - ✅ Visual (image) signatures
-- ✅ Password protection: open password, permissions password and permissions, AES-256 or AES-128
-- ✅ Open encrypted PDFs; documents restricting edits open read-only until unlocked with the owner password
+- ✅ Password protection: open password, permissions password, AES-256 or AES-128
+- ✅ Permissions: printing (none / low / high resolution), changing the document, page assembly, commenting, form filling, copying, accessibility; presets and a summary of the restrictions in effect
+- ✅ Permissions are enforced action by action for documents opened without the owner password; allowed edits are saved with the original encryption, so the owner password and restrictions are preserved. The owner password lifts the restrictions
 - ✅ Certificate-based digital signatures (PKCS#7 detached, SHA-256) from .p12/.pfx files, visible or invisible, as incremental updates so earlier signatures stay valid; self-signed test certificates can be created in the app
 - ✅ Signature validation: integrity, signature (RSA and ECDSA) and coverage; signer, issuer, time, reason
 - 🟡 Signer identity is not checked against trusted certificates (no trust list, revocation or timestamp checks yet)
-- ⬜ Signing password-protected files, long-term validation (LTV), timestamps
+- ⬜ Signing password-protected files, certification (DocMDP) signatures, long-term validation (LTV), timestamps
 - ⬜ Search & redact, sanitize document (metadata, hidden data)
 
 ### Document & output
@@ -102,6 +113,7 @@ created at, and turn with the page like printed content would.
 
 - **Fonts.** Noto Sans, Noto Sans Symbols 2 (bundled in `public/fonts`) and Noto Sans SC/KR (fetched from jsDelivr only when text needs them) are licensed under the SIL Open Font License; see `public/fonts/OFL.txt`. Offline, CJK characters fall back to `?`.
 - **node-forge.** `npm audit` flags node-forge for GHSA-86w9-cpqp-85rv, a flaw in its RSA signature *verification*. The app uses forge only to read .p12 files and create signatures; all verification goes through Web Crypto.
+- **Permissions.** PDF permissions are honoured by well-behaved software, not enforced cryptographically, and PDF has no permission that prevents saving a copy. To re-encrypt a restricted file without its owner password, the app derives the file key through an internal module of `@cantoo/pdf-lib` (aliased as `pdf-lib-internal/crypto` in `vite.config.ts`).
 - **Saving signed documents.** Edits to a signed document are saved by rewriting the file, which invalidates existing signatures (the app asks first). Sign again after editing.
 
 ## Keyboard shortcuts
