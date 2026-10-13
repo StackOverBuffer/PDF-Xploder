@@ -110,7 +110,7 @@ function Welcome() {
       onDrop={(e) => { e.preventDefault(); setOver(false); cmd.openFiles(Array.from(e.dataTransfer.files)); }}
     >
       <div className="welcome-card">
-        <h1>Awesome PDF</h1>
+        <h1>PDF-Xploder</h1>
         <p className="muted">View, annotate, organise, fill and sign PDFs — entirely in your browser. Files never leave your device.</p>
         <div className="welcome-actions">
           <button className="primary big" onClick={cmd.openFromDialog}><FolderOpen size={18} /> Open PDF…</button>
@@ -167,7 +167,7 @@ export function App() {
 
   useEffect(() => {
     const name = useStore.getState().fileName;
-    document.title = name ? `${dirty ? '• ' : ''}${name} — Awesome PDF` : 'Awesome PDF';
+    document.title = name ? `${dirty ? '• ' : ''}${name} — PDF-Xploder` : 'PDF-Xploder';
   }, [dirty, hasDoc]);
 
   return (

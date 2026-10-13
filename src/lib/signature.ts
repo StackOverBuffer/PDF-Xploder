@@ -119,7 +119,7 @@ export async function createTestCertificate(o: { name: string; email?: string; p
   const utf8 = (v: string) => ({ value: v, valueTagClass: forge.asn1.Type.UTF8 as never });
   const subject = [
     { name: 'commonName', ...utf8(o.name) },
-    { name: 'organizationName', ...utf8('Awesome PDF test certificate') },
+    { name: 'organizationName', ...utf8('PDF-Xploder test certificate') },
     ...(o.email ? [{ name: 'emailAddress', value: o.email }] : []),
   ];
   cert.setSubject(subject);
@@ -220,7 +220,7 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
     Contents: PDFHexString.of('0'.repeat(SIGNATURE_SPACE * 2)),
     M: PDFString.fromDate(date),
     Name: PDFHexString.fromText(o.identity.name),
-    Prop_Build: { App: { Name: 'AwesomePDF' } },
+    Prop_Build: { App: { Name: 'PDF-Xploder' } },
   });
   if (o.reason) sig.set(PDFName.of('Reason'), PDFHexString.fromText(o.reason));
   if (o.location) sig.set(PDFName.of('Location'), PDFHexString.fromText(o.location));

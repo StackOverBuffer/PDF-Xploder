@@ -88,7 +88,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   return (
     <header className="ribbon">
       <div className="titlebar">
-        <div className="brand">Awesome&nbsp;PDF</div>
+        <div className="brand">PDF-Xploder</div>
         <div className="quick">
           <button title={`${t('Open')} (Ctrl+O)`} onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
           <button title={`${t('Save')} (Ctrl+S)`} disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>

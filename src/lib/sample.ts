@@ -4,14 +4,14 @@ import { singleFontEngine, wrapLines } from './appearance';
 /** A small multi-page document with text, a form and bookmarks, for trying the editor out. */
 export async function createSampleDocument(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle('Awesome PDF sample');
-  doc.setAuthor('Awesome PDF');
+  doc.setTitle('PDF-Xploder sample');
+  doc.setAuthor('PDF-Xploder');
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const sections = [
     {
       title: '1. Welcome',
-      body: 'This sample document lets you try Awesome PDF. Select text with the Highlight, Underline or Strikeout tools to mark it up. Draw with the Pencil, add shapes, arrows and text boxes, drop sticky notes and stamps, or place your signature. Everything you add can be moved, restyled and deleted until you save.',
+      body: 'This sample document lets you try PDF-Xploder. Select text with the Highlight, Underline or Strikeout tools to mark it up. Draw with the Pencil, add shapes, arrows and text boxes, drop sticky notes and stamps, or place your signature. Everything you add can be moved, restyled and deleted until you save.',
     },
     {
       title: '2. Organising pages',
@@ -27,7 +27,7 @@ export async function createSampleDocument(): Promise<Uint8Array> {
     const page = doc.addPage([595.28, 841.89]);
     pageRefs.push(page.ref);
     page.drawRectangle({ x: 0, y: 781.89, width: 595.28, height: 60, color: rgb(0.11, 0.3, 0.6) });
-    page.drawText('Awesome PDF', { x: 50, y: 805, size: 20, font: bold, color: rgb(1, 1, 1) });
+    page.drawText('PDF-Xploder', { x: 50, y: 805, size: 20, font: bold, color: rgb(1, 1, 1) });
     page.drawText(s.title, { x: 50, y: 720, size: 24, font: bold, color: rgb(0.1, 0.1, 0.1) });
     wrapLines(singleFontEngine(font), s.body, 13, 495).forEach((line, k) => page.drawText(line, { x: 50, y: 680 - k * 20, size: 13, font, color: rgb(0.2, 0.2, 0.2) }));
     const filler = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';

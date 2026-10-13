@@ -3,7 +3,7 @@
  *
  * Writing produces standard subtypes (Highlight, Ink, Square, FreeText, …)
  * with an appearance stream, so other viewers show them and other editors can
- * edit them. A private /AwesomePDF entry keeps the exact model for lossless
+ * edit them. A private /AwesomePDF entry (the name is kept for files saved by earlier versions) keeps the exact model for lossless
  * round trips; standard keys still win where another editor changed them.
  */
 import {
