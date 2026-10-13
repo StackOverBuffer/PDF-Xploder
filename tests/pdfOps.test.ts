@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString, StandardFonts } from 'pdf-lib';
 import * as ops from '../src/lib/pdfOps';
 import type { Annotation } from '../src/lib/types';
 
@@ -126,15 +126,67 @@ describe('export', () => {
     expect(await ops.exportWithAnnotations(bytes, [[]])).toBe(bytes);
   });
 
+  const pngSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  const withImage: Annotation[] = [...all, { ...base, id: '11', type: 'image', rect: { x: 30, y: 30, w: 40, h: 40 }, rot: 0, src: pngSrc, signature: true }];
+  const subtypes = async (bytes: Uint8Array) => {
+    const doc = await PDFDocument.load(bytes);
+    const annots = doc.getPage(0).node.Annots();
+    return (annots?.asArray() ?? []).map((r) => (doc.context.lookup(r) as PDFDict).get(PDFName.of('Subtype'))!.toString());
+  };
+
   for (const rotation of [0, 90, 180, 270]) {
     it(`flattens every annotation type on a page rotated ${rotation}°`, async () => {
       const bytes = await ops.rotatePages(await makeDoc(1), [0], rotation);
-      const out = await ops.exportWithAnnotations(bytes, [all], { includeRedactions: true });
-      const doc = await PDFDocument.load(out);
-      // The sticky note is written as a real /Text annotation.
-      expect(doc.getPage(0).node.Annots()?.size()).toBe(1);
+      const out = await ops.exportWithAnnotations(bytes, [withImage], { flatten: true, burnRedactions: true });
+      expect(await subtypes(out)).toEqual([]);
+    });
+
+    it(`writes native annotations that round-trip losslessly at ${rotation}°`, async () => {
+      const bytes = await ops.rotatePages(await makeDoc(1), [0], rotation);
+      const out = await ops.exportWithAnnotations(bytes, [withImage]);
+      expect(await subtypes(out)).toEqual([
+        '/Highlight', '/Underline', '/Ink', '/Square', '/Circle', '/Line', '/FreeText', '/Text', '/Stamp', '/Redact', '/Stamp',
+      ]);
+      const back = await ops.importForEditing(out, () => 'new');
+      expect(back.count).toBe(withImage.length);
+      expect(back.annotations[0]).toEqual(withImage);
+      // Imported annotations are removed from the page so they are not drawn twice.
+      expect(await subtypes(back.bytes)).toEqual([]);
     });
   }
+
+  it('follows a move made by another editor', async () => {
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [[all[3]]]);
+    const doc = await PDFDocument.load(out);
+    const dict = doc.context.lookup(doc.getPage(0).node.Annots()!.get(0)) as PDFDict;
+    const r = (dict.get(PDFName.of('Rect')) as PDFArray).asArray().map((x) => (x as PDFNumber).asNumber());
+    dict.set(PDFName.of('Rect'), doc.context.obj([r[0] + 10, r[1] - 5, r[2] + 10, r[3] - 5]));
+    dict.set(PDFName.of('Contents'), PDFHexString.fromText('edited elsewhere'));
+    const back = await ops.importForEditing(await doc.save(), () => 'x');
+    expect(back.annotations[0][0]).toMatchObject({ type: 'rect', rect: { x: 60, y: 45, w: 30, h: 30 }, comment: 'edited elsewhere' });
+  });
+
+  it('imports standard annotations written by other software', async () => {
+    const doc = await PDFDocument.load(await makeDoc(1));
+    const page = doc.getPage(0);
+    const add = (o: Record<string, unknown>) => page.node.addAnnot(doc.context.register(doc.context.obj({ Type: 'Annot', ...o } as never)));
+    add({ Subtype: 'Highlight', Rect: [10, 10, 60, 22], QuadPoints: [10, 22, 60, 22, 10, 10, 60, 10], C: [1, 1, 0], T: PDFHexString.fromText('Ann'), Contents: PDFHexString.fromText('Look'), M: PDFString.of("D:20240102030405Z") });
+    add({ Subtype: 'FreeText', Rect: [20, 100, 150, 140], Contents: PDFHexString.fromText('Typewriter'), DA: PDFString.of('/Helv 10 Tf 0 0 1 rg') });
+    add({ Subtype: 'Line', Rect: [0, 0, 100, 100], L: [0, 0, 100, 100], LE: ['None', 'OpenArrow'], BS: { W: 3 }, C: [0, 0, 1] });
+    add({ Subtype: 'Square', Rect: [50, 50, 80, 80], BS: { W: 2 }, C: [1, 0, 0], IC: [0, 1, 0] });
+    add({ Subtype: 'Ink', Rect: [0, 0, 10, 10], InkList: [[1, 1, 5, 5, 9, 1]], C: [0, 0, 0] });
+    add({ Subtype: 'Text', Rect: [150, 270, 170, 290], Contents: PDFHexString.fromText('note'), C: [1, 0.8, 0] });
+    add({ Subtype: 'Link', Rect: [0, 0, 10, 10] });
+    const back = await ops.importForEditing(await doc.save(), () => 'gen');
+    expect(back.count).toBe(6);
+    expect(back.annotations[0].map((a) => a.type)).toEqual(['highlight', 'text', 'arrow', 'rect', 'ink', 'note']);
+    expect(back.annotations[0][0]).toMatchObject({ color: '#ffff00', author: 'Ann', comment: 'Look', createdAt: Date.UTC(2024, 0, 2, 3, 4, 5), rects: [{ x: 10, y: 10, w: 50, h: 12 }] });
+    expect(back.annotations[0][1]).toMatchObject({ text: 'Typewriter', fontSize: 10, color: '#0000ff', rect: { x: 20, y: 100, w: 130, h: 40 } });
+    expect(back.annotations[0][3]).toMatchObject({ rect: { x: 51, y: 51, w: 28, h: 28 }, width: 2, fill: '#00ff00' });
+    expect(back.annotations[0][5]).toMatchObject({ at: { x: 150, y: 290 }, text: 'note' });
+    // The link is not editable and stays in the document.
+    expect(await subtypes(back.bytes)).toEqual(['/Link']);
+  });
 
   it('replaces pages with images', async () => {
     // 1x1 transparent PNG

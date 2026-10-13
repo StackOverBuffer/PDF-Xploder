@@ -90,6 +90,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Btn icon={<FolderOpen size={I} />} label="Open" onClick={cmd.openFromDialog} />
               <Btn icon={<Save size={I} />} label="Save" disabled={noDoc} onClick={cmd.save} />
               <Btn icon={<SaveAll size={I} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
+              <Btn icon={<Layers size={I} />} label="Save flattened" title="Save a copy with comments burnt into the pages" disabled={noDoc} onClick={cmd.saveFlattenedCopy} />
               <Btn icon={<X size={I} />} label="Close" disabled={noDoc} onClick={() => (!S().dirty || confirm('Discard unsaved changes?')) && S().closeDocument()} />
             </Group>
             <Group label="Output">

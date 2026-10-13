@@ -1,5 +1,5 @@
 import { PDFDocument, PDFHexString, PDFName, PDFRef, StandardFonts, rgb } from 'pdf-lib';
-import { wrapText } from './pdfOps';
+import { singleFontEngine, wrapLines } from './appearance';
 
 /** A small multi-page document with text, a form and bookmarks, for trying the editor out. */
 export async function createSampleDocument(): Promise<Uint8Array> {
@@ -29,9 +29,9 @@ export async function createSampleDocument(): Promise<Uint8Array> {
     page.drawRectangle({ x: 0, y: 781.89, width: 595.28, height: 60, color: rgb(0.11, 0.3, 0.6) });
     page.drawText('Awesome PDF', { x: 50, y: 805, size: 20, font: bold, color: rgb(1, 1, 1) });
     page.drawText(s.title, { x: 50, y: 720, size: 24, font: bold, color: rgb(0.1, 0.1, 0.1) });
-    wrapText(font, s.body, 13, 495).forEach((line, k) => page.drawText(line, { x: 50, y: 680 - k * 20, size: 13, font, color: rgb(0.2, 0.2, 0.2) }));
+    wrapLines(singleFontEngine(font), s.body, 13, 495).forEach((line, k) => page.drawText(line, { x: 50, y: 680 - k * 20, size: 13, font, color: rgb(0.2, 0.2, 0.2) }));
     const filler = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';
-    wrapText(font, filler.repeat(3), 11, 495).forEach((line, k) => page.drawText(line, { x: 50, y: 520 - k * 16, size: 11, font, color: rgb(0.35, 0.35, 0.35) }));
+    wrapLines(singleFontEngine(font), filler.repeat(3), 11, 495).forEach((line, k) => page.drawText(line, { x: 50, y: 520 - k * 16, size: 11, font, color: rgb(0.35, 0.35, 0.35) }));
     page.drawText(`Page ${i + 1} of ${sections.length}`, { x: 260, y: 30, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
   });
 

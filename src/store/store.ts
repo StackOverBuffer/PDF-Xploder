@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
-import { load as loadPdfLib } from '../lib/pdfOps';
+import { importForEditing, load as loadPdfLib } from '../lib/pdfOps';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -220,6 +220,23 @@ export const useStore = create<Store>()((set, get) => {
       } catch {
         editable = false;
       }
+      const pageIds = loaded.geoms.map(() => uid('page'));
+      const annotations: Record<string, Annotation[]> = {};
+      if (editable) {
+        // Existing comments become editable: they move from the file into the model.
+        try {
+          const imp = await importForEditing(bytes, () => uid('annot'));
+          if (imp.count) {
+            const reloaded = await loadPdfJs(imp.bytes);
+            loaded.pdf.destroy();
+            loaded = reloaded;
+            bytes = imp.bytes;
+            imp.annotations.forEach((list, i) => list.length && (annotations[pageIds[i]] = list));
+          }
+        } catch (e) {
+          console.warn('Could not import annotations', e);
+        }
+      }
       get().pdf?.destroy();
       set({
         ...initialDoc,
@@ -227,7 +244,8 @@ export const useStore = create<Store>()((set, get) => {
         fileName: name,
         pdf: loaded.pdf,
         geoms: loaded.geoms,
-        pageIds: loaded.geoms.map(() => uid('page')),
+        pageIds,
+        annotations,
         editable,
         docVersion: get().docVersion + 1,
         fit: 'width',
