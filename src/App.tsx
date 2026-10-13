@@ -59,8 +59,8 @@ function useShortcuts() {
         if (k === '-') return run(() => s.setScale(s.scale / 1.2));
         if (k === '0') return run(() => s.setScale(s.scale, 'width'));
         if (typing) return;
-        if (k === 'z' && !e.shiftKey) return run(() => s.undo());
-        if (k === 'y' || (k === 'z' && e.shiftKey)) return run(() => s.redo());
+        if (k === 'z' && !e.shiftKey) return run(() => s.run('Undoing…', () => s.undo()));
+        if (k === 'y' || (k === 'z' && e.shiftKey)) return run(() => s.run('Redoing…', () => s.redo()));
         return;
       }
       if (typing || !s.pdf) return;

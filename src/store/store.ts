@@ -73,6 +73,11 @@ interface State {
   /** Form design mode: fields can be selected, moved, resized and edited. */
   formDesign: boolean;
   selectedField: { name: string; widget: number } | null;
+  /** Page-content editing (Edit objects tool). */
+  contentFilter: 'all' | 'text' | 'image' | 'shape';
+  contentSelection: { page: number; ids: number[] } | null;
+  /** Inline text editor: an existing line (id) or new text at a user-space point. */
+  contentEditing: { page: number; id?: number; at?: { x: number; y: number } } | null;
   /** Bumped whenever `pdf` is replaced, so caches can be invalidated. */
   docVersion: number;
   editable: boolean;
@@ -163,6 +168,8 @@ const initialDoc = {
   fields: [],
   formValues: {},
   selectedField: null,
+  contentSelection: null,
+  contentEditing: null,
   originalBytes: null,
   encryption: null,
   security: null,
@@ -250,6 +257,7 @@ export const useStore = create<Store>()((set, get) => {
     author: readAuthor(),
     highlightFields: true,
     formDesign: false,
+    contentFilter: 'all',
     sidebar: 'pages',
 
     async openDocument(bytes, name, opts = {}) {
@@ -463,7 +471,14 @@ export const useStore = create<Store>()((set, get) => {
 
     markSaved: () => set({ dirty: false }),
 
-    setTool: (tool) => set({ ...leaveEditing(null), tool, selected: tool === 'select' ? get().selected : null }),
+    setTool: (tool) =>
+      set({
+        ...leaveEditing(null),
+        tool,
+        selected: tool === 'select' ? get().selected : null,
+        contentSelection: tool === 'content' ? get().contentSelection : null,
+        contentEditing: null,
+      }),
     setStyle: (tool, patch) => set({ styles: { ...get().styles, [tool]: { ...get().styles[tool], ...patch } } }),
     setScale: (scale, fit = null) => set({ scale: Math.min(8, Math.max(0.1, scale)), fit }),
     setCurrentPage: (currentPage) => set({ currentPage }),

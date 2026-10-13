@@ -74,12 +74,17 @@ created at, and turn with the page like printed content would.
 - ⬜ Resize pages / change page boxes, N-up, interleave/merge odd–even scans
 
 ### Edit content
-- ✅ Add text boxes, images and signatures (draw, type, or upload)
-- ✅ Watermarks (text, size, colour, opacity, angle, page range)
-- ✅ Headers/footers with page numbers, dates, title and Bates numbering
+- ✅ **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several
+- ✅ Move (drag, arrow keys; Shift = 10 pt / constrain), resize with handles (Shift keeps proportions), rotate with the green handle (Shift snaps to 15°), rotate ±90°, flip, numeric position/size/rotation
+- ✅ Arrange: bring to front/forward, send backward/to back; align left/centre/right/top/middle/bottom (to the selection, or to the page for one object); distribute; same width/height
+- ✅ Edit existing text in place (double-click a line): the original font is kept when it has the characters, otherwise Noto Sans is used; change font, size, colour, character and word spacing, horizontal scale, baseline shift
+- ✅ Shapes: fill and stroke colour (or none), line width; images: replace (scaled to the original's size), export any selection as a 300 dpi PNG; remove clipping paths; duplicate (Ctrl+D) and delete
+- ✅ Add text, images, rectangles, ellipses and lines to the page content itself
+- ✅ Add text boxes, images and signatures as comments; watermarks; headers/footers with page numbers, dates, title and Bates numbering
 - ✅ Unicode text: Latin, Greek, Cyrillic, symbols and, when online, Chinese, Japanese and Korean
-- ⬜ Edit existing page text and images in place
-- ⬜ Background colours/images, add shapes as page content (non-annotation)
+- ⬜ Paragraph editing with reflow across lines, editing inside form XObjects, editing path points, convert text to curves
+
+How it works: `src/lib/content/` parses the content stream, interprets it with a full graphics state and cuts it into objects (text lines, paths, images, form XObjects, shadings). Each object is written back as a self-contained `q … Q` block carrying its own CTM, clipping paths, graphics state and marked content, so it can be changed independently. Before the first edit of a page the app rewrites it without changes and compares renderings; if it cannot reproduce the page exactly it asks before editing.
 
 ### Forms
 - ✅ Fill text fields, checkboxes, radio buttons, dropdowns and list boxes directly on the page or in the Form fields pane (undoable, saved with the document; Unicode values supported)
@@ -122,3 +127,5 @@ created at, and turn with the page like printed content would.
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
 `V` select · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
+
+Edit objects tool: arrow keys nudge (Shift ×10) · `Del` delete · `Ctrl+D` duplicate · `Ctrl+A` select all on the page · double-click text to edit · `Esc` deselect

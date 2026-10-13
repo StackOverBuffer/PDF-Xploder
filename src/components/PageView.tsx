@@ -4,6 +4,7 @@ import { useStore } from '../store/store';
 import { viewSize } from '../lib/geometry';
 import { AnnotationLayer } from './AnnotationLayer';
 import { WidgetLayer } from './WidgetLayer';
+import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
 
 interface Props {
@@ -18,6 +19,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   const geom = useStore((s) => s.geoms[index]);
   const pageId = useStore((s) => s.pageIds[index]);
   const scale = useStore((s) => s.scale);
+  const contentTool = useStore((s) => s.tool.startsWith('content'));
   const canvasHost = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const rendered = useRef<string>('');
@@ -84,6 +86,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
       <div className="textLayer" ref={textRef} />
       {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
       {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}
+      {visible && contentTool && <ContentLayer index={index} geom={geom} scale={scale} width={w} height={h} />}
       <div className="page-label">{index + 1}</div>
     </div>
   );

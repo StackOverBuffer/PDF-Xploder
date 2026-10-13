@@ -3,6 +3,38 @@ import { useStore, type ToolStyle } from '../store/store';
 import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
+import { ContentProperties } from './ContentProperties';
+
+function ContentToolHelp() {
+  const tool = useStore((s) => s.tool);
+  const filter = useStore((s) => s.contentFilter);
+  const style = useStore((s) => (s.tool === 'contentText' ? s.styles.text : s.styles.rect));
+  const hint: Record<string, string> = {
+    content: 'Click an object on the page to select it, or drag around several. Double-click text to edit it.',
+    contentText: 'Click on the page where the new text should start, type, then press Enter.',
+    contentRect: 'Drag to draw a rectangle into the page content.',
+    contentEllipse: 'Drag to draw an ellipse into the page content.',
+    contentLine: 'Drag to draw a line into the page content.',
+  };
+  return (
+    <div className="props-body">
+      <div className="props-head"><b>Edit page content</b></div>
+      <p className="muted small">{hint[tool]}</p>
+      {tool === 'content' && (
+        <label className="prop">
+          <span className="prop-label">Select</span>
+          <select value={filter} onChange={(e) => useStore.setState({ contentFilter: e.target.value as typeof filter, contentSelection: null })}>
+            <option value="all">All content</option><option value="text">Text only</option><option value="image">Images only</option><option value="shape">Shapes only</option>
+          </select>
+        </label>
+      )}
+      {tool !== 'content' && (
+        <StyleEditor type={tool === 'contentText' ? 'text' : 'rect'} style={style} onChange={(p) => useStore.getState().setStyle(tool === 'contentText' ? 'text' : 'rect', p)} />
+      )}
+      <p className="muted small">Changes are made to the page itself (not as comments) and can be undone with Ctrl+Z.</p>
+    </div>
+  );
+}
 import type { Annotation } from '../lib/types';
 
 export const STAMPS = ['Approved', 'Not Approved', 'Draft', 'Final', 'Confidential', 'For Comment', 'Void', 'Received', 'Reviewed', 'Rejected'];
@@ -162,12 +194,17 @@ export function PropertiesPanel() {
   const a = useStore((s) => (s.selected ? s.annotations[s.selected.pageId]?.find((x) => x.id === s.selected!.id) : undefined));
   const style = useStore((s) => s.styles[tool]);
   const author = useStore((s) => s.author);
+  const contentSel = useStore((s) => s.contentSelection);
   const field = useStore((s) => (s.selectedField ? s.fields.find((f) => f.name === s.selectedField!.name) : undefined));
 
   return (
     <aside className="props">
       <div className="panel-title">Properties</div>
-      {field ? (
+      {contentSel && tool === 'content' ? (
+        <ContentProperties />
+      ) : tool.startsWith('content') ? (
+        <ContentToolHelp />
+      ) : field ? (
         <FieldProperties field={field} />
       ) : sel && a ? (
         <AnnotationProps pageId={sel.pageId} a={a} />

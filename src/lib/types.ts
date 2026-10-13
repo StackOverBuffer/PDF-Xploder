@@ -138,6 +138,12 @@ export type Tool =
   | 'fieldCheckbox'
   | 'fieldDropdown'
   | 'fieldList'
-  | 'fieldRadio';
+  | 'fieldRadio'
+  /** Page content: select and edit objects; add text and shapes as content. */
+  | 'content'
+  | 'contentText'
+  | 'contentRect'
+  | 'contentEllipse'
+  | 'contentLine';
 
 export const NOTE_SIZE = 20;

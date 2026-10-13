@@ -451,3 +451,24 @@ export async function addRadioButton(name: string) {
   if (!requirePermission('designForms')) return;
   await S().run('Adding button…', async () => S().commitBytes(await forms.addRadioOption(S().bytes!, name)));
 }
+
+// ---------------------------------------------------------------- page content
+
+/** Add an image to the page content (not as an annotation), centred on the current page. */
+export async function addContentImage() {
+  if (!requirePermission('modify')) return;
+  const [f] = await pickFile('image/*');
+  if (!f) return;
+  const img = await normaliseImage(await readAsDataUrl(f));
+  const s = S();
+  const index = s.currentPage;
+  const g = s.geoms[index];
+  const vs = viewSize(g);
+  const k = Math.min((vs.width * 0.6) / img.width, (vs.height * 0.6) / img.height, 0.75);
+  const w = img.width * k;
+  const h = img.height * k;
+  const rect = viewRectToPdf(g, { left: (vs.width - w) / 2, top: (vs.height - h) / 2, width: w, height: h });
+  const { applyContentEdits, imageBytes } = await import('./content');
+  s.setTool('content');
+  await applyContentEdits(index, [{ type: 'addImage', rect, image: imageBytes(img.src) }]);
+}

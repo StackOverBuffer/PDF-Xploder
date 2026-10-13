@@ -4,7 +4,7 @@ import {
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, ListChecks, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed, useCan } from '../store/permissions';
@@ -37,8 +37,9 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 function ToolBtn({ tool, icon, label }: { tool: Tool; icon: ReactNode; label: string }) {
   const current = useStore((s) => s.tool);
   const hasDoc = useStore((s) => !!s.pdf);
-  const viewOnly = tool === 'select' || tool === 'hand';
-  const permitted = useStore((s) => allowed(s, tool === 'sign' ? 'fillForms' : tool.startsWith('field') ? 'designForms' : 'annotate'));
+  // Selecting page content is fine read-only (e.g. to export an image).
+  const viewOnly = tool === 'select' || tool === 'hand' || tool === 'content';
+  const permitted = useStore((s) => allowed(s, tool === 'sign' ? 'fillForms' : tool.startsWith('field') ? 'designForms' : tool.startsWith('content') ? 'modify' : 'annotate'));
   return (
     <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !permitted)} onClick={() => {
       useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool);
@@ -77,6 +78,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const canSign = useCan('fillForms');
   const canDesign = useCan('designForms');
   const formDesign = useStore((s) => s.formDesign);
+  const contentFilter = useStore((s) => s.contentFilter);
   const highlightFields = useStore((s) => s.highlightFields);
 
   return (
@@ -87,8 +89,8 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <button title="Open (Ctrl+O)" onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
           <button title="Save (Ctrl+S)" disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>
           <button title="Print (Ctrl+P)" disabled={!canPrint} onClick={cmd.print}><Printer size={16} /></button>
-          <button title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => S().undo()}><Undo2 size={16} /></button>
-          <button title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={() => S().redo()}><Redo2 size={16} /></button>
+          <button title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => S().run('Undoing…', () => S().undo())}><Undo2 size={16} /></button>
+          <button title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={() => S().run('Redoing…', () => S().redo())}><Redo2 size={16} /></button>
         </div>
         <div className="doc-title">{fileName ? `${fileName}${dirty ? ' •' : ''}` : ''}{hasDoc && !editable ? ' (read-only)' : ''}</div>
       </div>
@@ -198,8 +200,21 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
         )}
         {tab === 'Edit' && (
           <>
-            <Group label="Add content">
-              <ToolBtn tool="text" icon={<Type size={I} />} label="Text" />
+            <Group label="Edit content">
+              <ToolBtn tool="content" icon={<SquareDashedMousePointer size={I} />} label="Edit objects" />
+              <select className="rselect" title="What the Edit objects tool selects" disabled={!hasDoc} value={contentFilter} onChange={(e) => { useStore.setState({ contentFilter: e.target.value as typeof contentFilter, contentSelection: null }); S().setTool('content'); }}>
+                <option value="all">All</option><option value="text">Text</option><option value="image">Images</option><option value="shape">Shapes</option>
+              </select>
+            </Group>
+            <Group label="Add to page">
+              <ToolBtn tool="contentText" icon={<TypeOutline size={I} />} label="Text" />
+              <Btn icon={<ImagePlus size={I} />} label="Image" disabled={!canModify} onClick={cmd.addContentImage} />
+              <ToolBtn tool="contentRect" icon={<Square size={I} />} label="Rectangle" />
+              <ToolBtn tool="contentEllipse" icon={<Circle size={I} />} label="Ellipse" />
+              <ToolBtn tool="contentLine" icon={<Minus size={I} />} label="Line" />
+            </Group>
+            <Group label="Comments">
+              <ToolBtn tool="text" icon={<Type size={I} />} label="Text box" />
               <Btn icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
               <Btn icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
             </Group>
