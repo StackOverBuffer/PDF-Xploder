@@ -70,6 +70,9 @@ interface State {
   /** Form values edited since the bytes were last written; applied on save. */
   formValues: Record<string, FieldValue>;
   highlightFields: boolean;
+  /** Form design mode: fields can be selected, moved, resized and edited. */
+  formDesign: boolean;
+  selectedField: { name: string; widget: number } | null;
   /** Bumped whenever `pdf` is replaced, so caches can be invalidated. */
   docVersion: number;
   editable: boolean;
@@ -159,6 +162,7 @@ const initialDoc = {
   annotations: {},
   fields: [],
   formValues: {},
+  selectedField: null,
   originalBytes: null,
   encryption: null,
   security: null,
@@ -245,6 +249,7 @@ export const useStore = create<Store>()((set, get) => {
     styles: DEFAULT_STYLES,
     author: readAuthor(),
     highlightFields: true,
+    formDesign: false,
     sidebar: 'pages',
 
     async openDocument(bytes, name, opts = {}) {
@@ -466,7 +471,7 @@ export const useStore = create<Store>()((set, get) => {
       const p = Math.max(0, Math.min(page, get().pageIds.length - 1));
       set({ currentPage: p, scrollRequest: { page: p, y, nonce: Math.random() } });
     },
-    select: (selected) => set({ ...leaveEditing(selected?.id === get().editing ? get().editing : null), selected }),
+    select: (selected) => set({ ...leaveEditing(selected?.id === get().editing ? get().editing : null), selected, selectedField: selected ? null : get().selectedField }),
     setEditing: (editing) => set(leaveEditing(editing)),
     setSelectedPages: (selectedPages) => set({ selectedPages }),
     setSidebar: (sidebar) => set({ sidebar }),

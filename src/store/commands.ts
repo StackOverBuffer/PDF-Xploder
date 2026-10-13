@@ -1,5 +1,6 @@
 /** User-level commands: glue between UI, the store and pdf operations. */
 import * as ops from '../lib/pdfOps';
+import * as forms from '../lib/forms';
 import { annotationsByPage, uid, useStore } from './store';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
@@ -7,7 +8,7 @@ import { encrypt, reencryptLike } from '../lib/security';
 import { requirePermission } from './permissions';
 import { signPdf, type SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
-import type { Annotation } from '../lib/types';
+import type { Annotation, Rect } from '../lib/types';
 
 const S = () => useStore.getState();
 
@@ -397,4 +398,56 @@ export async function signDocument(o: SignOptions) {
     S().setSidebar('signatures');
     S().notify('Signed and saved. Further changes will invalidate the signature unless you sign again.');
   });
+}
+
+// ---------------------------------------------------------------- form design
+
+/** Pending (unsaved) form values follow renamed fields and are dropped for deleted ones. */
+function moveFormValue(from: string, to: string | null): Record<string, ops.FieldValue> {
+  const values = { ...S().formValues };
+  if (from in values) {
+    if (to) values[to] = values[from];
+    delete values[from];
+  }
+  return values;
+}
+
+export async function addField(kind: forms.NewFieldKind, page: number, rect: Rect) {
+  if (!requirePermission('designForms')) return;
+  await S().run('Adding field…', async () => {
+    const { bytes, name } = await forms.createField(S().bytes!, kind, page, rect);
+    await S().commitBytes(bytes);
+    useStore.setState({ formDesign: true, selectedField: { name, widget: 0 }, selected: null });
+  });
+}
+
+export async function updateFieldProps(name: string, patch: forms.FieldPatch) {
+  if (!requirePermission('designForms')) return;
+  await S().run('Updating field…', async () => {
+    const bytes = await forms.updateField(S().bytes!, name, patch);
+    const parent = name.includes('.') ? name.slice(0, name.lastIndexOf('.') + 1) : '';
+    const newName = patch.name && patch.name !== name ? parent + patch.name.trim() : name;
+    await S().commitBytes(bytes, undefined, undefined, newName !== name ? moveFormValue(name, newName) : undefined);
+    const sel = S().selectedField;
+    if (sel?.name === name) useStore.setState({ selectedField: { ...sel, name: newName } });
+  });
+}
+
+export async function deleteField(name: string) {
+  if (!requirePermission('designForms')) return;
+  if (!confirm(`Delete the form field “${name}”?`)) return;
+  await S().run('Deleting field…', async () => {
+    await S().commitBytes(await forms.deleteField(S().bytes!, name), undefined, undefined, moveFormValue(name, null));
+    useStore.setState({ selectedField: null });
+  });
+}
+
+export async function moveFieldWidget(name: string, widget: number, rect: Rect) {
+  if (!requirePermission('designForms')) return;
+  await S().run('Moving field…', async () => S().commitBytes(await forms.setWidgetRect(S().bytes!, name, widget, rect)));
+}
+
+export async function addRadioButton(name: string) {
+  if (!requirePermission('designForms')) return;
+  await S().run('Adding button…', async () => S().commitBytes(await forms.addRadioOption(S().bytes!, name)));
 }

@@ -1,7 +1,9 @@
 import { memo, useEffect, useState } from 'react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
-import { pdfRectToView } from '../lib/geometry';
+import { pdfRectToView, viewRectToPdf, type VRect } from '../lib/geometry';
+import { Lock } from 'lucide-react';
+import { moveFieldWidget } from '../store/commands';
 import { resolveDest, type PDFDocumentProxy } from '../lib/pdfjs';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import type { PageGeom, Rect } from '../lib/types';
@@ -89,6 +91,8 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
     };
   }, [pdf, index]);
 
+  const design = useStore((s) => s.formDesign);
+  if (design) return <DesignLayer index={index} geom={geom} scale={scale} />;
   if (!items.length) return null;
   const byName = new Map(fields.map((f) => [f.name, f]));
 
@@ -169,4 +173,70 @@ function Widget({ a, f, value, disabled, style, scale }: { a: AnnotData; f: Fiel
     );
   }
   return null;
+}
+
+type DragState = { name: string; widget: number; mode: 'move' | 'resize'; x: number; y: number; orig: VRect; dx: number; dy: number; moved: boolean };
+
+/** Form design: every field widget on the page as a selectable, movable box. */
+function DesignLayer({ index, geom, scale }: Props) {
+  const fields = useStore((s) => s.fields);
+  const selected = useStore((s) => s.selectedField);
+  const canDesign = useCan('designForms');
+  const [drag, setDrag] = useState<DragState | null>(null);
+
+  const boxes = fields.flatMap((f) => f.widgets.map((w, i) => ({ f, i, w })).filter(({ w }) => w.page === index));
+
+  const start = (e: React.PointerEvent, name: string, widget: number, orig: VRect, mode: 'move' | 'resize', locked: boolean) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    useStore.setState({ selectedField: { name, widget }, selected: null });
+    if (!canDesign || locked) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ name, widget, mode, x: e.clientX, y: e.clientY, orig, dx: 0, dy: 0, moved: false });
+  };
+  const move = (e: React.PointerEvent) => {
+    if (!drag) return;
+    const dx = (e.clientX - drag.x) / scale;
+    const dy = (e.clientY - drag.y) / scale;
+    setDrag({ ...drag, dx, dy, moved: drag.moved || Math.abs(dx) + Math.abs(dy) > 1 });
+  };
+  const end = () => {
+    if (!drag) return;
+    setDrag(null);
+    if (!drag.moved) return;
+    const v = rectAfter(drag);
+    moveFieldWidget(drag.name, drag.widget, viewRectToPdf(geom, v));
+  };
+
+  return (
+    <div className="widget-layer design" onPointerMove={move} onPointerUp={end} onPointerCancel={() => setDrag(null)}>
+      {boxes.map(({ f, i, w }) => {
+        const base = pdfRectToView(geom, w.rect);
+        const live = drag && drag.name === f.name && drag.widget === i ? rectAfter(drag) : base;
+        const isSel = selected?.name === f.name;
+        const locked = f.props.locked;
+        return (
+          <div
+            key={`${f.name}#${i}`}
+            className={`field-box kind-${f.kind} ${isSel ? 'selected' : ''} ${locked ? 'locked' : ''} ${f.readOnly ? 'readonly' : ''}`}
+            style={{ left: live.left * scale, top: live.top * scale, width: live.width * scale, height: live.height * scale }}
+            title={`${f.name} (${f.kind})${locked ? ' · locked' : ''}${f.props.readOnly ? ' · read-only' : ''}${f.props.required ? ' · required' : ''}`}
+            onPointerDown={(e) => start(e, f.name, i, base, 'move', locked)}
+          >
+            <span className="field-label">{locked && <Lock size={9} />}{f.name}{f.props.required ? ' *' : ''}</span>
+            {isSel && canDesign && !locked && (
+              <span className="field-handle" onPointerDown={(e) => start(e, f.name, i, base, 'resize', locked)} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function rectAfter(d: DragState): VRect {
+  return d.mode === 'move'
+    ? { ...d.orig, left: d.orig.left + d.dx, top: d.orig.top + d.dy }
+    : { ...d.orig, width: Math.max(6, d.orig.width + d.dx), height: Math.max(6, d.orig.height + d.dy) };
 }

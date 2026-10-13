@@ -6,6 +6,8 @@ import { hasRect, resizePatch, translatePatch, viewBounds } from '../lib/annotGe
 import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
+import { addField } from '../store/commands';
+import type { NewFieldKind } from '../lib/forms';
 
 interface Props {
   index: number;
@@ -16,7 +18,10 @@ interface Props {
   height: number;
 }
 
-const DRAW_TOOLS: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign'];
+const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
+  fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
+};
+const DRAW_TOOLS: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
 
 type Draft =
@@ -36,13 +41,15 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const selected = useStore((s) => (s.selected?.pageId === pageId ? s.selected.id : null));
   const editing = useStore((s) => s.editing);
   const editable = useCan('annotate');
+  const canDesign = useCan('designForms');
+  const canSign = useCan('fillForms');
   const hits = useStore((s) => s.search.hits);
   const hitIndex = useStore((s) => s.search.index);
   const svgRef = useRef<SVGSVGElement>(null);
   const [draft, setDraft] = useState<Draft>(null);
   const drag = useRef<Drag>(null);
 
-  const drawing = DRAW_TOOLS.includes(tool) && editable;
+  const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : editable);
 
   /** Pointer position in view space (scale 1). */
   const viewPt = (e: { clientX: number; clientY: number }): Pt => {
@@ -108,12 +115,24 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       store.addAnnotation(index, { ...base(tool), type: tool, width: st.width, p1: viewToPdf(geom, d.start), p2: viewToPdf(geom, d.end) });
       return;
     }
-    const defaults: Record<string, [number, number]> = { text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20], sign: [200, 60] };
+    const defaults: Record<string, [number, number]> = {
+      text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20], sign: [200, 60],
+      fieldText: [180, 22], fieldCheckbox: [14, 14], fieldRadio: [14, 14], fieldDropdown: [140, 22], fieldList: [140, 60],
+    };
     const [dw, dh] = defaults[tool] ?? [100, 70];
     const box: VRect = click
       ? { left: d.start.x, top: d.start.y, width: dw, height: dh }
       : { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy };
     const rect = viewRectToPdf(geom, box);
+    const fieldKind = FIELD_TOOLS[tool];
+    if (fieldKind) {
+      // Check boxes and radio buttons stay square.
+      const square = fieldKind === 'checkbox' || fieldKind === 'radio';
+      const r = square && !click ? viewRectToPdf(geom, { ...box, width: Math.min(box.width, box.height), height: Math.min(box.width, box.height) }) : rect;
+      store.setTool('select');
+      addField(fieldKind, index, r);
+      return;
+    }
     switch (tool) {
       case 'sign':
         store.setTool('select');
@@ -192,6 +211,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       if (useStore.getState().tool === 'select' && !(e.target as Element).closest('.annot')) {
         const s = useStore.getState();
         if (s.selected?.pageId === pageId) s.select(null);
+        if (s.selectedField && !(e.target as Element).closest('.field-box')) useStore.setState({ selectedField: null });
       }
     };
     page.addEventListener('pointerdown', onDown);

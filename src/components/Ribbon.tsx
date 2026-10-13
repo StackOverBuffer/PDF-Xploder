@@ -4,7 +4,7 @@ import {
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, ListChecks, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, ListChecks, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed, useCan } from '../store/permissions';
@@ -39,7 +39,12 @@ function ToolBtn({ tool, icon, label }: { tool: Tool; icon: ReactNode; label: st
   const hasDoc = useStore((s) => !!s.pdf);
   const viewOnly = tool === 'select' || tool === 'hand';
   const permitted = useStore((s) => allowed(s, tool === 'sign' ? 'fillForms' : tool.startsWith('field') ? 'designForms' : 'annotate'));
-  return <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !permitted)} onClick={() => useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool)} />;
+  return (
+    <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !permitted)} onClick={() => {
+      useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool);
+      if (tool.startsWith('field')) useStore.setState({ formDesign: true });
+    }} />
+  );
 }
 
 function SidebarBtn({ tab, icon, label }: { tab: SidebarTab; icon: ReactNode; label: string }) {
@@ -70,6 +75,9 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const canPrint = useCan('print');
   const canAnnotate = useCan('annotate');
   const canSign = useCan('fillForms');
+  const canDesign = useCan('designForms');
+  const formDesign = useStore((s) => s.formDesign);
+  const highlightFields = useStore((s) => s.highlightFields);
 
   return (
     <header className="ribbon">
@@ -205,6 +213,18 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <>
             <Group label="Fill">
               <SidebarBtn tab="forms" icon={<FormInput size={I} />} label="Form fields" />
+              <Btn icon={<Highlighter size={I} />} label="Highlight" active={highlightFields} disabled={noDoc} onClick={() => useStore.setState({ highlightFields: !highlightFields })} />
+            </Group>
+            <Group label="Design">
+              <Btn icon={<PencilRuler size={I} />} label="Edit form" active={formDesign} disabled={!canDesign} title="Select, move and change form fields" onClick={() => useStore.setState({ formDesign: !formDesign, selectedField: null })} />
+              <ToolBtn tool="fieldText" icon={<TextCursorInput size={I} />} label="Text field" />
+              <ToolBtn tool="fieldCheckbox" icon={<SquareCheck size={I} />} label="Check box" />
+              <ToolBtn tool="fieldRadio" icon={<CircleDot size={I} />} label="Radio" />
+              <ToolBtn tool="fieldDropdown" icon={<ChevronDownSquare size={I} />} label="Dropdown" />
+              <ToolBtn tool="fieldList" icon={<List size={I} />} label="List box" />
+            </Group>
+            <Group label="Finish">
+              <Btn icon={<Layers size={I} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
             </Group>
           </>
         )}

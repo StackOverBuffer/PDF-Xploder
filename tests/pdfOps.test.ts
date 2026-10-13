@@ -96,7 +96,7 @@ describe('document operations', () => {
 
     const filled = await ops.setFormValues(bytes, { name: 'Ada', agree: true, color: 'blue' });
     const fields = await ops.getFormFields(filled);
-    expect(fields).toEqual([
+    expect(fields).toMatchObject([
       { kind: 'text', name: 'name', value: 'Ada', multiline: false, readOnly: false },
       { kind: 'checkbox', name: 'agree', value: true, readOnly: false },
       { kind: 'dropdown', name: 'color', value: 'blue', options: ['red', 'blue'], readOnly: false },

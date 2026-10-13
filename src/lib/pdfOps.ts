@@ -317,36 +317,9 @@ export async function setMetadata(bytes: Uint8Array, m: Metadata): Promise<Uint8
 
 // ---------------------------------------------------------------- forms
 
-export type FieldInfo =
-  | { kind: 'text'; name: string; value: string; multiline: boolean; readOnly: boolean }
-  | { kind: 'checkbox'; name: string; value: boolean; readOnly: boolean }
-  | { kind: 'radio' | 'dropdown'; name: string; value: string; options: string[]; readOnly: boolean }
-  | { kind: 'list'; name: string; value: string[]; options: string[]; readOnly: boolean }
-  | { kind: 'other'; name: string; readOnly: boolean };
-
-export async function getFormFields(bytes: Uint8Array): Promise<FieldInfo[]> {
-  const doc = await load(bytes);
-  return doc.getForm().getFields().map((f): FieldInfo => {
-    const name = f.getName();
-    const readOnly = f.isReadOnly();
-    if (f instanceof PDFTextField) {
-      return { kind: 'text', name, value: f.getText() ?? '', multiline: f.isMultiline(), readOnly };
-    }
-    if (f instanceof PDFCheckBox) return { kind: 'checkbox', name, value: f.isChecked(), readOnly };
-    if (f instanceof PDFRadioGroup) {
-      return { kind: 'radio', name, value: f.getSelected() ?? '', options: f.getOptions(), readOnly };
-    }
-    if (f instanceof PDFDropdown) {
-      return { kind: 'dropdown', name, value: f.getSelected()[0] ?? '', options: f.getOptions(), readOnly };
-    }
-    if (f instanceof PDFOptionList) {
-      return { kind: 'list', name, value: f.getSelected(), options: f.getOptions(), readOnly };
-    }
-    return { kind: 'other', name, readOnly };
-  });
-}
-
-export type FieldValue = string | boolean | string[];
+export { getFormFields, type FieldInfo } from './forms';
+import type { FieldValue } from './forms';
+export type { FieldValue };
 
 export async function setFormValues(
   bytes: Uint8Array,

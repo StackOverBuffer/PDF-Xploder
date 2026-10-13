@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import { useStore, type ToolStyle } from '../store/store';
 import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
+import { FieldProperties } from './FieldProperties';
 import type { Annotation } from '../lib/types';
 
 export const STAMPS = ['Approved', 'Not Approved', 'Draft', 'Final', 'Confidential', 'For Comment', 'Void', 'Received', 'Reviewed', 'Rejected'];
@@ -131,7 +132,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
 
 const TOOL_NAMES: Record<string, string> = {
   highlight: 'Highlight', underline: 'Underline', strikeout: 'Strikeout', ink: 'Pencil', rect: 'Rectangle', ellipse: 'Ellipse',
-  line: 'Line', arrow: 'Arrow', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature',
+  line: 'Line', arrow: 'Arrow', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature', fieldText: 'Text field', fieldCheckbox: 'Check box', fieldDropdown: 'Dropdown', fieldList: 'List box', fieldRadio: 'Radio button',
 };
 
 const TOOL_HINTS: Record<string, string> = {
@@ -146,6 +147,11 @@ const TOOL_HINTS: Record<string, string> = {
   text: 'Click or drag to place a text box, then type.',
   note: 'Click to place a sticky note.',
   stamp: 'Click or drag to place the stamp.',
+  fieldText: 'Drag a box for the new text field.',
+  fieldCheckbox: 'Click or drag to place a check box.',
+  fieldDropdown: 'Drag a box for the new dropdown.',
+  fieldList: 'Drag a box for the new list box.',
+  fieldRadio: 'Click to place a radio button; add more from its properties.',
   sign: 'Drag a box where the signature should appear.',
   redact: 'Drag over content to mark it for redaction.',
 };
@@ -156,11 +162,14 @@ export function PropertiesPanel() {
   const a = useStore((s) => (s.selected ? s.annotations[s.selected.pageId]?.find((x) => x.id === s.selected!.id) : undefined));
   const style = useStore((s) => s.styles[tool]);
   const author = useStore((s) => s.author);
+  const field = useStore((s) => (s.selectedField ? s.fields.find((f) => f.name === s.selectedField!.name) : undefined));
 
   return (
     <aside className="props">
       <div className="panel-title">Properties</div>
-      {sel && a ? (
+      {field ? (
+        <FieldProperties field={field} />
+      ) : sel && a ? (
         <AnnotationProps pageId={sel.pageId} a={a} />
       ) : style ? (
         <div className="props-body">

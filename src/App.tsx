@@ -64,10 +64,14 @@ function useShortcuts() {
         return;
       }
       if (typing || !s.pdf) return;
-      if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && s.selectedField && s.formDesign) {
+        e.preventDefault();
+        cmd.deleteField(s.selectedField.name);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) {
         e.preventDefault();
         s.deleteAnnotation(s.selected.pageId, s.selected.id);
       } else if (e.key === 'Escape') {
+        if (s.selectedField) useStore.setState({ selectedField: null });
         s.select(null);
         s.setTool('select');
       } else if (e.key === 'PageDown') {

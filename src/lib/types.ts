@@ -132,6 +132,12 @@ export type Tool =
   | 'stamp'
   | 'redact'
   /** Drag a box for a visible digital signature. */
-  | 'sign';
+  | 'sign'
+  /** Form design: drag a box to create a field of that kind. */
+  | 'fieldText'
+  | 'fieldCheckbox'
+  | 'fieldDropdown'
+  | 'fieldList'
+  | 'fieldRadio';
 
 export const NOTE_SIZE = 20;
