@@ -396,3 +396,9 @@ select.widget { padding: 0; }
 .stamp-thumb { width: 16px; height: 16px; object-fit: contain; }
 .stamp-preview { opacity: 0.6; pointer-events: none; }
 .annot-layer.drawing.tool-stamp { cursor: copy; }
+/* Ribbon squeezed to fit narrow windows */
+.rbody[data-compact="1"] .rgroup { padding: 0 2px; }
+.rbody[data-compact="1"] .rbtn.size-big { min-width: 44px; padding: 4px 2px 2px; font-size: 11px; }
+.rbody[data-compact="1"] .rbtn.size-small { padding: 2px 3px; font-size: 11.5px; gap: 3px; }
+.rgroup[data-icons] .rbtn.size-small .rlabel { display: none; }
+.rgroup[data-icons] .rbtn.size-small { width: auto; }

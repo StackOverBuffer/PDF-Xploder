@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
@@ -33,6 +33,29 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const lang = useLang((l) => l.lang);
   const setLang = useLang((l) => l.setLang);
   const [tab, setTab] = useState<TabName>('Home');
+  // Like PDF-XChange, squeeze the ribbon when the window is too narrow: first tighter buttons,
+  // then small buttons lose their labels group by group, from the right.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const fits = () => el.scrollWidth <= el.clientWidth + 1;
+    const fit = () => {
+      const groups = [...el.querySelectorAll<HTMLElement>(':scope > .rgroup')];
+      el.dataset.compact = '0';
+      groups.forEach((g) => delete g.dataset.icons);
+      if (fits()) return;
+      el.dataset.compact = '1';
+      for (const g of groups.reverse()) {
+        if (fits()) return;
+        if (g.querySelector('.rbtn.size-small .rlabel')) g.dataset.icons = '';
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab, lang]);
   const hasDoc = useStore((s) => !!s.pdf);
   const editable = useStore((s) => s.editable);
   const canUndo = useStore((s) => s.past.length > 0);
@@ -103,7 +126,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <button key={n} role="tab" aria-selected={tab === n} className={`rtab ${tab === n ? 'active' : ''} ${n === 'File' ? 'file' : ''}`} onClick={() => setTab(n)}>{t(n)}</button>
         ))}
       </nav>
-      <div className="rbody" role="tabpanel">
+      <div className="rbody" role="tabpanel" ref={bodyRef}>
         {tab === 'File' && (
           <>
             <Group label="Document">
