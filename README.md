@@ -1,5 +1,7 @@
 # PDF-Xploder
 
+**▶ Open the app: <https://stackoverbuffer.github.io/PDF-Xploder/>**
+
 A browser-based PDF editor aiming for feature parity with **PDF-XChange Editor**.
 Everything runs client-side: documents are never uploaded anywhere.
 
@@ -18,7 +20,7 @@ Click **Try a sample** on the start screen for a document with text, a form and 
 repository's default branch is pushed (or when run manually from the Actions tab). One-time
 setup: in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**. The site
 is then served at `https://<owner>.github.io/<repo>/`; the build picks up that sub-path through
-the `BASE_PATH` environment variable (`BASE_PATH=/awesome-pdf/ npm run build` reproduces it locally).
+the `BASE_PATH` environment variable (`BASE_PATH=/PDF-Xploder/ npm run build` reproduces it locally).
 
 ## Architecture
 
@@ -39,6 +41,8 @@ rotated or cropped. Text, stamps, images and text markup also remember the page 
 created at, and turn with the page like printed content would.
 
 ## Feature status vs. PDF-XChange Editor
+
+The full list of PDF-XChange Editor features and their status is in [ROADMAP.md](ROADMAP.md).
 
 ✅ done · 🟡 partial · ⬜ not started
 
