@@ -10,8 +10,9 @@ import type { CheckResult } from '../lib/accessibility';
 import { tf, tr, useLang, useT } from '../lib/i18n';
 import { BarcodesDialog, RecompressDialog } from './ContentDialogs';
 import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
+import { OrganizeDialog, type OrganizeDialogName } from './OrganizeDialogs';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes';
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | OrganizeDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -384,6 +385,10 @@ export function Dialogs() {
     case 'recompress': return <RecompressDialog close={close} />;
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
+    case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
+    case 'orgDuplicate': case 'orgReplace': case 'orgSwap': case 'orgOverlay': case 'orgNormalize': case 'orgFindDuplicates': case 'orgRotate': case 'orgCrop':
+    case 'orgAutoCrop': case 'orgResize': case 'orgMargins': case 'orgWatermark': case 'orgBackground': case 'orgHeaderFooter': case 'orgBates': case 'orgPageLabels':
+      return <OrganizeDialog name={open} close={close} />;
     default: return null;
   }
 }

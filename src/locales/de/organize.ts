@@ -1,5 +1,120 @@
 /** German strings: Document organisation: Organize tab, its menus and dialogs. Keys are the English text. */
 const DE: Record<string, string> = {
+  // ribbon: groups and buttons
+  'Page Shape': 'Form der Seite ändern', 'Other Tools': 'Andere Werkzeuge',
+  'Blank Pages…': 'Leere Seiten…', 'Pages from File…': 'Seiten aus Datei…', 'Images as Pages…': 'Bilder als Seiten…',
+  'Page from Clipboard Image': 'Seite aus Bild in der Zwischenablage', 'Delete Pages…': 'Seiten löschen…', 'Delete Blank Pages': 'Leere Seiten löschen',
+  'Extract Pages': 'Seiten extrahieren', 'Move Pages': 'Seiten verschieben', 'Merge Pages': 'Seiten zusammenführen', 'Split Document': 'Aufteilen',
+  'By Number of Pages…': 'Nach Seitenanzahl…', 'Into Single Pages…': 'In einzelne Seiten…', 'By Page Ranges…': 'Nach Seitenbereichen…',
+  'By Bookmarks…': 'Nach Lesezeichen…', 'By File Size…': 'Nach Dateigröße…', 'Duplicate Pages': 'Seiten duplizieren',
+  'Replace Pages': 'Seiten ersetzen', 'Swap Pages': 'Seiten austauschen', 'Overlay Pages': 'Überlagern', 'Normalize Pages': 'Seiten normalisieren',
+  'Find Duplicates': 'Duplikate finden', 'Reverse Order': 'Seitenreihenfolge umkehren',
+  'Reverse the order of the selected pages (or of all pages)': 'Reihenfolge der markierten Seiten (oder aller Seiten) umkehren',
+  'Rotate 180°': 'Um 180° drehen', 'Rotate Pages…': 'Seiten drehen…', 'Crop Pages…': 'Seiten zuschneiden…',
+  'Remove White Margins…': 'Weiße Ränder entfernen…', 'Resize Pages': 'Größe ändern', Margins: 'Ränder', 'Add page margins': 'Seitenränder hinzufügen',
+  Background: 'Hintergrund', 'Headers & Footers': 'Kopf- und Fußzeilen', 'Bates Numbering': 'Paginierung', 'Number Pages': 'Seiten nummerieren',
+  'Page labels: the page numbers viewers show': 'Seitenbeschriftungen: die Seitenzahlen, die Anzeigeprogramme zeigen',
+  'Add Watermark…': 'Wasserzeichen hinzufügen…', 'Remove Watermarks': 'Wasserzeichen entfernen',
+  'Add Background…': 'Hintergrund hinzufügen…', 'Remove Backgrounds': 'Hintergrund entfernen',
+  'Add Headers & Footers…': 'Kopf- und Fußzeilen hinzufügen…', 'Remove Headers & Footers': 'Kopf- und Fußzeilen entfernen',
+  'Add Bates Numbering…': 'Paginierung hinzufügen…', 'Remove Bates Numbering': 'Paginierung entfernen',
+
+  // dialog building blocks
+  all: 'alle', 'all, or e.g. 1-3, 5': 'alle, oder z. B. 1-3, 5', Cancel: 'Abbrechen', OK: 'OK', 'Choose…': 'Auswählen…',
+  'No file chosen': 'Keine Datei ausgewählt', 'page(s)': 'Seite(n)', File: 'Datei', Position: 'Position', 'Before page': 'Vor Seite',
+  'After page': 'Nach Seite', 'At the start': 'Am Anfang', 'At the end': 'Am Ende', 'Paper size': 'Papierformat', Custom: 'Benutzerdefiniert',
+  'Swap width and height': 'Breite und Höhe tauschen', Landscape: 'Querformat', Portrait: 'Hochformat', Width: 'Breite', Height: 'Höhe',
+  Top: 'Oben', Right: 'Rechts', Bottom: 'Unten', Left: 'Links', Subset: 'Teilmenge', 'All pages in range': 'Alle Seiten im Bereich',
+  'Odd pages only': 'Nur ungerade Seiten', 'Even pages only': 'Nur gerade Seiten', Remove: 'Entfernen', 'Move up': 'Nach oben',
+  'Move down': 'Nach unten', Text: 'Text', 'Font size': 'Schriftgröße', Colour: 'Farbe', Opacity: 'Deckkraft', Angle: 'Winkel',
+  Placement: 'Platzierung', 'In front of the page content': 'Vor dem Seiteninhalt', 'Behind the page content': 'Hinter dem Seiteninhalt',
+  'Margin (pt)': 'Rand (pt)', 'Margin (mm)': 'Rand (mm)', 'Preview:': 'Vorschau:', 'Loading…': 'Wird geladen…', 'Opening…': 'Wird geöffnet…',
+  Anchor: 'Ausrichtung', 'top-left': 'Oben links', top: 'Oben', 'top-right': 'Oben rechts', left: 'Links', center: 'Mitte', right: 'Rechts',
+  'bottom-left': 'Unten links', bottom: 'Unten', 'bottom-right': 'Unten rechts',
+  "Keep each page's orientation": 'Ausrichtung jeder Seite beibehalten',
+
+  // inserting
+  'Insert blank pages': 'Leere Seiten einfügen', 'Number of pages': 'Anzahl der Seiten', 'Same size as the neighbouring page': 'Gleiche Größe wie die benachbarte Seite',
+  'Merge files': 'Dateien zusammenführen', 'Insert pages from file': 'Seiten aus Datei einfügen', Merge: 'Zusammenführen',
+  'All pages of these PDF files are inserted into this document, in this order.': 'Alle Seiten dieser PDF-Dateien werden in dieser Reihenfolge in dieses Dokument eingefügt.',
+  'Add files…': 'Dateien hinzufügen…', 'Pages of the file': 'Seiten der Datei', 'Insert images as pages': 'Bilder als Seiten einfügen',
+  Images: 'Bilder', 'Page size': 'Seitengröße', 'Image size (96 dpi)': 'Bildgröße (96 dpi)', 'Same as the current page': 'Wie die aktuelle Seite',
+  "Each image is fitted and centred on its own page, turned to match the image's orientation.": 'Jedes Bild wird auf eine eigene Seite eingepasst und zentriert; die Seite folgt der Ausrichtung des Bildes.',
+
+  // deleting, extracting, moving, splitting
+  'Delete pages': 'Seiten löschen', 'Extract pages': 'Seiten extrahieren', Extract: 'Extrahieren', 'One file per page': 'Eine Datei pro Seite',
+  'Delete the pages after extracting': 'Seiten nach dem Extrahieren löschen',
+  'The extracted pages are downloaded as new PDF files, with their comments.': 'Die extrahierten Seiten werden mit ihren Kommentaren als neue PDF-Dateien heruntergeladen.',
+  'Move pages': 'Seiten verschieben', Move: 'Verschieben', 'Move to': 'Verschieben nach', 'Split document': 'Dokument aufteilen', Split: 'Teilen',
+  'Split by': 'Aufteilen nach', 'Single pages': 'Einzelne Seiten', 'Page ranges': 'Seitenbereiche', 'Top-level bookmarks': 'Lesezeichen der obersten Ebene',
+  'File size': 'Dateigröße', 'Pages per file': 'Seiten pro Datei', 'Creates {n} file(s).': 'Erstellt {n} Datei(en).', Ranges: 'Bereiche',
+  'Separate the files with semicolons.': 'Trennen Sie die Dateien durch Semikolons.',
+  'One file per top-level bookmark, from its page up to the next bookmark.': 'Eine Datei pro Lesezeichen der obersten Ebene, von seiner Seite bis zum nächsten Lesezeichen.',
+  'Maximum size (MB)': 'Maximale Größe (MB)', 'Your browser may ask permission to download multiple files.': 'Ihr Browser fragt eventuell nach der Erlaubnis, mehrere Dateien herunterzuladen.',
+
+  // duplicating, replacing, swapping, overlaying
+  'Duplicate pages': 'Seiten duplizieren', Duplicate: 'Duplizieren', Copies: 'Kopien', 'Insert copies': 'Kopien einfügen', 'After each page': 'Nach jeder Seite',
+  'After the last page of the range': 'Nach der letzten Seite des Bereichs', 'Collate (1, 2, 1, 2 instead of 1, 1, 2, 2)': 'Sortieren (1, 2, 1, 2 statt 1, 1, 2, 2)',
+  'Replace pages': 'Seiten ersetzen', Replace: 'Ersetzen', 'With pages from': 'Durch Seiten aus',
+  'The replaced pages and their comments are removed; the new pages take the place of the first one.': 'Die ersetzten Seiten und ihre Kommentare werden entfernt; die neuen Seiten treten an die Stelle der ersten.',
+  'Swap pages': 'Seiten austauschen', Swap: 'Austauschen', 'Swap with': 'Austauschen mit', 'Each group of pages takes the place of the other.': 'Jede Seitengruppe nimmt den Platz der anderen ein.',
+  'Overlay pages': 'Seiten überlagern', 'Overlay file': 'Überlagerungsdatei', 'On pages': 'Auf Seiten', 'Pages to use': 'Zu verwendende Seiten',
+  'First page on every page': 'Erste Seite auf jeder Seite', 'Page by page, then stop': 'Seite für Seite, dann aufhören', 'Page by page, repeating': 'Seite für Seite, wiederholend',
+  'Scale to fit the page': 'An Seite anpassen',
+
+  // normalising, duplicates
+  'Normalize pages': 'Seiten normalisieren', 'Normalize page boxes (media box = crop box, origin at 0,0)': 'Seitenrahmen normalisieren (Medienrahmen = Beschnittrahmen, Ursprung bei 0,0)',
+  "Remove page rotation (keep the pages' appearance)": 'Seitendrehung entfernen (Aussehen der Seiten bleibt erhalten)', Keep: 'Beibehalten',
+  'Same as the first page': 'Wie die erste Seite', 'Same as the largest page': 'Wie die größte Seite', 'Same as the smallest page': 'Wie die kleinste Seite',
+  'Find duplicate pages': 'Doppelte Seiten finden', 'Start search': 'Suche starten', Compare: 'Vergleichen', 'Page content (identical pages)': 'Seiteninhalt (identische Seiten)',
+  'Appearance (similar-looking pages)': 'Aussehen (ähnlich aussehende Seiten)', 'Select duplicates': 'Duplikate markieren', 'Delete duplicates': 'Duplikate löschen',
+  '{n} group(s) of duplicate pages. The first page of each group is kept.': '{n} Gruppe(n) doppelter Seiten. Die erste Seite jeder Gruppe bleibt erhalten.',
+  'No duplicate pages found.': 'Keine doppelten Seiten gefunden.',
+
+  // page shape
+  'Rotate pages': 'Seiten drehen', Direction: 'Richtung', '90° clockwise': '90° im Uhrzeigersinn', '90° counter-clockwise': '90° gegen den Uhrzeigersinn',
+  Orientation: 'Ausrichtung', 'Portrait and landscape pages': 'Hoch- und Querformatseiten', 'Portrait pages only': 'Nur Hochformatseiten', 'Landscape pages only': 'Nur Querformatseiten',
+  'Crop pages': 'Seiten zuschneiden', 'Margins to cut off, measured on the page as displayed.': 'Abzuschneidende Ränder, gemessen an der angezeigten Seite.',
+  'Remove white margins': 'Weiße Ränder entfernen', 'Crops each page to the area that has visible content.': 'Schneidet jede Seite auf den Bereich mit sichtbarem Inhalt zu.',
+  'Keep a margin of (mm)': 'Rand beibehalten (mm)', 'Resize pages': 'Seitengröße ändern', Resize: 'Größe ändern', Content: 'Inhalt',
+  'Scale to fit the new size': 'An die neue Größe anpassen', 'Keep its size (change the page box only)': 'Größe beibehalten (nur Seitenrahmen ändern)',
+  'Enlarges the pages on each side; the content keeps its size and place.': 'Vergrößert die Seiten an jeder Seite; der Inhalt behält Größe und Position.',
+
+  // page marks
+  'Add watermark': 'Wasserzeichen hinzufügen', CONFIDENTIAL: 'VERTRAULICH', 'Add background': 'Hintergrund hinzufügen', Image: 'Bild',
+  'Image size (%)': 'Bildgröße (%)',
+  'The background is drawn behind the page content. Pages with an opaque white background of their own hide it.': 'Der Hintergrund wird hinter dem Seiteninhalt gezeichnet. Seiten mit eigenem deckend weißem Hintergrund verdecken ihn.',
+  'Add headers and footers': 'Kopf- und Fußzeilen hinzufügen', 'Header left': 'Kopfzeile links', 'Header centre': 'Kopfzeile Mitte', 'Header right': 'Kopfzeile rechts',
+  'Footer left': 'Fußzeile links', 'Footer centre': 'Fußzeile Mitte', 'Footer right': 'Fußzeile rechts', 'Page {page} of {pages}': 'Seite {page} von {pages}',
+  'Placeholders:': 'Platzhalter:', 'First page number': 'Erste Seitenzahl', 'Bates numbering': 'Paginierung (Bates-Nummerierung)', Prefix: 'Präfix',
+  'Start number': 'Startnummer', Digits: 'Stellen', Suffix: 'Suffix',
+  'Number pages': 'Seiten nummerieren', 'Remove page labels': 'Seitenbeschriftungen entfernen',
+  'Page labels are the page numbers viewers show, e.g. i–iv for the front matter, then 1, 2, 3.': 'Seitenbeschriftungen sind die Seitenzahlen, die Anzeigeprogramme zeigen, z. B. i–iv für die Einleitung, dann 1, 2, 3.',
+  'From page': 'Ab Seite', Style: 'Stil', 'Start at': 'Beginnen bei', 'Add range': 'Bereich hinzufügen', 'None (prefix only)': 'Keine (nur Präfix)',
+
+  // progress and messages
+  'Inserting…': 'Wird eingefügt…', 'Inserting pages…': 'Seiten werden eingefügt…', 'Looking for blank pages…': 'Leere Seiten werden gesucht…',
+  'Extracting…': 'Wird extrahiert…', 'Splitting…': 'Wird aufgeteilt…', 'Duplicating…': 'Wird dupliziert…', 'Swapping pages…': 'Seiten werden ausgetauscht…',
+  'Replacing pages…': 'Seiten werden ersetzt…', 'Reversing…': 'Reihenfolge wird umgekehrt…', 'Rotating…': 'Wird gedreht…',
+  'Looking for duplicate pages…': 'Doppelte Seiten werden gesucht…', 'Deleting…': 'Wird gelöscht…', 'Overlaying pages…': 'Seiten werden überlagert…',
+  'Normalizing pages…': 'Seiten werden normalisiert…', 'Resizing pages…': 'Seitengröße wird geändert…', 'Adding margins…': 'Ränder werden hinzugefügt…',
+  'Removing white margins…': 'Weiße Ränder werden entfernt…', 'Removing…': 'Wird entfernt…', 'Adding watermark…': 'Wasserzeichen wird hinzugefügt…',
+  'Adding background…': 'Hintergrund wird hinzugefügt…', 'Adding header/footer…': 'Kopf-/Fußzeile wird hinzugefügt…',
+  'Adding Bates numbers…': 'Paginierung wird hinzugefügt…', 'Numbering pages…': 'Seiten werden nummeriert…',
+  'The clipboard could not be read. Allow clipboard access and try again.': 'Die Zwischenablage konnte nicht gelesen werden. Erlauben Sie den Zugriff und versuchen Sie es erneut.',
+  'There is no image on the clipboard.': 'In der Zwischenablage ist kein Bild.', 'No pages match.': 'Keine passenden Seiten.',
+  'There are no blank pages.': 'Es gibt keine leeren Seiten.', 'A document must keep at least one page.': 'Ein Dokument muss mindestens eine Seite behalten.',
+  'Delete {n} blank page(s): {pages}?': '{n} leere Seite(n) löschen: {pages}?', 'Deleted {n} blank page(s).': '{n} leere Seite(n) gelöscht.',
+  'Created {n} file(s).': '{n} Datei(en) erstellt.', 'Deleted {n} duplicate page(s).': '{n} doppelte Seite(n) gelöscht.',
+  'No white margins found.': 'Keine weißen Ränder gefunden.', 'Cropped {n} page(s).': '{n} Seite(n) zugeschnitten.',
+  watermarks: 'Wasserzeichen', backgrounds: 'Hintergründe', 'headers and footers': 'Kopf- und Fußzeilen', 'Bates numbers': 'Paginierungen',
+  'There are no {what} to remove.': 'Es gibt keine {what} zum Entfernen.', 'Removed {what} from the pages.': '{what} wurden von den Seiten entfernt.',
+  'Enter the text for at least one position.': 'Geben Sie für mindestens eine Position einen Text ein.',
+  // errors from the organize library
+  'The page groups to swap overlap.': 'Die auszutauschenden Seitengruppen überschneiden sich.', 'Choose two groups of pages to swap.': 'Wählen Sie zwei Seitengruppen zum Austauschen.',
+  'Choose the pages to replace and the replacement pages.': 'Wählen Sie die zu ersetzenden Seiten und die Ersatzseiten.',
+  'This document has no bookmarks that point to its pages.': 'Dieses Dokument hat keine Lesezeichen, die auf seine Seiten verweisen.',
+  'The page size is too small.': 'Die Seitengröße ist zu klein.', 'Choose a colour or an image for the background.': 'Wählen Sie eine Farbe oder ein Bild für den Hintergrund.',
 };
 
 export default DE;
