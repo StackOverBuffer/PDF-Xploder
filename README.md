@@ -5,6 +5,8 @@
 A browser-based PDF editor aiming for feature parity with **PDF-XChange Editor**.
 Everything runs client-side: documents are never uploaded anywhere.
 
+Live Demo is reachable here: https://stackoverbuffer.github.io/PDF-Xploder/
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173
