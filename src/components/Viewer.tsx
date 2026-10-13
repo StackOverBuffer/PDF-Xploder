@@ -47,6 +47,7 @@ function selectionTextRects(range: Range): DOMRect[] {
 
 export function Viewer() {
   const geoms = useStore((s) => s.geoms);
+  const docSession = useStore((s) => s.docSession);
   const scale = useStore((s) => s.scale);
   const fit = useStore((s) => s.fit);
   const tool = useStore((s) => s.tool);
@@ -236,7 +237,8 @@ export function Viewer() {
         openFiles(Array.from(e.dataTransfer.files));
       }}
     >
-      <div className="pages" style={{ height: y + PAD - GAP, minWidth: maxWidth + PAD * 2 }}>
+      {/* A different document gets fresh page views, so nothing of the previous one can linger. */}
+      <div className="pages" key={docSession} style={{ height: y + PAD - GAP, minWidth: maxWidth + PAD * 2 }}>
         {geoms.map((g, i) => (
           <div key={i} className="page-slot" style={{ top: tops[i], width: Math.floor(viewSize(g).width * scale) }}>
             <PageView index={i} visible={visible.has(i)} />

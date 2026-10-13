@@ -77,11 +77,25 @@ function cipherName(enc: PDFDict): string {
 
 /** Read the encryption dictionary without decrypting anything. */
 export async function inspectEncryption(bytes: Uint8Array): Promise<EncryptionInfo> {
+  // The trailer is never compressed: without an /Encrypt key anywhere the file is not encrypted,
+  // and the (slow, for big files) full parse can be skipped.
+  if (!containsAscii(bytes, '/Encrypt')) return { encrypted: false, permissions: ALL_PERMISSIONS };
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
   const enc = doc.context.lookup(doc.context.trailerInfo.Encrypt);
   if (!(enc instanceof PDFDict)) return { encrypted: false, permissions: ALL_PERMISSIONS };
   const p = (enc.lookup(PDFName.of('P')) as PDFNumber | undefined)?.asNumber() ?? -1;
   return { encrypted: true, algorithm: cipherName(enc), permissions: decodePermissions(p) };
+}
+
+function containsAscii(bytes: Uint8Array, word: string): boolean {
+  const codes = [...word].map((c) => c.charCodeAt(0));
+  const first = codes[0];
+  for (let i = bytes.indexOf(first); i >= 0 && i <= bytes.length - codes.length; i = bytes.indexOf(first, i + 1)) {
+    let k = 1;
+    while (k < codes.length && bytes[i + k] === codes[k]) k++;
+    if (k === codes.length) return true;
+  }
+  return false;
 }
 
 /** Whether `password` (user or owner) opens the document. */

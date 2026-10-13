@@ -11,6 +11,16 @@ export type { PDFDocumentProxy, PDFPageProxy };
 
 export class PasswordCancelled extends Error {}
 
+/** Character maps and standard font data, served by the pdfjs-assets plugin (see vite.config.ts). */
+const ASSETS =
+  typeof document === 'undefined'
+    ? {}
+    : {
+        cMapUrl: `${import.meta.env.BASE_URL}pdfjs/cmaps/`,
+        cMapPacked: true,
+        standardFontDataUrl: `${import.meta.env.BASE_URL}pdfjs/standard_fonts/`,
+      };
+
 /**
  * Open a document with pdf.js. pdf.js transfers the buffer it is given to its
  * worker, so always hand it a copy and keep the original for pdf-lib.
@@ -20,7 +30,7 @@ export async function openPdf(
   askPassword: (retry: boolean) => string | null,
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
-  const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false });
+  const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, ...ASSETS });
   task.onPassword = (update: (pw: string) => void, reason: number) => {
     const pw = askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {

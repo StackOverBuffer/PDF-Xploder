@@ -11,6 +11,7 @@ const THUMB_W = 130;
 const Thumb = memo(function Thumb({ index }: { index: number }) {
   const pdf = useStore((s) => s.pdf);
   const docVersion = useStore((s) => s.docVersion);
+  const opening = useStore((s) => s.opening);
   const geom = useStore((s) => s.geoms[index]);
   const hostRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
@@ -26,7 +27,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
   }, []);
 
   useEffect(() => {
-    if (!inView || !pdf) return;
+    if (!inView || !pdf || opening) return;
     let cancelled = false;
     let task: { cancel(): void } | null = null;
     (async () => {
@@ -48,7 +49,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
       cancelled = true;
       task?.cancel();
     };
-  }, [inView, pdf, docVersion, index, scale, geom.rotation]);
+  }, [inView, pdf, docVersion, index, scale, geom.rotation, opening]);
 
   return <div ref={hostRef} className="thumb-canvas" style={{ width: THUMB_W, height: Math.round(height * scale) }} />;
 });
@@ -56,6 +57,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
 export function Thumbnails() {
   const t = useT();
   const count = useStore((s) => s.geoms.length);
+  const docSession = useStore((s) => s.docSession);
   const current = useStore((s) => s.currentPage);
   const selected = useStore((s) => s.selectedPages);
   const pageIds = useStore((s) => s.pageIds);
@@ -115,7 +117,7 @@ export function Thumbnails() {
         <button title={t('Delete')} disabled={!canAssemble} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
         <span className="muted small">{tf('{n} sel.', { n })}</span>
       </div>
-      <div className="thumbs" onDragLeave={() => setDropAt(null)} onDrop={onDrop}>
+      <div className="thumbs" key={docSession} onDragLeave={() => setDropAt(null)} onDrop={onDrop}>
         {Array.from({ length: count }, (_, i) => (
           <div
             key={i}

@@ -82,6 +82,10 @@ interface State {
   contentEditing: { page: number; id?: number; at?: { x: number; y: number } } | null;
   /** Bumped whenever `pdf` is replaced, so caches can be invalidated. */
   docVersion: number;
+  /** Bumped when a different document is opened or the document is closed (not on edits). */
+  docSession: number;
+  /** A document is being opened: the current one stops rendering so the work goes to the new one. */
+  opening: boolean;
   editable: boolean;
   dirty: boolean;
   /** The file exactly as opened; saved verbatim while nothing changed (keeps signatures valid). */
@@ -252,9 +256,117 @@ export const useStore = create<Store>()((set, get) => {
     set({ currentPage: Math.min(get().currentPage, snap.pageIds.length - 1) });
   }
 
+  async function openDocumentImpl(bytes: Uint8Array, name: string, opts: { password?: string; ownerPassword?: string } = {}) {
+    const original = bytes;
+    let loaded;
+    try {
+      loaded = await loadPdfJs(bytes, opts.password, 0);
+    } catch (e) {
+      if (e instanceof PasswordCancelled) return;
+      throw e;
+    }
+    let encryption: EncryptionInfo = { encrypted: false, permissions: ALL_PERMISSIONS };
+    try {
+      encryption = await inspectEncryption(bytes);
+    } catch {
+      /* damaged: handled below */
+    }
+    let editable = true;
+    let security: SecuritySettings | null = null;
+    let lock: State['lock'] = null;
+    let permissions: Permissions = ALL_PERMISSIONS;
+    let ownerAccess = true;
+    let keepEncryption: State['keepEncryption'] = null;
+    const userPassword = loaded.password ?? '';
+    if (encryption.encrypted) {
+      const owner = opts.ownerPassword;
+      const restricted = !allPermissionsGranted(encryption.permissions);
+      // Without the owner password the author's restrictions apply, action by action.
+      ownerAccess = owner !== undefined || !restricted;
+      permissions = owner !== undefined ? ALL_PERMISSIONS : encryption.permissions;
+      if (!ownerAccess) lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
+      try {
+        const password = owner ?? userPassword;
+        const plain = await decrypt(bytes, password);
+        const reloaded = await loadPdfJs(plain);
+        loaded.pdf.destroy();
+        loaded = { ...reloaded, password: loaded.password };
+        bytes = plain;
+        // Saving re-encrypts with the original key, so both passwords keep working.
+        keepEncryption = { password };
+        security = {
+          userPassword,
+          ownerPassword: owner ?? (restricted ? '' : userPassword),
+          permissions: encryption.permissions,
+          algorithm: encryption.algorithm === 'AES-128' ? 'AES-128' : 'AES-256',
+        };
+      } catch (e) {
+        console.warn('Could not decrypt for editing', e);
+        editable = false;
+      }
+    }
+    // (Unencrypted files are checked by the import below, to parse them only once.)
+    const pageIds = loaded.geoms.map(() => uid('page'));
+    const annotations: Record<string, Annotation[]> = {};
+    if (editable) {
+      // Existing comments become editable: they move from the file into the model.
+      try {
+        const imp = await importForEditing(bytes, () => uid('annot'));
+        if (imp.count) {
+          const reloaded = await loadPdfJs(imp.bytes, undefined, 0);
+          loaded.pdf.destroy();
+          loaded = { ...reloaded, password: loaded.password };
+          bytes = imp.bytes;
+          imp.annotations.forEach((list, i) => list.length && (annotations[pageIds[i]] = list));
+        }
+      } catch (e) {
+        // Tell a file pdf-lib cannot read apart from one whose comments failed to import.
+        try {
+          await loadPdfLib(bytes);
+          console.warn('Could not import annotations', e);
+        } catch {
+          editable = false;
+        }
+      }
+    }
+    get().pdf?.destroy();
+    set({
+      ...initialDoc,
+      bytes,
+      originalBytes: original,
+      fileName: name,
+      pdf: loaded.pdf,
+      geoms: loaded.geoms,
+      pageIds,
+      annotations,
+      editable,
+      encryption,
+      security,
+      securityChanged: false,
+      keepEncryption,
+      permissions,
+      ownerAccess,
+      lock,
+      docVersion: get().docVersion + 1,
+      docSession: get().docSession + 1,
+      fit: 'width',
+      sidebar: get().sidebar,
+    });
+    if (!editable) get().notify(tr('This document is damaged or uses unsupported encryption: it is open read-only.'), 'error');
+    verifySignatures(original)
+      .then((signatures) => {
+        if (get().originalBytes !== original) return;
+        set({ signatures });
+        if (signatures.length && get().sidebar !== 'signatures') set({ sidebar: 'signatures' });
+      })
+      .catch((e) => console.warn('Signature check failed', e));
+  }
+
   return {
     ...initialDoc,
     docVersion: 0,
+    docSession: 0,
+    opening: false,
     busy: null,
     toast: null,
     scale: 1,
@@ -268,107 +380,12 @@ export const useStore = create<Store>()((set, get) => {
     sidebar: 'pages',
 
     async openDocument(bytes, name, opts = {}) {
-      const original = bytes;
-      let loaded;
+      set({ opening: true });
       try {
-        loaded = await loadPdfJs(bytes, opts.password, 0);
-      } catch (e) {
-        if (e instanceof PasswordCancelled) return;
-        throw e;
+        await openDocumentImpl(bytes, name, opts);
+      } finally {
+        set({ opening: false });
       }
-      let encryption: EncryptionInfo = { encrypted: false, permissions: ALL_PERMISSIONS };
-      try {
-        encryption = await inspectEncryption(bytes);
-      } catch {
-        /* damaged: handled below */
-      }
-      let editable = true;
-      let security: SecuritySettings | null = null;
-      let lock: State['lock'] = null;
-      let permissions: Permissions = ALL_PERMISSIONS;
-      let ownerAccess = true;
-      let keepEncryption: State['keepEncryption'] = null;
-      const userPassword = loaded.password ?? '';
-      if (encryption.encrypted) {
-        const owner = opts.ownerPassword;
-        const restricted = !allPermissionsGranted(encryption.permissions);
-        // Without the owner password the author's restrictions apply, action by action.
-        ownerAccess = owner !== undefined || !restricted;
-        permissions = owner !== undefined ? ALL_PERMISSIONS : encryption.permissions;
-        if (!ownerAccess) lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
-        try {
-          const password = owner ?? userPassword;
-          const plain = await decrypt(bytes, password);
-          const reloaded = await loadPdfJs(plain);
-          loaded.pdf.destroy();
-          loaded = { ...reloaded, password: loaded.password };
-          bytes = plain;
-          // Saving re-encrypts with the original key, so both passwords keep working.
-          keepEncryption = { password };
-          security = {
-            userPassword,
-            ownerPassword: owner ?? (restricted ? '' : userPassword),
-            permissions: encryption.permissions,
-            algorithm: encryption.algorithm === 'AES-128' ? 'AES-128' : 'AES-256',
-          };
-        } catch (e) {
-          console.warn('Could not decrypt for editing', e);
-          editable = false;
-        }
-      } else {
-        try {
-          await loadPdfLib(bytes);
-        } catch {
-          editable = false;
-        }
-      }
-      const pageIds = loaded.geoms.map(() => uid('page'));
-      const annotations: Record<string, Annotation[]> = {};
-      if (editable) {
-        // Existing comments become editable: they move from the file into the model.
-        try {
-          const imp = await importForEditing(bytes, () => uid('annot'));
-          if (imp.count) {
-            const reloaded = await loadPdfJs(imp.bytes, undefined, 0);
-            loaded.pdf.destroy();
-            loaded = { ...reloaded, password: loaded.password };
-            bytes = imp.bytes;
-            imp.annotations.forEach((list, i) => list.length && (annotations[pageIds[i]] = list));
-          }
-        } catch (e) {
-          console.warn('Could not import annotations', e);
-        }
-      }
-      get().pdf?.destroy();
-      set({
-        ...initialDoc,
-        bytes,
-        originalBytes: original,
-        fileName: name,
-        pdf: loaded.pdf,
-        geoms: loaded.geoms,
-        pageIds,
-        annotations,
-        editable,
-        encryption,
-        security,
-        securityChanged: false,
-        keepEncryption,
-        permissions,
-        ownerAccess,
-        lock,
-        docVersion: get().docVersion + 1,
-        fit: 'width',
-        sidebar: get().sidebar,
-      });
-      if (!editable) get().notify(tr('This document is damaged or uses unsupported encryption: it is open read-only.'), 'error');
-      verifySignatures(original)
-        .then((signatures) => {
-          if (get().originalBytes !== original) return;
-          set({ signatures });
-          if (signatures.length && get().sidebar !== 'signatures') set({ sidebar: 'signatures' });
-        })
-        .catch((e) => console.warn('Signature check failed', e));
     },
 
     async unlock(ownerPassword) {
@@ -394,7 +411,7 @@ export const useStore = create<Store>()((set, get) => {
 
     closeDocument() {
       get().pdf?.destroy();
-      set({ ...initialDoc, docVersion: get().docVersion + 1 });
+      set({ ...initialDoc, docVersion: get().docVersion + 1, docSession: get().docSession + 1 });
     },
 
     async commitBytes(bytes, pageIds, annotations, formValues) {
