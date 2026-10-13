@@ -1,5 +1,5 @@
 {
-  "name": "awesome-pdf",
+  "name": "pdf-xploder",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -20,9 +20,12 @@
     "pdfjs-dist": "4.10.38",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "tesseract.js": "7.0.0",
     "zustand": "5.0.3"
   },
   "devDependencies": {
+    "@tesseract.js-data/deu": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@types/node": "22.10.7",
     "@types/node-forge": "1.3.11",
     "@types/react": "18.3.18",

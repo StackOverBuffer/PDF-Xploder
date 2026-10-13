@@ -131,10 +131,21 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - ✅ Document properties (title, author, subject, keywords, creator, producer)
 - ✅ Export the current page as PNG
 - ⬜ Export to other image formats / Office formats, optimize/compress, PDF/A
-- ⬜ OCR for scanned documents
+- ✅ OCR for scanned documents (see below)
 - ✅ Share the PDF via the system share sheet (where the browser supports it)
 - ✅ Accessibility: quick check (tags, language, title, text, field tooltips, permissions) with one-click fixes; read aloud; inverted page colours
 - ⬜ Multiple documents in tabs, autosave (e.g. IndexedDB)
+
+### OCR
+- ✅ **OCR Pages** dialog like PDF-XChange's Enhanced OCR plugin: all / current / a range of pages; German, English, French, Italian, Spanish, Dutch and Polish (any combination); 150–400 dpi; pages that already contain text are skipped unless asked
+- ✅ Output types: **Searchable Image** (page unchanged, invisible text scaled to each word), **Editable Text and Images** (visible, editable text in a font matching the recognised style, table lines as vector lines, the recognised text and lines painted out of the page image in their local background colour) and **Fine Page Content** (only text, lines and images of picture regions on a white page)
+- ✅ Text style recognition from the pixels of each word: colour, bold (stroke width), italic (stroke slant), underline and strikeout, serif / sans-serif / monospaced; Helvetica, Times and Courier with bold/italic variants, Noto Sans for characters outside WinAnsi
+- ✅ Table recognition: ruling lines and cell grids (with merged cells); lines are removed before recognition so they do not turn into characters
+- ✅ Detects (and optionally corrects) image skew up to ±15° and wrong page rotation (90°/180°/270°, corrected through the page's rotation)
+- ✅ Multi-threaded: several Tesseract workers recognise pages in parallel, with per-page progress and cancel
+- 🟡 Style recognition is heuristic: bold serif text is often taken for sans-serif, and very small text (< 8 pt at 150 dpi) gives unreliable bold/italic results
+
+How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its worker, core and language data (`best_int` models) are fetched from jsDelivr with pinned versions (see `src/lib/ocr/config.ts`). Everything else is in `src/lib/ocr/`: skew and orientation detection by projection profiles, ruling-line and picture detection, style measurements, and the writers for the three output types.
 
 ## Notes
 

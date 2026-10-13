@@ -7,7 +7,7 @@ import {
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
-  BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp,
+  BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -332,6 +332,9 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
         {tab === 'Organize' && <OrganizeTab />}
         {tab === 'Convert' && (
           <>
+            <Group label="OCR">
+              <Btn icon={<ScanText size={L} />} label="OCR Pages" title="Recognise text in scanned pages (runs locally in the browser)" disabled={!canModify} onClick={() => show('ocr')} />
+            </Group>
             <Group label="Convert">
               <Btn icon={<FileImage size={L} />} label="To image" title="Save the current page as a PNG image" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
               <ToolBtn tool="snapshot" icon={<Camera size={L} />} label="Region to image" title="Drag a box to copy that part of the page as an image" />

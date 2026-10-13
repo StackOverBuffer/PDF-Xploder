@@ -11,8 +11,9 @@ import { tf, tr, useLang, useT } from '../lib/i18n';
 import { BarcodesDialog, RecompressDialog } from './ContentDialogs';
 import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 import { OrganizeDialog, type OrganizeDialogName } from './OrganizeDialogs';
+import { OcrDialog } from './OcrDialog';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | OrganizeDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | OrganizeDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -384,6 +385,7 @@ export function Dialogs() {
     case 'accessibility': return <AccessibilityDialog close={close} />;
     case 'recompress': return <RecompressDialog close={close} />;
     case 'barcodes': return <BarcodesDialog close={close} />;
+    case 'ocr': return <OcrDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
     case 'orgDuplicate': case 'orgReplace': case 'orgSwap': case 'orgOverlay': case 'orgNormalize': case 'orgFindDuplicates': case 'orgRotate': case 'orgCrop':

@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import DE_ORGANIZE from '../locales/de/organize';
 import DE_CONTEXT from '../locales/de/context';
 import DE_UI from '../locales/de/ui';
+import DE_OCR from '../locales/de/ocr';
 
 export type Lang = 'en' | 'de';
 
@@ -56,6 +57,7 @@ const DE: Record<string, string> = {
   Panes: 'Fenster', Search: 'Suche', Sidebar: 'Seitenleiste', Zoom: 'Zoom', Help: 'Hilfe', Shortcuts: 'Tastenkürzel',
   Language: 'Sprache', More: 'Weitere Optionen',
   // Convert
+  'OCR Pages': 'Seiten OCR', 'Recognise text in scanned pages (runs locally in the browser)': 'Text in gescannten Seiten erkennen (läuft lokal im Browser)',
   'To image': 'In Bild', 'Region to image': 'Bereich als Bild', 'Flatten comments': 'Kommentare reduzieren',
   'Flattened copy': 'Reduzierte Kopie',
   // Share
@@ -67,7 +69,7 @@ const DE: Record<string, string> = {
   'Stop reading': 'Vorlesen beenden', Display: 'Anzeige', 'Invert colours': 'Farben umkehren',
 };
 
-const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE } };
+const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE_OCR, ...DE } };
 
 function initialLang(): Lang {
   try {

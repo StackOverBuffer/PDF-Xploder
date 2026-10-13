@@ -109,7 +109,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Create a PDF from Clipboard Content | 🟡 insert a clipboard image as a page |
 | Create a PDF from an Image File | 🟡 insert images as pages into a new document |
 | Create a PDF from Text / Markdown / CSV / RTF | ⬜ |
-| Create a PDF from Scanned Content | 🟡 webcam/scanner capture is not available in browsers; 🔧 OCR of scanned PDFs |
+| Create a PDF from Scanned Content | 🟡 insert scans as pages and run OCR; scanner access is not available in browsers |
 | Create New Documents from Web Page URLs | 🚫 cross-origin pages cannot be fetched from the browser |
 | Create PDF Portfolio Files | ⬜ |
 | Create PDFs from Email Files | ⬜ |
@@ -188,7 +188,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Content, Destinations, Links, History, 3D Model Tree Panes | ⬜ |
 | Guides, Rulers, Grid, Snapping | ⬜ |
 | Format Tab | 🟡 properties panel |
-| Correct/Deskew Scans, Draw Lines for Tables in OCR, Updated OCR Engine | 🔧 |
+| Correct/Deskew Scans, Draw Lines for Tables in OCR, Updated OCR Engine | ✅ |
 | Rename Documents | ⬜ |
 | Insert RTF/Text Files | ⬜ |
 | Shrink Page Content in Headers/Footers/Bates | 🟡 resize pages / add margins first |
@@ -207,7 +207,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Add Barcodes | ⬜ |
 | Add JavaScript | ⬜ |
 | Convert Document Colours | ⬜ |
-| Deskew / Enhance Scanned Pages | 🔧 |
+| Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
 | Rasterize Pages | ⬜ |
 | Recompress Document Images | 🟡 per image |
 | View/Edit Document Properties | ✅ |
@@ -273,9 +273,9 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 | Feature | Status |
 |---|---|
-| Perform OCR on Documents | 🔧 tesseract.js, runs locally in the browser |
-| Enhanced OCR: style and table recognition, three output types, multithreading, skew/rotation detection and correction | 🔧 |
-| OCR Selected Region / Multiple Selected Images via the Context Menu | 🔧 |
+| Perform OCR on Documents | ✅ tesseract.js, runs locally in the browser (Convert → OCR Pages) |
+| Enhanced OCR: style and table recognition, three output types, multithreading, skew/rotation detection and correction | ✅ |
+| OCR Selected Region / Multiple Selected Images via the Context Menu | 🟡 OCR from an image's context menu (whole page); ⬜ region |
 | OCR when Converting to MS Office Formats | ⬜ (with the Office export) |
 
 ## 15. Secure documents
@@ -294,7 +294,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 | Feature | Status |
 |---|---|
-| Enhanced OCR Engine | 🔧 |
+| Enhanced OCR Engine | ✅ |
 | Create and Edit Fillable Forms | ✅ |
 | Create Customized Dynamic Stamps | ⬜ |
 | Compare Documents | ⬜ |

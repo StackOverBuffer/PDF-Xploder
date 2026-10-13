@@ -118,7 +118,7 @@ export function objectMenu(page: number, geom: PageGeom, chosen: ObjectInfo[], l
       null,
       { label: 'Save Logo…', icon: i(Stamp), disabled: !copy, onClick: () => ca.stampFromSelection(page, ids, { image: true }) },
       null,
-      { label: 'Recognize Text in Images…', icon: i(ScanText), unavailable: 'Text recognition (OCR) is not available in this browser version yet.' },
+      { label: 'Recognize Text in Images…', icon: i(ScanText), disabled: !modify, onClick: () => useDialog.getState().show('ocr', { pages: [page] }) },
       { label: 'Recognize Barcodes…', icon: i(ScanBarcode), disabled: !copy, onClick: async () => {
         const codes = await ca.detectBarcodes(page, image.id);
         if (codes) useDialog.getState().show('barcodes', codes);
