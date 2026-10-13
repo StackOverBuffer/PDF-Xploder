@@ -6,6 +6,7 @@ import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../l
 import { viewRectToPdf, viewSize } from '../lib/geometry';
 import { encrypt, reencryptLike } from '../lib/security';
 import { requirePermission } from './permissions';
+import { tf, tr } from '../lib/i18n';
 import { signPdf, type SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation, Rect } from '../lib/types';
@@ -21,7 +22,7 @@ export function targetPages(): number[] {
 export async function openFiles(files: File[]) {
   const pdfs = files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) return S().notify('Please choose a PDF file.', 'error');
-  if (S().dirty && !confirm('Discard unsaved changes?')) return;
+  if (S().dirty && !confirm(tr('Discard unsaved changes?'))) return;
   await S().run('Opening…', async () => {
     const [first, ...rest] = pdfs;
     await S().openDocument(await fileBytes(first), first.name);
@@ -36,7 +37,7 @@ export async function openFromDialog() {
 }
 
 export async function newDocument() {
-  if (S().dirty && !confirm('Discard unsaved changes?')) return;
+  if (S().dirty && !confirm(tr('Discard unsaved changes?'))) return;
   await S().run('Creating…', async () => S().openDocument(await ops.createBlankDocument(), 'Untitled.pdf'));
 }
 
@@ -70,7 +71,7 @@ export async function buildFileForSave(): Promise<Uint8Array> {
 function confirmBreakingSignatures(): boolean {
   const s = S();
   if (!s.dirty || !s.signatures.length) return true;
-  return confirm('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?');
+  return confirm(tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'));
 }
 
 export async function save() {
@@ -92,7 +93,7 @@ export async function saveFlattenedCopy() {
 
 export async function saveAs() {
   if (!S().bytes) return;
-  const name = prompt('File name', S().fileName || 'document.pdf');
+  const name = prompt(tr('File name'), S().fileName || 'document.pdf');
   if (!name) return;
   useStore.setState({ fileName: /\.pdf$/i.test(name) ? name : `${name}.pdf` });
   await save();
@@ -128,7 +129,7 @@ export async function rotate(delta: number, pages = targetPages()) {
 export async function deletePages(pages = targetPages()) {
   if (!requirePermission('assemble')) return;
   if (pages.length >= S().pageIds.length) return S().notify('A document must keep at least one page.', 'error');
-  if (!confirm(`Delete ${pages.length} page(s)?`)) return;
+  if (!confirm(tf('Delete {n} page(s)?', { n: pages.length }))) return;
   await S().run('Deleting…', async () => {
     const ids = S().pageIds.filter((_, i) => !pages.includes(i));
     await S().commitBytes(await ops.deletePages(S().bytes!, pages), ids);
@@ -309,7 +310,7 @@ export async function applyRedactions() {
   const byPage = annotationsByPage(s);
   const pages = byPage.flatMap((l, i) => (l.some((a) => a.type === 'redact') ? [i] : []));
   if (!pages.length) return s.notify('Mark areas with the Redact tool first.');
-  if (!confirm(`Apply redactions on ${pages.length} page(s)? Those pages will be converted to images: their text will no longer be selectable or searchable.`)) return;
+  if (!confirm(tf('Apply redactions on {n} page(s)? Those pages will be converted to images: their text will no longer be selectable or searchable.', { n: pages.length }))) return;
   await s.run('Applying redactions…', async () => {
     const flat = await ops.exportWithAnnotations(await currentBytes(), byPage.map((l, i) => (pages.includes(i) ? l : [])), { flatten: true, burnRedactions: true });
     const { pdf } = await openPdf(flat, () => null);
@@ -327,7 +328,7 @@ export async function applyRedactions() {
     const annotations = { ...s.annotations };
     for (const i of pages) delete annotations[s.pageIds[i]];
     await S().commitBytes(out, undefined, annotations);
-    s.notify(`Redacted ${pages.length} page(s).`);
+    s.notify(tf('Redacted {n} page(s).', { n: pages.length }));
   });
 }
 
@@ -435,7 +436,7 @@ export async function updateFieldProps(name: string, patch: forms.FieldPatch) {
 
 export async function deleteField(name: string) {
   if (!requirePermission('designForms')) return;
-  if (!confirm(`Delete the form field “${name}”?`)) return;
+  if (!confirm(tf('Delete the form field “{name}”?', { name }))) return;
   await S().run('Deleting field…', async () => {
     await S().commitBytes(await forms.deleteField(S().bytes!, name), undefined, undefined, moveFormValue(name, null));
     useStore.setState({ selectedField: null });
@@ -480,7 +481,7 @@ export async function setAllFieldsLocked(locked: boolean) {
     const { bytes, changed } = await forms.setFieldsLocked(S().bytes!, locked);
     if (!changed) return S().notify(locked ? 'All fields are already locked.' : 'No fields are locked.');
     await S().commitBytes(bytes);
-    S().notify(`${locked ? 'Locked' : 'Unlocked'} ${changed} field widget(s).`);
+    S().notify(tf(locked ? 'Locked {n} field widget(s).' : 'Unlocked {n} field widget(s).', { n: changed }));
   });
 }
 
@@ -491,6 +492,6 @@ export async function makeAllFieldsEditable() {
     const { bytes, changed } = await forms.makeFieldsEditable(S().bytes!);
     if (!changed) return S().notify('All fields are already editable.');
     await S().commitBytes(bytes);
-    S().notify(`Made ${changed} field(s) editable.`);
+    S().notify(tf('Made {n} field(s) editable.', { n: changed }));
   });
 }

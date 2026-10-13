@@ -8,21 +8,23 @@ import { createTestCertificate, readP12, type Identity } from '../lib/signature'
 import { downloadBlob, fileBytes } from '../lib/download';
 import type { Rect } from '../lib/types';
 import { Modal, useDialog } from './Dialogs';
+import { tf, tr, useT } from '../lib/i18n';
 
 function UnlockForm({ onDone }: { onDone: () => void }) {
   const [pw, setPw] = useState('');
   const [error, setError] = useState('');
+  const t = useT();
   const submit = async () => {
     const ok = await useStore.getState().run('Unlocking…', () => useStore.getState().unlock(pw));
     if (ok) onDone();
-    else setError('That is not the permissions (owner) password.');
+    else setError(tr('That is not the permissions (owner) password.'));
   };
   return (
     <>
-      <p>Changing this document’s security requires its <b>permissions password</b> (owner password). Enter it to lift the restrictions for this session.</p>
-      <label className="row"><span>Password</span><input type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
+      <p>{t('Changing this document’s security requires its')} <b>{t('permissions password')}</b> {t('(owner password). Enter it to lift the restrictions for this session.')}</p>
+      <label className="row"><span>{t('Password')}</span><input type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
       {error && <p className="error-text">{error}</p>}
-      <div className="row"><span /><button className="primary" onClick={submit}><KeyRound size={14} /> Unlock</button></div>
+      <div className="row"><span /><button className="primary" onClick={submit}><KeyRound size={14} /> {t('Unlock')}</button></div>
     </>
   );
 }
@@ -32,6 +34,7 @@ const SUMMARY: Action[] = ['print', 'modify', 'assemble', 'annotate', 'fillForms
 /** What the current session may do, as derived from the document's permissions. */
 function RestrictionsSummary() {
   const state = useStore();
+  const t = useT();
   return (
     <table className="perm-summary">
       <tbody>
@@ -39,12 +42,12 @@ function RestrictionsSummary() {
           const ok = allowed(state, a);
           return (
             <tr key={a}>
-              <td>{ACTION_LABELS[a]}</td>
-              <td className={ok ? 'ok' : 'bad'}>{ok ? <><Check size={14} /> Allowed</> : <><XIcon size={14} /> Not allowed</>}</td>
+              <td>{t(ACTION_LABELS[a])}</td>
+              <td className={ok ? 'ok' : 'bad'}>{ok ? <><Check size={14} /> {t('Allowed')}</> : <><XIcon size={14} /> {t('Not allowed')}</>}</td>
             </tr>
           );
         })}
-        {state.permissions.printing && !state.permissions.highResPrinting && <tr><td colSpan={2} className="muted small">Printing is limited to low resolution.</td></tr>}
+        {state.permissions.printing && !state.permissions.highResPrinting && <tr><td colSpan={2} className="muted small">{t('Printing is limited to low resolution.')}</td></tr>}
       </tbody>
     </table>
   );
@@ -55,22 +58,23 @@ type PrintLevel = 'none' | 'low' | 'high';
 /** Editor for the permission bits; the two-level printing setting maps onto two bits. */
 function PermissionsEditor({ value, onChange }: { value: Permissions; onChange: (p: Permissions) => void }) {
   const print: PrintLevel = !value.printing ? 'none' : value.highResPrinting ? 'high' : 'low';
+  const t = useT();
   const box = (k: keyof Permissions, label: string, hint?: string) => (
     <label className="perm-row">
       <input type="checkbox" checked={value[k]} onChange={(e) => onChange({ ...value, [k]: e.target.checked })} />
-      <span>{label}{hint && <span className="muted small"> — {hint}</span>}</span>
+      <span>{t(label)}{hint && <span className="muted small"> — {t(hint)}</span>}</span>
     </label>
   );
   return (
     <div className="perm-editor">
-      <label className="row"><span>Printing</span>
+      <label className="row"><span>{t('Printing')}</span>
         <select value={print} onChange={(e) => {
           const v = e.target.value as PrintLevel;
           onChange({ ...value, printing: v !== 'none', highResPrinting: v === 'high' });
         }}>
-          <option value="none">Not allowed</option>
-          <option value="low">Low resolution (150 dpi)</option>
-          <option value="high">High resolution</option>
+          <option value="none">{t('Not allowed')}</option>
+          <option value="low">{t('Low resolution (150 dpi)')}</option>
+          <option value="high">{t('High resolution')}</option>
         </select>
       </label>
       {box('modifying', 'Changing the document', 'content, page marks, form design')}
@@ -81,10 +85,10 @@ function PermissionsEditor({ value, onChange }: { value: Permissions; onChange: 
       {box('contentAccessibility', 'Text access for screen readers')}
       <div className="row"><span />
         <div className="chips">
-          <button onClick={() => onChange(ALL_PERMISSIONS)}>Allow all</button>
-          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, fillingForms: false, copying: false })}>Read &amp; print only</button>
-          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false })}>Comments &amp; forms only</button>
-          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, copying: false })}>Forms only</button>
+          <button onClick={() => onChange(ALL_PERMISSIONS)}>{t('Allow all')}</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, fillingForms: false, copying: false })}>{t('Read & print only')}</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false })}>{t('Comments & forms only')}</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, copying: false })}>{t('Forms only')}</button>
         </div>
       </div>
     </div>
@@ -98,7 +102,7 @@ function currentSettings(): SecuritySettings {
 function apply(next: SecuritySettings | null, close: () => void) {
   const s = useStore.getState();
   s.setSecurity(next);
-  s.notify(next ? 'Security settings will be applied when you save.' : 'Security will be removed when you save.');
+  s.notify(tr(next ? 'Security settings will be applied when you save.' : 'Security will be removed when you save.'));
   close();
 }
 
@@ -110,40 +114,40 @@ export function PermissionsDialog({ close }: { close: () => void }) {
   const [ownerPw, setOwnerPw] = useState(initial.ownerPassword && initial.ownerPassword !== initial.userPassword ? initial.ownerPassword : '');
   const [error, setError] = useState('');
   const restricting = !allPermissionsGranted(perms);
+  const t = useT();
 
   const submit = () => {
     if (!restricting) {
       // Nothing restricted: keep only an open password, if there is one.
       return apply(initial.userPassword ? { ...initial, ownerPassword: initial.userPassword, permissions: ALL_PERMISSIONS } : null, close);
     }
-    if (!ownerPw) return setError('Set a permissions password: it is needed to change these settings later.');
-    if (ownerPw === initial.userPassword) return setError('The permissions password must differ from the open password.');
+    if (!ownerPw) return setError(tr('Set a permissions password: it is needed to change these settings later.'));
+    if (ownerPw === initial.userPassword) return setError(tr('The permissions password must differ from the open password.'));
     apply({ ...initial, ownerPassword: ownerPw, permissions: perms }, close);
   };
 
   return (
     <Modal
-      title="Document permissions"
+      title={t('Document permissions')}
       wide
       onClose={close}
-      footer={ownerAccess ? <><button onClick={close}>Cancel</button><button className="primary" onClick={submit}><ShieldCheck size={14} /> Apply</button></> : undefined}
+      footer={ownerAccess ? <><button onClick={close}>{t('Cancel')}</button><button className="primary" onClick={submit}><ShieldCheck size={14} /> {t('Apply')}</button></> : undefined}
     >
-      <h3 className="section">Restrictions in effect</h3>
+      <h3 className="section">{t('Restrictions in effect')}</h3>
       <RestrictionsSummary />
       {!ownerAccess ? (
         <UnlockForm onDone={close} />
       ) : (
         <>
-          <h3 className="section">Allow others to</h3>
+          <h3 className="section">{t('Allow others to')}</h3>
           <PermissionsEditor value={perms} onChange={setPerms} />
           {restricting && (
-            <label className="row"><span>Permissions password</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder="needed to change permissions later" /></label>
+            <label className="row"><span>{t('Permissions password')}</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder={t('needed to change permissions later')} /></label>
           )}
           {error && <p className="error-text">{error}</p>}
-          {signed && <p className="warn-text small">This document is signed. Changing its security rewrites the file and invalidates the signatures.</p>}
+          {signed && <p className="warn-text small">{t('This document is signed. Changing its security rewrites the file and invalidates the signatures.')}</p>}
           <p className="muted small">
-            Permissions are enforced by PDF software (this app included) for anyone without the permissions password. PDF has no permission that
-            prevents saving a copy: to stop others from saving changes, disallow changing, commenting and form filling. Permissions are applied when you save.
+            {t('Permissions are enforced by PDF software (this app included) for anyone without the permissions password. PDF has no permission that prevents saving a copy: to stop others from saving changes, disallow changing, commenting and form filling. Permissions are applied when you save.')}
           </p>
         </>
       )}
@@ -164,50 +168,51 @@ export function SecurityDialog({ close }: { close: () => void }) {
   const [algorithm, setAlgorithm] = useState<Algorithm>(initial.algorithm);
   const [error, setError] = useState('');
   const restricted = !allPermissionsGranted(initial.permissions);
+  const t = useT();
 
   if (!ownerAccess) {
-    return <Modal title="Password security" onClose={close}><UnlockForm onDone={close} /></Modal>;
+    return <Modal title={t('Password security')} onClose={close}><UnlockForm onDone={close} /></Modal>;
   }
 
   const submit = () => {
-    if (requireOpen && !userPw) return setError('Enter the password needed to open the document.');
-    if (restricted && !ownerPw) return setError('This document restricts permissions: keep a permissions password.');
-    if (requireOpen && ownerPw && userPw === ownerPw) return setError('The two passwords must differ, or anyone who can open the file could lift the restrictions.');
+    if (requireOpen && !userPw) return setError(tr('Enter the password needed to open the document.'));
+    if (restricted && !ownerPw) return setError(tr('This document restricts permissions: keep a permissions password.'));
+    if (requireOpen && ownerPw && userPw === ownerPw) return setError(tr('The two passwords must differ, or anyone who can open the file could lift the restrictions.'));
     const open = requireOpen ? userPw : '';
     if (!open && !restricted) return apply(null, close);
     apply({ userPassword: open, ownerPassword: ownerPw || open, permissions: initial.permissions, algorithm }, close);
   };
 
   const status = securityChanged
-    ? current ? `On save: encrypted with ${current.algorithm}.` : 'On save: no encryption.'
-    : encryption?.encrypted ? `On save: unchanged (${encryption.algorithm}).` : 'On save: no encryption.';
+    ? current ? tf('On save: encrypted with {algorithm}.', { algorithm: current.algorithm }) : t('On save: no encryption.')
+    : encryption?.encrypted ? tf('On save: unchanged ({algorithm}).', { algorithm: encryption.algorithm ?? '' }) : t('On save: no encryption.');
 
   return (
     <Modal
-      title="Password security"
+      title={t('Password security')}
       onClose={close}
       footer={
         <>
-          {(current || encryption?.encrypted) && <button className="danger" onClick={() => apply(null, close)}>Remove security</button>}
+          {(current || encryption?.encrypted) && <button className="danger" onClick={() => apply(null, close)}>{t('Remove security')}</button>}
           <span className="spacer" />
-          <button onClick={close}>Cancel</button>
-          <button className="primary" onClick={submit}><ShieldCheck size={14} /> Apply</button>
+          <button onClick={close}>{t('Cancel')}</button>
+          <button className="primary" onClick={submit}><ShieldCheck size={14} /> {t('Apply')}</button>
         </>
       }
     >
-      <p className="muted small">{encryption?.encrypted ? `Opened file: encrypted (${encryption.algorithm}).` : 'Opened file: not encrypted.'} {status}</p>
-      {signed && <p className="warn-text small">This document is signed. Changing its security rewrites the file and invalidates the signatures.</p>}
-      <label className="row inline"><input type="checkbox" checked={requireOpen} onChange={(e) => setRequireOpen(e.target.checked)} /> Require a password to open the document</label>
-      {requireOpen && <label className="row"><span>Open password</span><input type="password" value={userPw} onChange={(e) => setUserPw(e.target.value)} autoComplete="new-password" /></label>}
-      <label className="row"><span>Permissions password</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder={restricted ? 'required' : 'optional'} /></label>
-      <div className="row"><span>Permissions</span>
-        <span className="small">{restricted ? 'Some actions are restricted.' : 'Everything is allowed.'}</span>
-        <button onClick={() => { close(); useDialog.getState().show('permissions'); }}>Edit permissions…</button>
+      <p className="muted small">{encryption?.encrypted ? tf('Opened file: encrypted ({algorithm}).', { algorithm: encryption.algorithm ?? '' }) : t('Opened file: not encrypted.')} {status}</p>
+      {signed && <p className="warn-text small">{t('This document is signed. Changing its security rewrites the file and invalidates the signatures.')}</p>}
+      <label className="row inline"><input type="checkbox" checked={requireOpen} onChange={(e) => setRequireOpen(e.target.checked)} /> {t('Require a password to open the document')}</label>
+      {requireOpen && <label className="row"><span>{t('Open password')}</span><input type="password" value={userPw} onChange={(e) => setUserPw(e.target.value)} autoComplete="new-password" /></label>}
+      <label className="row"><span>{t('Permissions password')}</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder={t(restricted ? 'required' : 'optional')} /></label>
+      <div className="row"><span>{t('Permissions')}</span>
+        <span className="small">{t(restricted ? 'Some actions are restricted.' : 'Everything is allowed.')}</span>
+        <button onClick={() => { close(); useDialog.getState().show('permissions'); }}>{t('Edit permissions…')}</button>
       </div>
-      <label className="row"><span>Encryption</span>
+      <label className="row"><span>{t('Encryption')}</span>
         <select value={algorithm} onChange={(e) => setAlgorithm(e.target.value as Algorithm)}>
-          <option value="AES-256">AES-256 (Acrobat X and later)</option>
-          <option value="AES-128">AES-128 (Acrobat 7 and later)</option>
+          <option value="AES-256">{t('AES-256 (Acrobat X and later)')}</option>
+          <option value="AES-128">{t('AES-128 (Acrobat 7 and later)')}</option>
         </select>
       </label>
       {error && <p className="error-text">{error}</p>}
@@ -226,6 +231,7 @@ function TestCertificateForm({ onCreated }: { onCreated: (p12: Uint8Array, passw
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const create = async () => {
     if (!name || !pw) return;
     setBusy(true);
@@ -239,11 +245,11 @@ function TestCertificateForm({ onCreated }: { onCreated: (p12: Uint8Array, passw
   };
   return (
     <div className="subpanel">
-      <p className="muted small">Creates a self-signed certificate for trying out signing. Signatures made with it are mathematically valid, but other people’s software will not recognise you as a trusted signer.</p>
-      <label className="row"><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      <label className="row"><span>Email</span><input value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-      <label className="row"><span>Protect with</span><input type="password" placeholder="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></label>
-      <div className="row"><span /><button disabled={!name || !pw || busy} onClick={create}>{busy ? 'Creating…' : 'Create and download .p12'}</button></div>
+      <p className="muted small">{t('Creates a self-signed certificate for trying out signing. Signatures made with it are mathematically valid, but other people’s software will not recognise you as a trusted signer.')}</p>
+      <label className="row"><span>{t('Name')}</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label className="row"><span>{t('Email')}</span><input value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      <label className="row"><span>{t('Protect with')}</span><input type="password" placeholder={t('password')} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></label>
+      <div className="row"><span /><button disabled={!name || !pw || busy} onClick={create}>{t(busy ? 'Creating…' : 'Create and download .p12')}</button></div>
     </div>
   );
 }
@@ -254,7 +260,9 @@ export function SignDialog({ close, placement }: { close: () => void; placement?
   const [password, setPassword] = useState('');
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [error, setError] = useState('');
-  const [reason, setReason] = useState('I approve this document');
+  const t = useT();
+  // The default reason is written into the signature, so it follows the interface language.
+  const [reason, setReason] = useState(() => tr('I approve this document'));
   const [location, setLocation] = useState('');
   const [contactInfo, setContact] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -266,7 +274,7 @@ export function SignDialog({ close, placement }: { close: () => void; placement?
     try {
       setIdentity(await readP12(bytes, pw));
     } catch (e) {
-      setError((e as Error).message);
+      setError(tr((e as Error).message));
     }
   };
 
@@ -280,12 +288,12 @@ export function SignDialog({ close, placement }: { close: () => void; placement?
 
   return (
     <Modal
-      title="Sign with a certificate"
+      title={t('Sign with a certificate')}
       wide
       onClose={close}
-      footer={<><button onClick={close}>Cancel</button><button className="primary" disabled={!identity} onClick={sign}><FileKey2 size={14} /> Sign and save</button></>}
+      footer={<><button onClick={close}>{t('Cancel')}</button><button className="primary" disabled={!identity} onClick={sign}><FileKey2 size={14} /> {t('Sign and save')}</button></>}
     >
-      <label className="row"><span>Certificate</span>
+      <label className="row"><span>{t('Certificate')}</span>
         <input type="file" accept=".p12,.pfx,application/x-pkcs12" onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
@@ -296,23 +304,23 @@ export function SignDialog({ close, placement }: { close: () => void; placement?
         }} />
       </label>
       {fileName && <p className="muted small">{fileName}</p>}
-      <label className="row"><span>Password</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} /><button disabled={!p12} onClick={() => load()}>Open</button></label>
+      <label className="row"><span>{t('Password')}</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} /><button disabled={!p12} onClick={() => load()}>{t('Open')}</button></label>
       {error && <p className="error-text">{error}</p>}
       {identity && (
         <div className="identity">
           <b>{identity.name}</b>{identity.email ? ` <${identity.email}>` : ''}
-          <div className="muted small">Issued by {identity.issuer}{identity.issuer === identity.name ? ' (self-signed)' : ''} · valid {identity.notBefore.toLocaleDateString()} – {identity.notAfter.toLocaleDateString()}</div>
-          {expired && <div className="warn-text small">This certificate is not valid today.</div>}
+          <div className="muted small">{tf('Issued by {issuer}', { issuer: identity.issuer })}{identity.issuer === identity.name ? ` (${t('self-signed')})` : ''} · {t('valid')} {identity.notBefore.toLocaleDateString()} – {identity.notAfter.toLocaleDateString()}</div>
+          {expired && <div className="warn-text small">{t('This certificate is not valid today.')}</div>}
         </div>
       )}
-      <button className="link small" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Hide' : 'No certificate? Create a test certificate…'}</button>
-      {showCreate && <TestCertificateForm onCreated={(bytes, pw, name) => { setP12(bytes); setPassword(pw); setFileName(`${name} (test certificate)`); setShowCreate(false); load(bytes, pw); }} />}
-      <label className="row"><span>Reason</span><input value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-      <label className="row"><span>Location</span><input value={location} onChange={(e) => setLocation(e.target.value)} /></label>
-      <label className="row"><span>Contact</span><input value={contactInfo} onChange={(e) => setContact(e.target.value)} /></label>
+      <button className="link small" onClick={() => setShowCreate(!showCreate)}>{t(showCreate ? 'Hide' : 'No certificate? Create a test certificate…')}</button>
+      {showCreate && <TestCertificateForm onCreated={(bytes, pw, name) => { setP12(bytes); setPassword(pw); setFileName(`${name} (${tr('test certificate')})`); setShowCreate(false); load(bytes, pw); }} />}
+      <label className="row"><span>{t('Reason')}</span><input value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+      <label className="row"><span>{t('Location')}</span><input value={location} onChange={(e) => setLocation(e.target.value)} /></label>
+      <label className="row"><span>{t('Contact')}</span><input value={contactInfo} onChange={(e) => setContact(e.target.value)} /></label>
       <p className="muted small">
-        {placement ? `A visible signature is placed on page ${placement.page + 1} where you drew it.` : 'Invisible signature. To show it on a page, use Protect → Sign and drag a box.'}{' '}
-        The signed file is downloaded and reopened; existing signatures stay valid.
+        {placement ? tf('A visible signature is placed on page {n} where you drew it.', { n: placement.page + 1 }) : t('Invisible signature. To show it on a page, use Protect → Sign and drag a box.')}{' '}
+        {t('The signed file is downloaded and reopened; existing signatures stay valid.')}
       </p>
     </Modal>
   );

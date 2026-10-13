@@ -4,7 +4,9 @@ import { useCan } from '../store/permissions';
 import type { SigStatus } from '../lib/signature';
 import { useDialog } from './Dialogs';
 import { ACTION_LABELS, allowed, type Action } from '../store/permissions';
+import { tf, useLang, useT } from '../lib/i18n';
 
+/** Labels are English translation keys. */
 export const STATUS: Record<SigStatus, { label: string; icon: typeof ShieldCheck; cls: string }> = {
   valid: { label: 'Valid', icon: ShieldCheck, cls: 'ok' },
   'valid-modified': { label: 'Valid, but changed later', icon: ShieldAlert, cls: 'warn' },
@@ -13,15 +15,16 @@ export const STATUS: Record<SigStatus, { label: string; icon: typeof ShieldCheck
 };
 
 export function SignaturesPanel() {
+  const t = useT();
   const signatures = useStore((s) => s.signatures);
   const editable = useCan('fillForms');
   return (
     <div className="panel">
       <div className="panel-title">
-        Signatures <span className="muted">({signatures.length})</span>
-        <button className="small-btn" disabled={!editable} onClick={() => useStore.getState().setTool('sign')} title="Drag a box on the page for a visible signature">Sign…</button>
+        {t('Signatures')} <span className="muted">({signatures.length})</span>
+        <button className="small-btn" disabled={!editable} onClick={() => useStore.getState().setTool('sign')} title={t('Drag a box on the page for a visible signature')}>{t('Sign…')}</button>
       </div>
-      {signatures.length === 0 && <p className="muted pad">This document has no digital signatures.</p>}
+      {signatures.length === 0 && <p className="muted pad">{t('This document has no digital signatures.')}</p>}
       <div className="comment-list">
         {signatures.map((sig, i) => {
           const st = STATUS[sig.status];
@@ -32,19 +35,19 @@ export function SignaturesPanel() {
               <div className="comment-body">
                 <div className="comment-head">
                   <b>{sig.signer}</b>
-                  <span className={`sig-status ${st.cls}`}>{st.label}</span>
+                  <span className={`sig-status ${st.cls}`}>{t(st.label)}</span>
                 </div>
-                <div className="comment-text">{sig.detail}</div>
+                <div className="comment-text">{t(sig.detail)}</div>
                 <dl className="sig-details small">
-                  {sig.signedAt && <><dt>Signed</dt><dd>{sig.signedAt.toLocaleString()}</dd></>}
-                  {sig.reason && <><dt>Reason</dt><dd>{sig.reason}</dd></>}
-                  {sig.location && <><dt>Location</dt><dd>{sig.location}</dd></>}
-                  {sig.issuer && <><dt>Issuer</dt><dd>{sig.issuer}{sig.selfSigned ? ' (self-signed)' : ''}</dd></>}
-                  {sig.certValidTo && <><dt>Certificate</dt><dd>valid {sig.certValidFrom?.toLocaleDateString()} – {sig.certValidTo.toLocaleDateString()}</dd></>}
-                  {sig.algorithm && <><dt>Algorithm</dt><dd>{sig.algorithm}</dd></>}
-                  <dt>Field</dt><dd>{sig.fieldName}{sig.page !== undefined ? ` · page ${sig.page + 1}` : ' · invisible'}</dd>
+                  {sig.signedAt && <><dt>{t('Signed')}</dt><dd>{sig.signedAt.toLocaleString()}</dd></>}
+                  {sig.reason && <><dt>{t('Reason')}</dt><dd>{sig.reason}</dd></>}
+                  {sig.location && <><dt>{t('Location')}</dt><dd>{sig.location}</dd></>}
+                  {sig.issuer && <><dt>{t('Issuer')}</dt><dd>{sig.issuer}{sig.selfSigned ? ` (${t('self-signed')})` : ''}</dd></>}
+                  {sig.certValidTo && <><dt>{t('Certificate')}</dt><dd>{t('valid')} {sig.certValidFrom?.toLocaleDateString()} – {sig.certValidTo.toLocaleDateString()}</dd></>}
+                  {sig.algorithm && <><dt>{t('Algorithm')}</dt><dd>{sig.algorithm}</dd></>}
+                  <dt>{t('Field')}</dt><dd>{sig.fieldName}{sig.page !== undefined ? ` · ${tf('page {n}', { n: sig.page + 1 })}` : ` · ${t('invisible')}`}</dd>
                 </dl>
-                <div className="muted small">Signer identity is not checked against a list of trusted certificates.</div>
+                <div className="muted small">{t('Signer identity is not checked against a list of trusted certificates.')}</div>
               </div>
             </div>
           );
@@ -61,12 +64,17 @@ export function DocBanner() {
   const dirty = useStore((s) => s.dirty);
   const show = useDialog((d) => d.show);
   const state = useStore();
+  const t = useT();
+  const lang = useLang((l) => l.lang);
   if (lock) {
     const denied = (['print', 'modify', 'assemble', 'annotate', 'fillForms', 'copy'] as Action[]).filter((a) => !allowed(state, a));
     return (
       <div className="doc-banner warn">
-        <ShieldAlert size={16} /> Restricted by the document’s security: {denied.map((a) => ACTION_LABELS[a].toLowerCase()).join(', ')} {denied.length === 1 ? 'is' : 'are'} not allowed.
-        <button onClick={() => show('permissions')}>Permissions…</button>
+        <ShieldAlert size={16} /> {tf(denied.length === 1 ? 'Restricted by the document’s security: {actions} is not allowed.' : 'Restricted by the document’s security: {actions} are not allowed.', {
+          // German nouns keep their capitals.
+          actions: denied.map((a) => (lang === 'en' ? ACTION_LABELS[a].toLowerCase() : t(ACTION_LABELS[a]))).join(', '),
+        })}
+        <button onClick={() => show('permissions')}>{t('Permissions…')}</button>
       </div>
     );
   }
@@ -79,9 +87,9 @@ export function DocBanner() {
   return (
     <div className={`doc-banner ${st.cls}`}>
       <Icon size={16} />
-      {worst === 'invalid' ? 'At least one signature is invalid.' : worst === 'unknown' ? 'Some signatures could not be checked.' : `Signed by ${last.signer}${signatures.length > 1 ? ` and ${signatures.length - 1} other(s)` : ''}: signatures are intact.`}
-      {dirty && <span className="muted"> Unsaved changes will invalidate them when saved.</span>}
-      <button onClick={() => useStore.getState().setSidebar('signatures')}>Signature panel</button>
+      {worst === 'invalid' ? t('At least one signature is invalid.') : worst === 'unknown' ? t('Some signatures could not be checked.') : signatures.length > 1 ? tf('Signed by {signer} and {n} other(s): signatures are intact.', { signer: last.signer, n: signatures.length - 1 }) : tf('Signed by {signer}: signatures are intact.', { signer: last.signer })}
+      {dirty && <span className="muted"> {t('Unsaved changes will invalidate them when saved.')}</span>}
+      <button onClick={() => useStore.getState().setSidebar('signatures')}>{t('Signature panel')}</button>
     </div>
   );
 }

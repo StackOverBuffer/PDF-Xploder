@@ -100,6 +100,11 @@ export function tr(s: string): string {
   return translate(useLang.getState().lang, s);
 }
 
+/** Translate (outside React, like tr) and fill `{name}` placeholders: tf('Page {n}', { n: 3 }). */
+export function tf(s: string, vars: Record<string, string | number>): string {
+  return tr(s).replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+}
+
 /** Translation function for the current interface language. */
 export function useT(): (s: string) => string {
   const lang = useLang((l) => l.lang);

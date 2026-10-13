@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Highlighter } from 'lucide-react';
 import { styleFor, uid, useStore, type SearchHit } from '../store/store';
 import { useCan } from '../store/permissions';
 import { pageTextRuns, type TextRun } from '../lib/pdfjs';
+import { tf, useT } from '../lib/i18n';
 
 let cache: { version: number; runs: TextRun[][] } | null = null;
 
@@ -51,6 +52,7 @@ export function goToHit(index: number) {
 }
 
 export function SearchPanel() {
+  const t = useT();
   const search = useStore((s) => s.search);
   const docVersion = useStore((s) => s.docVersion);
   const editable = useCan('annotate');
@@ -107,30 +109,30 @@ export function SearchPanel() {
       ];
     }
     useStore.setState({ annotations, dirty: true });
-    s.notify(`Highlighted ${s.search.hits.length} match(es).`);
+    s.notify(tf('Highlighted {n} match(es).', { n: s.search.hits.length }));
   };
 
   return (
     <div className="panel">
-      <div className="panel-title">Search</div>
+      <div className="panel-title">{t('Search')}</div>
       <form className="search-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <input ref={inputRef} placeholder="Find text…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <button type="submit" className="primary">Find</button>
+        <input ref={inputRef} placeholder={t('Find text…')} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <button type="submit" className="primary">{t('Find')}</button>
       </form>
       <div className="search-opts">
-        <label><input type="checkbox" checked={search.matchCase} onChange={(e) => submit(e.target.checked)} /> Match case</label>
+        <label><input type="checkbox" checked={search.matchCase} onChange={(e) => submit(e.target.checked)} /> {t('Match case')}</label>
         <span className="spacer" />
-        <button className="icon-btn" title="Previous" onClick={() => go(search.index - 1)}><ChevronUp size={16} /></button>
-        <button className="icon-btn" title="Next" onClick={() => go(search.index + 1)}><ChevronDown size={16} /></button>
-        <button className="icon-btn" title="Highlight all matches" disabled={!editable || !search.hits.length} onClick={highlightAll}><Highlighter size={16} /></button>
+        <button className="icon-btn" title={t('Previous')} onClick={() => go(search.index - 1)}><ChevronUp size={16} /></button>
+        <button className="icon-btn" title={t('Next')} onClick={() => go(search.index + 1)}><ChevronDown size={16} /></button>
+        <button className="icon-btn" title={t('Highlight all matches')} disabled={!editable || !search.hits.length} onClick={highlightAll}><Highlighter size={16} /></button>
       </div>
       <div className="muted small pad">
-        {running ? 'Searching…' : search.query ? `${search.hits.length} match(es)${search.index >= 0 ? ` · ${search.index + 1} of ${search.hits.length}` : ''}` : ''}
+        {running ? t('Searching…') : search.query ? `${tf('{n} match(es)', { n: search.hits.length })}${search.index >= 0 ? ` · ${tf('{i} of {n}', { i: search.index + 1, n: search.hits.length })}` : ''}` : ''}
       </div>
       <div className="search-results">
         {search.hits.slice(0, 500).map((h, i) => (
           <button key={i} className={`search-result ${i === search.index ? 'current' : ''}`} onClick={() => go(i)}>
-            <span className="muted small">p.{h.page + 1}</span> {h.context}
+            <span className="muted small">{tf('p.{n}', { n: h.page + 1 })}</span> {h.context}
           </button>
         ))}
       </div>

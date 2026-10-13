@@ -4,6 +4,7 @@
  * without its owner password; with it, everything is allowed.
  */
 import { useStore, type Store } from './store';
+import { tf, tr } from '../lib/i18n';
 
 export type Action =
   /** Add, change or delete comments (annotations). */
@@ -53,6 +54,7 @@ export function allowed(s: PermState, a: Action): boolean {
   }
 }
 
+/** English labels (translation keys): show them with t()/tr(). */
 export const ACTION_LABELS: Record<Action, string> = {
   annotate: 'Commenting',
   fillForms: 'Filling in form fields',
@@ -77,8 +79,8 @@ export function requirePermission(a: Action): boolean {
   if (allowed(s, a)) return true;
   s.notify(
     !s.editable
-      ? 'This document is read-only.'
-      : `${ACTION_LABELS[a]} is not allowed by this document’s security settings. Unlock it with the permissions password to change them.`,
+      ? tr('This document is read-only.')
+      : tf('{action} is not allowed by this document’s security settings. Unlock it with the permissions password to change them.', { action: tr(ACTION_LABELS[a]) }),
     'error',
   );
   return false;

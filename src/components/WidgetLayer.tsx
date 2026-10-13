@@ -9,6 +9,8 @@ import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import type { PageGeom, Rect } from '../lib/types';
 import { fieldValue } from './FormsPanel';
 import { fillBlockers } from '../lib/forms';
+import { tf, tr, useT } from '../lib/i18n';
+import { KIND_LABEL } from './FieldProperties';
 
 /** The subset of pdf.js annotation data used here. */
 interface AnnotData {
@@ -57,7 +59,7 @@ async function followLink(a: AnnotData) {
   const s = useStore.getState();
   const url = a.url ?? a.unsafeUrl;
   if (url) {
-    if (confirm(`Open this link in a new tab?\n\n${url}`)) window.open(url, '_blank', 'noopener,noreferrer');
+    if (confirm(`${tr('Open this link in a new tab?')}\n\n${url}`)) window.open(url, '_blank', 'noopener,noreferrer');
     return;
   }
   if (a.dest !== undefined && s.pdf) {
@@ -83,6 +85,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
   const editable = useCan('fillForms');
   const highlight = useStore((s) => s.highlightFields);
   const [items, setItems] = useState<AnnotData[]>([]);
+  const t = useT();
 
   useEffect(() => {
     let live = true;
@@ -110,7 +113,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
               className="pdf-link"
               style={style}
               href={target ?? '#'}
-              title={target ?? 'Go to destination'}
+              title={target ?? t('Go to destination')}
               onClick={(e) => {
                 e.preventDefault();
                 followLink(a);
@@ -121,7 +124,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
         const f = a.fieldName ? byName.get(a.fieldName) : undefined;
         if (!f || a.pushButton || a.fieldType === 'Sig') return null;
         const why = [...(editable ? [] : ['the document’s security settings do not allow filling in forms']), ...fillBlockers(f), ...(a.readOnly && !f.props.readOnly ? ['it is marked read-only'] : [])];
-        return <Widget key={a.id} a={a} f={f} value={fieldValue(f, edits)} disabled={why.length > 0} reason={why.length ? `${f.name}: cannot be filled in because ${why.join(' and ')}.` : undefined} style={style} scale={scale} />;
+        return <Widget key={a.id} a={a} f={f} value={fieldValue(f, edits)} disabled={why.length > 0} reason={why.length ? tf('{name}: cannot be filled in because {reasons}.', { name: f.name, reasons: why.map(t).join(` ${t('and')} `) }) : undefined} style={style} scale={scale} />;
       })}
     </div>
   );
@@ -185,6 +188,7 @@ function DesignLayer({ index, geom, scale }: Props) {
   const selected = useStore((s) => s.selectedField);
   const canDesign = useCan('designForms');
   const [drag, setDrag] = useState<DragState | null>(null);
+  const t = useT();
 
   const boxes = fields.flatMap((f) => f.widgets.map((w, i) => ({ f, i, w })).filter(({ w }) => w.page === index));
 
@@ -223,7 +227,7 @@ function DesignLayer({ index, geom, scale }: Props) {
             key={`${f.name}#${i}`}
             className={`field-box kind-${f.kind} ${isSel ? 'selected' : ''} ${locked ? 'locked' : ''} ${f.readOnly ? 'readonly' : ''}`}
             style={{ left: live.left * scale, top: live.top * scale, width: live.width * scale, height: live.height * scale }}
-            title={`${f.name} (${f.kind})${locked ? ' · locked' : ''}${f.props.readOnly ? ' · read-only' : ''}${f.props.required ? ' · required' : ''}`}
+            title={`${f.name} (${t(KIND_LABEL[f.kind])})${locked ? ` · ${t('locked')}` : ''}${f.props.readOnly ? ` · ${t('read-only')}` : ''}${f.props.required ? ` · ${t('required')}` : ''}`}
             onPointerDown={(e) => start(e, f.name, i, base, 'move', locked)}
           >
             <span className="field-label">{locked && <Lock size={9} />}{f.name}{f.props.required ? ' *' : ''}</span>

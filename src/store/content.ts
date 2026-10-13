@@ -4,6 +4,7 @@
  */
 import { useStore } from './store';
 import { requirePermission } from './permissions';
+import { tf } from '../lib/i18n';
 import { describeObjects, editPage, loadForEditing, readPage, writePage, type ContentEdit, type ObjectInfo } from '../lib/content/page';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import { downloadBlob, baseName } from '../lib/download';
@@ -77,7 +78,8 @@ async function confirmPageIsEditable(page: number): Promise<boolean> {
     const diff = diffFraction(before, after);
     if (diff > 0.002 || pc.unknown.length) {
       const pct = (diff * 100).toFixed(1);
-      if (!confirm(`This page uses content the editor cannot reproduce exactly (${pct}% of the page would look different${pc.unknown.length ? `; unsupported operators: ${[...new Set(pc.unknown)].join(', ')}` : ''}). Edit it anyway?`)) return false;
+      const ops = pc.unknown.length ? tf('; unsupported operators: {ops}', { ops: [...new Set(pc.unknown)].join(', ') }) : '';
+      if (!confirm(tf('This page uses content the editor cannot reproduce exactly ({pct}% of the page would look different{ops}). Edit it anyway?', { pct, ops }))) return false;
     }
     verified.add(id);
     return true;

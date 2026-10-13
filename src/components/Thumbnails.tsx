@@ -4,6 +4,7 @@ import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { viewSize } from '../lib/geometry';
+import { tf, useT } from '../lib/i18n';
 
 const THUMB_W = 130;
 
@@ -53,6 +54,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
 });
 
 export function Thumbnails() {
+  const t = useT();
   const count = useStore((s) => s.geoms.length);
   const current = useStore((s) => s.currentPage);
   const selected = useStore((s) => s.selectedPages);
@@ -105,13 +107,13 @@ export function Thumbnails() {
   return (
     <div className="panel thumbs-panel">
       <div className="panel-toolbar">
-        <button title="Rotate left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)}><RotateCcw size={16} /></button>
-        <button title="Rotate right" disabled={!canAssemble} onClick={() => cmd.rotate(90)}><RotateCw size={16} /></button>
-        <button title="Insert blank page after" disabled={!canAssemble} onClick={() => cmd.insertBlank()}><FilePlus2 size={16} /></button>
-        <button title="Duplicate" disabled={!canAssemble} onClick={() => cmd.duplicate()}><Copy size={16} /></button>
-        <button title="Extract to new file" disabled={!canCopy} onClick={() => cmd.extract()}><FileOutput size={16} /></button>
-        <button title="Delete" disabled={!canAssemble} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
-        <span className="muted small">{n} sel.</span>
+        <button title={t('Rotate left')} disabled={!canAssemble} onClick={() => cmd.rotate(-90)}><RotateCcw size={16} /></button>
+        <button title={t('Rotate right')} disabled={!canAssemble} onClick={() => cmd.rotate(90)}><RotateCw size={16} /></button>
+        <button title={t('Insert blank page after')} disabled={!canAssemble} onClick={() => cmd.insertBlank()}><FilePlus2 size={16} /></button>
+        <button title={t('Duplicate')} disabled={!canAssemble} onClick={() => cmd.duplicate()}><Copy size={16} /></button>
+        <button title={t('Extract to new file')} disabled={!canCopy} onClick={() => cmd.extract()}><FileOutput size={16} /></button>
+        <button title={t('Delete')} disabled={!canAssemble} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
+        <span className="muted small">{tf('{n} sel.', { n })}</span>
       </div>
       <div className="thumbs" onDragLeave={() => setDropAt(null)} onDrop={onDrop}>
         {Array.from({ length: count }, (_, i) => (
@@ -125,7 +127,7 @@ export function Thumbnails() {
           >
             <div className="thumb-frame">
               <Thumb index={i} />
-              {(annotations[pageIds[i]]?.length ?? 0) > 0 && <span className="thumb-badge" title="Has annotations">{annotations[pageIds[i]].length}</span>}
+              {(annotations[pageIds[i]]?.length ?? 0) > 0 && <span className="thumb-badge" title={t('Has annotations')}>{annotations[pageIds[i]].length}</span>}
             </div>
             <div className="thumb-label">{i + 1}</div>
           </div>

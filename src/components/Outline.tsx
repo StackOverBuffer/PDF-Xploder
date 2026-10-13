@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useStore } from '../store/store';
 import { resolveDest } from '../lib/pdfjs';
+import { useT } from '../lib/i18n';
 
 interface Node {
   title: string;
@@ -37,6 +38,7 @@ function Item({ node, depth }: { node: Node; depth: number }) {
 }
 
 export function Outline() {
+  const t = useT();
   const pdf = useStore((s) => s.pdf);
   const [items, setItems] = useState<Node[] | null>(null);
   useEffect(() => {
@@ -49,8 +51,8 @@ export function Outline() {
   }, [pdf]);
   return (
     <div className="panel">
-      <div className="panel-title">Bookmarks</div>
-      {items === null ? <p className="muted pad">Loading…</p> : items.length === 0 ? <p className="muted pad">This document has no bookmarks.</p> : (
+      <div className="panel-title">{t('Bookmarks')}</div>
+      {items === null ? <p className="muted pad">{t('Loading…')}</p> : items.length === 0 ? <p className="muted pad">{t('This document has no bookmarks.')}</p> : (
         <ul className="outline">{items.map((n, i) => <Item key={i} node={n} depth={0} />)}</ul>
       )}
     </div>

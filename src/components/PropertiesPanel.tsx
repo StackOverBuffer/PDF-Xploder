@@ -5,6 +5,10 @@ import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
 import { ContentProperties } from './ContentProperties';
 import { makeAllFieldsEditable, setAllFieldsLocked } from '../store/commands';
+import { useT } from '../lib/i18n';
+
+/** `t(key)`, or `en` while `key` has no translation: for words whose plain key ("Fill") means something else in the ribbon. */
+const tOr = (t: (s: string) => string, key: string, en: string) => (t(key) === key ? en : t(key));
 
 function FormDesignHelp() {
   const fields = useStore((s) => s.fields);
@@ -13,21 +17,22 @@ function FormDesignHelp() {
   const locked = fields.filter((f) => f.props.locked).length;
   const readOnly = fields.filter((f) => f.props.readOnly).length;
   const valueLocked = fields.filter((f) => f.props.lockedContents).length;
+  const t = useT();
   return (
     <div className="props-body">
-      <div className="props-head"><b>Edit form</b></div>
-      <p className="muted small">Click a field to change its properties; drag it to move it, or use the field tools to add new ones.</p>
-      {!canDesign && <p className="error-text small">This document’s security settings do not allow changing form fields{canFill ? '' : ' or filling them in'}. Unlock it with the permissions password (Protect → Permissions).</p>}
+      <div className="props-head"><b>{t('Edit form')}</b></div>
+      <p className="muted small">{t('Click a field to change its properties; drag it to move it, or use the field tools to add new ones.')}</p>
+      {!canDesign && <p className="error-text small">{t(canFill ? 'This document’s security settings do not allow changing form fields. Unlock it with the permissions password (Protect → Permissions).' : 'This document’s security settings do not allow changing form fields or filling them in. Unlock it with the permissions password (Protect → Permissions).')}</p>}
       {(locked > 0 || readOnly > 0 || valueLocked > 0) && (
         <div className="notice">
-          <p className="small"><b>Some fields are protected by the document:</b></p>
+          <p className="small"><b>{t('Some fields are protected by the document:')}</b></p>
           <ul className="small">
-            {readOnly > 0 && <li><b>{readOnly}</b> read-only (dashed outline): cannot be filled in.</li>}
-            {valueLocked > 0 && <li><b>{valueLocked}</b> with a locked value: cannot be filled in.</li>}
-            {locked > 0 && <li><b>{locked}</b> locked (lock icon): cannot be moved, resized, deleted or changed. Filling in is not affected.</li>}
+            {readOnly > 0 && <li><b>{readOnly}</b> {t('read-only (dashed outline): cannot be filled in.')}</li>}
+            {valueLocked > 0 && <li><b>{valueLocked}</b> {t('with a locked value: cannot be filled in.')}</li>}
+            {locked > 0 && <li><b>{locked}</b> {t('locked (lock icon): cannot be moved, resized, deleted or changed. Filling in is not affected.')}</li>}
           </ul>
-          <button disabled={!canDesign} onClick={() => makeAllFieldsEditable()}>Make all fields editable</button>
-          {locked > 0 && <button disabled={!canDesign} onClick={() => setAllFieldsLocked(false)}>Only unlock (keep read-only)</button>}
+          <button disabled={!canDesign} onClick={() => makeAllFieldsEditable()}>{t('Make all fields editable')}</button>
+          {locked > 0 && <button disabled={!canDesign} onClick={() => setAllFieldsLocked(false)}>{t('Only unlock (keep read-only)')}</button>}
         </div>
       )}
     </div>
@@ -38,6 +43,7 @@ function ContentToolHelp() {
   const tool = useStore((s) => s.tool);
   const filter = useStore((s) => s.contentFilter);
   const style = useStore((s) => (s.tool === 'contentText' ? s.styles.text : s.styles.rect));
+  const t = useT();
   const hint: Record<string, string> = {
     content: 'Click an object on the page to select it, or drag around several. Double-click text to edit it.',
     contentText: 'Click on the page where the new text should start, type, then press Enter.',
@@ -47,20 +53,20 @@ function ContentToolHelp() {
   };
   return (
     <div className="props-body">
-      <div className="props-head"><b>Edit page content</b></div>
-      <p className="muted small">{hint[tool]}</p>
+      <div className="props-head"><b>{t('Edit page content')}</b></div>
+      <p className="muted small">{hint[tool] && t(hint[tool])}</p>
       {tool === 'content' && (
         <label className="prop">
-          <span className="prop-label">Select</span>
+          <span className="prop-label">{t('Select')}</span>
           <select value={filter} onChange={(e) => useStore.setState({ contentFilter: e.target.value as typeof filter, contentSelection: null })}>
-            <option value="all">All content</option><option value="text">Text only</option><option value="image">Images only</option><option value="shape">Shapes only</option>
+            <option value="all">{t('All content')}</option><option value="text">{t('Text only')}</option><option value="image">{t('Images only')}</option><option value="shape">{t('Shapes only')}</option>
           </select>
         </label>
       )}
       {tool !== 'content' && (
         <StyleEditor type={tool === 'contentText' ? 'text' : 'rect'} style={style} onChange={(p) => useStore.getState().setStyle(tool === 'contentText' ? 'text' : 'rect', p)} />
       )}
-      <p className="muted small">Changes are made to the page itself (not as comments) and can be undone with Ctrl+Z.</p>
+      <p className="muted small">{t('Changes are made to the page itself (not as comments) and can be undone with Ctrl+Z.')}</p>
     </div>
   );
 }
@@ -71,15 +77,16 @@ export const STAMPS = ['Approved', 'Not Approved', 'Draft', 'Final', 'Confidenti
 const SWATCHES = ['#ffeb3b', '#ff9800', '#e53935', '#d81b60', '#8e24aa', '#1e88e5', '#00acc1', '#43a047', '#111111', '#757575', '#ffffff'];
 
 function ColorRow({ value, onChange, allowNone, label }: { value: string | null; onChange: (c: string | null) => void; allowNone?: boolean; label: string }) {
+  const t = useT();
   return (
     <div className="prop">
       <span className="prop-label">{label}</span>
       <div className="swatches">
-        {allowNone && <button className={`swatch-btn none ${value === null ? 'active' : ''}`} title="None" onClick={() => onChange(null)} />}
+        {allowNone && <button className={`swatch-btn none ${value === null ? 'active' : ''}`} title={t('None')} onClick={() => onChange(null)} />}
         {SWATCHES.map((c) => (
           <button key={c} className={`swatch-btn ${value === c ? 'active' : ''}`} style={{ background: c }} title={c} onClick={() => onChange(c)} />
         ))}
-        <input type="color" value={value ?? '#ffffff'} onChange={(e) => onChange(e.target.value)} title="Custom colour" />
+        <input type="color" value={value ?? '#ffffff'} onChange={(e) => onChange(e.target.value)} title={t('Custom colour')} />
       </div>
     </div>
   );
@@ -124,16 +131,17 @@ function fieldsFor(type: string): Fields {
 
 function StyleEditor({ type, style, onChange }: { type: string; style: Partial<ToolStyle>; onChange: (p: Partial<ToolStyle>) => void }) {
   const f = fieldsFor(type);
+  const t = useT();
   return (
     <>
-      {f.color && <ColorRow label={type === 'rect' || type === 'ellipse' ? 'Stroke' : 'Colour'} value={style.color ?? null} onChange={(c) => c && onChange({ color: c })} />}
-      {f.fill && <ColorRow label="Fill" allowNone value={style.fill ?? null} onChange={(c) => onChange({ fill: c })} />}
-      {f.width && <Slider label="Thickness" value={style.width ?? 1} min={0.5} max={20} step={0.5} onChange={(width) => onChange({ width })} fmt={(v) => `${v} pt`} />}
-      {f.fontSize && <Slider label="Font size" value={style.fontSize ?? 12} min={6} max={72} step={1} onChange={(fontSize) => onChange({ fontSize })} fmt={(v) => `${v} pt`} />}
-      {f.opacity && <Slider label="Opacity" value={style.opacity ?? 1} min={0.1} max={1} step={0.05} onChange={(opacity) => onChange({ opacity })} fmt={(v) => `${Math.round(v * 100)}%`} />}
+      {f.color && <ColorRow label={t(type === 'rect' || type === 'ellipse' ? 'Stroke' : 'Colour')} value={style.color ?? null} onChange={(c) => c && onChange({ color: c })} />}
+      {f.fill && <ColorRow label={tOr(t, 'Fill colour', 'Fill')} allowNone value={style.fill ?? null} onChange={(c) => onChange({ fill: c })} />}
+      {f.width && <Slider label={t('Thickness')} value={style.width ?? 1} min={0.5} max={20} step={0.5} onChange={(width) => onChange({ width })} fmt={(v) => `${v} pt`} />}
+      {f.fontSize && <Slider label={t('Font size')} value={style.fontSize ?? 12} min={6} max={72} step={1} onChange={(fontSize) => onChange({ fontSize })} fmt={(v) => `${v} pt`} />}
+      {f.opacity && <Slider label={t('Opacity')} value={style.opacity ?? 1} min={0.1} max={1} step={0.05} onChange={(opacity) => onChange({ opacity })} fmt={(v) => `${Math.round(v * 100)}%`} />}
       {f.stamp && (
         <label className="prop">
-          <span className="prop-label">Stamp text</span>
+          <span className="prop-label">{t('Stamp text')}</span>
           <input list="stamp-list" value={style.stampLabel ?? ''} onChange={(e) => onChange({ stampLabel: e.target.value })} />
           <datalist id="stamp-list">{STAMPS.map((s) => <option key={s} value={s} />)}</datalist>
         </label>
@@ -145,6 +153,7 @@ function StyleEditor({ type, style, onChange }: { type: string; style: Partial<T
 function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   const update = (patch: Partial<Annotation>, history = true) => useStore.getState().updateAnnotation(pageId, a.id, patch, { history });
   const editable = useCan('annotate');
+  const t = useT();
   const style: Partial<ToolStyle> = {
     color: a.color,
     opacity: a.opacity,
@@ -160,33 +169,33 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   return (
     <fieldset disabled={!editable} className="props-body">
       <div className="props-head">
-        <b>{ANNOT_LABELS[a.type]}</b>
+        <b>{t(ANNOT_LABELS[a.type])}</b>
         <span className="muted small">{a.author} · {new Date(a.createdAt).toLocaleString()}</span>
       </div>
       <StyleEditor type={a.type} style={style} onChange={onStyle} />
       {a.type === 'text' && (
         <>
           <label className="prop">
-            <span className="prop-label">Text</span>
+            <span className="prop-label">{t('Text')}</span>
             <textarea id="prop-text" rows={4} value={a.text} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
           </label>
-          <label className="prop inline"><input type="checkbox" checked={a.border} onChange={(e) => update({ border: e.target.checked })} /> Border</label>
+          <label className="prop inline"><input type="checkbox" checked={a.border} onChange={(e) => update({ border: e.target.checked })} /> {t('Border')}</label>
         </>
       )}
       {a.type === 'note' && (
         <label className="prop">
-          <span className="prop-label">Note</span>
-          <textarea id="prop-text" rows={6} value={a.text} placeholder="Type your note…" onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
+          <span className="prop-label">{t('Note')}</span>
+          <textarea id="prop-text" rows={6} value={a.text} placeholder={t('Type your note…')} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
         </label>
       )}
       {a.type !== 'note' && (
         <label className="prop">
-          <span className="prop-label">Comment</span>
-          <textarea rows={3} value={a.comment ?? ''} placeholder="Add a comment…" onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
+          <span className="prop-label">{tOr(t, 'Comment text', 'Comment')}</span>
+          <textarea rows={3} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
         </label>
       )}
-      {a.type === 'redact' && <p className="muted small">Redaction marks are only previews. Use <b>Protect → Apply redactions</b> to permanently remove the content underneath.</p>}
-      <button className="danger" onClick={() => useStore.getState().deleteAnnotation(pageId, a.id)}><Trash2 size={14} /> Delete</button>
+      {a.type === 'redact' && <p className="muted small">{t('Redaction marks are only previews. Use')} <b>{t('Protect → Apply redactions')}</b> {t('to permanently remove the content underneath.')}</p>}
+      <button className="danger" onClick={() => useStore.getState().deleteAnnotation(pageId, a.id)}><Trash2 size={14} /> {t('Delete')}</button>
     </fieldset>
   );
 }
@@ -226,10 +235,11 @@ export function PropertiesPanel() {
   const contentSel = useStore((s) => s.contentSelection);
   const formDesign = useStore((s) => s.formDesign);
   const field = useStore((s) => (s.selectedField ? s.fields.find((f) => f.name === s.selectedField!.name) : undefined));
+  const t = useT();
 
   return (
     <aside className="props">
-      <div className="panel-title">Properties</div>
+      <div className="panel-title">{t('Properties')}</div>
       {contentSel && tool === 'content' ? (
         <ContentProperties />
       ) : tool.startsWith('content') ? (
@@ -242,15 +252,15 @@ export function PropertiesPanel() {
         <AnnotationProps pageId={sel.pageId} a={a} />
       ) : style ? (
         <div className="props-body">
-          <div className="props-head"><b>{TOOL_NAMES[tool]} tool</b></div>
-          <p className="muted small">{TOOL_HINTS[tool]}</p>
+          <div className="props-head"><b>{t(`${TOOL_NAMES[tool]} tool`)}</b></div>
+          <p className="muted small">{TOOL_HINTS[tool] && t(TOOL_HINTS[tool])}</p>
           <StyleEditor type={tool} style={style} onChange={(p) => useStore.getState().setStyle(tool, p)} />
         </div>
       ) : (
         <div className="props-body">
-          <p className="muted small">Select an annotation to edit it, or pick a tool from the Comment tab.</p>
+          <p className="muted small">{t('Select an annotation to edit it, or pick a tool from the Comment tab.')}</p>
           <label className="prop">
-            <span className="prop-label">Author name</span>
+            <span className="prop-label">{t('Author name')}</span>
             <input value={author} onChange={(e) => useStore.getState().setAuthor(e.target.value)} />
           </label>
         </div>

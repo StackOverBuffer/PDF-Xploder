@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { annotationsByPage, useStore } from './store';
 import { requirePermission } from './permissions';
+import { tf, tr } from '../lib/i18n';
 import * as ops from '../lib/pdfOps';
 import { buildFileForSave, currentBytes, normaliseImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
@@ -162,7 +163,7 @@ export async function attachFiles() {
 }
 
 export async function deleteAttachment(a: att.AttachmentInfo) {
-  if (!requirePermission('modify') || !confirm(`Remove the attachment “${a.fileName}”?`)) return;
+  if (!requirePermission('modify') || !confirm(tf('Remove the attachment “{name}”?', { name: a.fileName }))) return;
   await S().run('Removing attachment…', async () => {
     await S().commitBytes(await att.removeAttachment(S().bytes!, a.key));
     useExtras.setState((x) => ({ attachmentsVersion: x.attachmentsVersion + 1 }));
@@ -237,11 +238,11 @@ export async function fixAccessibility(fix: FixId): Promise<boolean> {
   if (!requirePermission('modify')) return false;
   let value = '';
   if (fix === 'lang') {
-    value = prompt('Document language (e.g. de-DE, en-US):', navigator.language || 'en-US')?.trim() ?? '';
+    value = prompt(tr('Document language (e.g. de-DE, en-US):'), navigator.language || 'en-US')?.trim() ?? '';
     if (!value) return false;
   }
   if (fix === 'title') {
-    value = prompt('Document title:', baseName(S().fileName || ''))?.trim() ?? '';
+    value = prompt(tr('Document title:'), baseName(S().fileName || ''))?.trim() ?? '';
     if (!value) return false;
   }
   await S().run('Updating document…', async () => S().commitBytes(await applyAccessibilityFix(S().bytes!, fix, value)));

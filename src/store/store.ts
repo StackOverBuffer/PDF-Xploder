@@ -5,6 +5,7 @@ import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '..
 import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 import { ALL_PERMISSIONS, allPermissionsGranted, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import { verifySignatures, type SignatureInfo } from '../lib/signature';
+import { tr } from '../lib/i18n';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -210,7 +211,7 @@ export const useStore = create<Store>()((set, get) => {
     let tries = 0;
     const { pdf, password } = await openPdf(bytes, (retry) => {
       if (knownPassword !== undefined && tries++ === 0) return knownPassword;
-      return window.prompt(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:');
+      return window.prompt(tr(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'));
     });
     const geoms = withViewRotation(await pageGeoms(pdf), viewRotation);
     return { pdf, geoms, password };
@@ -360,7 +361,7 @@ export const useStore = create<Store>()((set, get) => {
         fit: 'width',
         sidebar: get().sidebar,
       });
-      if (!editable) get().notify('This document is damaged or uses unsupported encryption: it is open read-only.', 'error');
+      if (!editable) get().notify(tr('This document is damaged or uses unsupported encryption: it is open read-only.'), 'error');
       verifySignatures(original)
         .then((signatures) => {
           if (get().originalBytes !== original) return;
@@ -512,7 +513,8 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     async run(label, fn) {
-      set({ busy: label });
+      // Labels and messages are English keys; translate them centrally.
+      set({ busy: tr(label) });
       try {
         return await fn();
       } catch (e) {
@@ -525,7 +527,7 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     notify(msg, kind = 'info') {
-      set({ toast: { msg, kind } });
+      set({ toast: { msg: tr(msg), kind } });
       const t = get().toast;
       setTimeout(() => {
         if (get().toast === t) set({ toast: null });

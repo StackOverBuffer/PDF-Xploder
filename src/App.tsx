@@ -20,6 +20,7 @@ import { Dialogs, useDialog } from './components/Dialogs';
 import { createSampleDocument } from './lib/sample';
 import { getFormFields } from './lib/pdfOps';
 import type { Tool } from './lib/types';
+import { useT } from './lib/i18n';
 
 const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'pages', icon: LayoutGrid, label: 'Pages' },
@@ -101,6 +102,7 @@ function useShortcuts() {
 }
 
 function Welcome() {
+  const t = useT();
   const [over, setOver] = useState(false);
   return (
     <div
@@ -111,13 +113,13 @@ function Welcome() {
     >
       <div className="welcome-card">
         <h1>PDF-Xploder</h1>
-        <p className="muted">View, annotate, organise, fill and sign PDFs — entirely in your browser. Files never leave your device.</p>
+        <p className="muted">{t('View, annotate, organise, fill and sign PDFs — entirely in your browser. Files never leave your device.')}</p>
         <div className="welcome-actions">
-          <button className="primary big" onClick={cmd.openFromDialog}><FolderOpen size={18} /> Open PDF…</button>
-          <button className="big" onClick={cmd.newDocument}><FilePlus size={18} /> New blank</button>
-          <button className="big" onClick={openSample}><Sparkles size={18} /> Try a sample</button>
+          <button className="primary big" onClick={cmd.openFromDialog}><FolderOpen size={18} /> {t('Open PDF…')}</button>
+          <button className="big" onClick={cmd.newDocument}><FilePlus size={18} /> {t('New blank')}</button>
+          <button className="big" onClick={openSample}><Sparkles size={18} /> {t('Try a sample')}</button>
         </div>
-        <p className="muted small">…or drop PDF files here. Dropping several combines them into one document.</p>
+        <p className="muted small">{t('…or drop PDF files here. Dropping several combines them into one document.')}</p>
       </div>
     </div>
   );
@@ -143,6 +145,7 @@ function useFormFields() {
 }
 
 export function App() {
+  const t = useT();
   const hasDoc = useStore((s) => !!s.pdf);
   const sidebar = useStore((s) => s.sidebar);
   const toast = useStore((s) => s.toast);
@@ -177,7 +180,7 @@ export function App() {
         {hasDoc && (
           <nav className="sidebar-rail">
             {SIDEBAR.map(({ tab, icon: Icon, label }) => (
-              <button key={tab} title={label} className={sidebar === tab ? 'active' : ''} onClick={() => useStore.getState().setSidebar(sidebar === tab ? null : tab)}>
+              <button key={tab} title={t(label)} className={sidebar === tab ? 'active' : ''} onClick={() => useStore.getState().setSidebar(sidebar === tab ? null : tab)}>
                 <Icon size={18} />
               </button>
             ))}
