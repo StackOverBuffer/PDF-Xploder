@@ -1,6 +1,7 @@
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
+import { fillBlockers } from '../lib/forms';
 import { fillForm, resetFormEdits } from '../store/commands';
 
 export function fieldValue(f: FieldInfo, edits: Record<string, FieldValue>): FieldValue | undefined {
@@ -32,6 +33,7 @@ export function FormsPanel() {
           return (
             <label key={f.name} className="field">
               <span className="field-name" title={f.name}>{f.name}{f.name in edits ? ' •' : ''}</span>
+              {fillBlockers(f).length > 0 && <span className="muted small">Cannot be filled in: {fillBlockers(f).join(', ')}.</span>}
               {f.kind === 'text' && (f.multiline ? (
                 <textarea disabled={disabled} value={String(v ?? '')} onFocus={checkpoint} onChange={(e) => set(f.name, e.target.value, false)} />
               ) : (

@@ -255,6 +255,7 @@ select.widget { padding: 0; }
 .field-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #fff; border: 1.5px solid var(--accent); cursor: nwse-resize; }
 .notice { border: 1px solid #f0d78c; background: #fffbea; border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
 .notice p { margin: 0; }
+.notice ul { margin: 0; padding-left: 18px; }
 .prop-group { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
 .content-layer { position: absolute; inset: 0; z-index: 5; cursor: default; }

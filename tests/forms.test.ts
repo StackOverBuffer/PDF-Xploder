@@ -71,6 +71,27 @@ describe('form design', () => {
     expect((await forms.setFieldsLocked(unlocked.bytes, false)).changed).toBe(0);
   });
 
+  it('makes protected fields editable, including widget-level read-only flags', async () => {
+    let { bytes } = await forms.createField(await blank(), 'text', 0, { x: 10, y: 10, w: 100, h: 20 }, 'A');
+    bytes = await forms.updateField(bytes, 'A', { readOnly: true, lockedContents: true });
+    bytes = (await forms.setFieldsLocked(bytes, true)).bytes;
+    // Some producers set the annotation-level ReadOnly flag instead of the field flag.
+    const doc = await PDFDocument.load(bytes);
+    const w = doc.getForm().getField('A').acroField.getWidgets()[0];
+    w.setFlagTo(1 << 6, true);
+    doc.getForm().getField('A').disableReadOnly();
+    bytes = await doc.save();
+    let a = await field(bytes, 'A');
+    expect(a.props).toMatchObject({ readOnly: true, locked: true, lockedContents: true });
+    expect(forms.fillBlockers(a)).toEqual(['it is marked read-only', 'its value is locked']);
+    const res = await forms.makeFieldsEditable(bytes);
+    expect(res.changed).toBe(1);
+    a = await field(res.bytes, 'A');
+    expect(a.props).toMatchObject({ readOnly: false, locked: false, lockedContents: false });
+    expect(a.readOnly).toBe(false);
+    expect(forms.fillBlockers(a)).toEqual([]);
+  });
+
   it('renames fields, edits choice options and adds radio buttons', async () => {
     let { bytes } = await forms.createField(await blank(), 'dropdown', 0, { x: 10, y: 300, w: 120, h: 20 });
     bytes = await forms.updateField(bytes, 'Dropdown1', { name: 'Country', options: ['Germany', 'France', ' ', 'Spain'], editable: true, sort: true });

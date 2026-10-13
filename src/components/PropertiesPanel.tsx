@@ -4,22 +4,30 @@ import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
 import { ContentProperties } from './ContentProperties';
-import { setAllFieldsLocked } from '../store/commands';
+import { makeAllFieldsEditable, setAllFieldsLocked } from '../store/commands';
 
 function FormDesignHelp() {
   const fields = useStore((s) => s.fields);
+  const canDesign = useCan('designForms');
+  const canFill = useCan('fillForms');
   const locked = fields.filter((f) => f.props.locked).length;
+  const readOnly = fields.filter((f) => f.props.readOnly).length;
+  const valueLocked = fields.filter((f) => f.props.lockedContents).length;
   return (
     <div className="props-body">
       <div className="props-head"><b>Edit form</b></div>
       <p className="muted small">Click a field to change its properties; drag it to move it, or use the field tools to add new ones.</p>
-      {locked > 0 && (
+      {!canDesign && <p className="error-text small">This document’s security settings do not allow changing form fields{canFill ? '' : ' or filling them in'}. Unlock it with the permissions password (Protect → Permissions).</p>}
+      {(locked > 0 || readOnly > 0 || valueLocked > 0) && (
         <div className="notice">
-          <p className="small">
-            <b>{locked} of {fields.length} field(s) are locked</b> (shown with a lock). The document marks them with the PDF “Locked” flag, as set by
-            Acrobat’s “Locked” field property, so they cannot be moved, resized, deleted or changed until they are unlocked. Filling them in is not affected.
-          </p>
-          <button onClick={() => setAllFieldsLocked(false)}>Unlock all fields</button>
+          <p className="small"><b>Some fields are protected by the document:</b></p>
+          <ul className="small">
+            {readOnly > 0 && <li><b>{readOnly}</b> read-only (dashed outline): cannot be filled in.</li>}
+            {valueLocked > 0 && <li><b>{valueLocked}</b> with a locked value: cannot be filled in.</li>}
+            {locked > 0 && <li><b>{locked}</b> locked (lock icon): cannot be moved, resized, deleted or changed. Filling in is not affected.</li>}
+          </ul>
+          <button disabled={!canDesign} onClick={() => makeAllFieldsEditable()}>Make all fields editable</button>
+          {locked > 0 && <button disabled={!canDesign} onClick={() => setAllFieldsLocked(false)}>Only unlock (keep read-only)</button>}
         </div>
       )}
     </div>

@@ -483,3 +483,14 @@ export async function setAllFieldsLocked(locked: boolean) {
     S().notify(`${locked ? 'Locked' : 'Unlocked'} ${changed} field widget(s).`);
   });
 }
+
+/** Clear read-only, value locks and Locked on every field so the form can be filled and edited. */
+export async function makeAllFieldsEditable() {
+  if (!requirePermission('designForms')) return;
+  await S().run('Updating fields…', async () => {
+    const { bytes, changed } = await forms.makeFieldsEditable(S().bytes!);
+    if (!changed) return S().notify('All fields are already editable.');
+    await S().commitBytes(bytes);
+    S().notify(`Made ${changed} field(s) editable.`);
+  });
+}

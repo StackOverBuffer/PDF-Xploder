@@ -24,6 +24,7 @@ import type { Rect } from './types';
 const F_HIDDEN = 1 << 1;
 const F_PRINT = 1 << 2;
 const F_NOVIEW = 1 << 5;
+const F_READONLY = 1 << 6;
 const F_LOCKED = 1 << 7;
 const F_LOCKED_CONTENTS = 1 << 9;
 
@@ -154,7 +155,8 @@ export function describeField(doc: PDFDocument, f: PDFField): FieldInfo {
   const kind = kindOf(f);
   const props: FieldProps = {
     tooltip: tooltipOf(f),
-    readOnly: f.isReadOnly(),
+    // Read-only can be set on the field (Ff bit 1) or, by some producers, on its widgets (F bit 7).
+    readOnly: f.isReadOnly() || ws.some(({ widget }) => widget.hasFlag(F_READONLY)),
     required: f.isRequired(),
     noExport: !f.isExported(),
     locked: ws.some(({ widget }) => widget.hasFlag(F_LOCKED)),
@@ -242,7 +244,13 @@ export async function updateField(bytes: Uint8Array, name: string, patch: FieldP
     if (patch.tooltip) f.acroField.dict.set(PDFName.of('TU'), PDFHexString.fromText(patch.tooltip));
     else f.acroField.dict.delete(PDFName.of('TU'));
   }
-  if (patch.readOnly !== undefined) (patch.readOnly ? f.enableReadOnly() : f.disableReadOnly());
+  if (patch.readOnly !== undefined) {
+    if (patch.readOnly) f.enableReadOnly();
+    else {
+      f.disableReadOnly();
+      ws.forEach((w) => w.setFlagTo(F_READONLY, false));
+    }
+  }
   if (patch.required !== undefined) (patch.required ? f.enableRequired() : f.disableRequired());
   if (patch.noExport !== undefined) (patch.noExport ? f.disableExporting() : f.enableExporting());
   if (patch.locked !== undefined) ws.forEach((w) => w.setFlagTo(F_LOCKED, patch.locked!));
@@ -380,6 +388,42 @@ export async function setFieldsLocked(bytes: Uint8Array, locked: boolean, names?
         changed++;
       }
     }
+  }
+  return { bytes: changed ? await saveForm(doc) : bytes, changed };
+}
+
+/** Why a field cannot be filled in, in words (empty when it can). */
+export function fillBlockers(f: FieldInfo): string[] {
+  const out: string[] = [];
+  if (f.props.readOnly) out.push('it is marked read-only');
+  if (f.props.lockedContents) out.push('its value is locked');
+  if (f.kind === 'signature') out.push('it is a signature field (use Protect → Sign)');
+  if (f.kind === 'button' || f.kind === 'other') out.push('this field type cannot be filled in here');
+  return out;
+}
+
+/**
+ * Make every field editable and fillable: clear read-only (field and widget
+ * flags), value locks and the Locked flag.
+ */
+export async function makeFieldsEditable(bytes: Uint8Array): Promise<{ bytes: Uint8Array; changed: number }> {
+  const doc = await load(bytes);
+  let changed = 0;
+  for (const f of doc.getForm().getFields()) {
+    let touched = false;
+    if (f.isReadOnly()) {
+      f.disableReadOnly();
+      touched = true;
+    }
+    for (const { widget } of widgetsOf(f)) {
+      for (const flag of [F_READONLY, F_LOCKED, F_LOCKED_CONTENTS]) {
+        if (widget.hasFlag(flag)) {
+          widget.setFlagTo(flag, false);
+          touched = true;
+        }
+      }
+    }
+    if (touched) changed++;
   }
   return { bytes: changed ? await saveForm(doc) : bytes, changed };
 }

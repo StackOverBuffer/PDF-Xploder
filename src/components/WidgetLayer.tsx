@@ -8,6 +8,7 @@ import { resolveDest, type PDFDocumentProxy } from '../lib/pdfjs';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import type { PageGeom, Rect } from '../lib/types';
 import { fieldValue } from './FormsPanel';
+import { fillBlockers } from '../lib/forms';
 
 /** The subset of pdf.js annotation data used here. */
 interface AnnotData {
@@ -119,13 +120,14 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
         }
         const f = a.fieldName ? byName.get(a.fieldName) : undefined;
         if (!f || a.pushButton || a.fieldType === 'Sig') return null;
-        return <Widget key={a.id} a={a} f={f} value={fieldValue(f, edits)} disabled={!editable || !!a.readOnly || f.readOnly} style={style} scale={scale} />;
+        const why = [...(editable ? [] : ['the document’s security settings do not allow filling in forms']), ...fillBlockers(f), ...(a.readOnly && !f.props.readOnly ? ['it is marked read-only'] : [])];
+        return <Widget key={a.id} a={a} f={f} value={fieldValue(f, edits)} disabled={why.length > 0} reason={why.length ? `${f.name}: cannot be filled in because ${why.join(' and ')}.` : undefined} style={style} scale={scale} />;
       })}
     </div>
   );
 });
 
-function Widget({ a, f, value, disabled, style, scale }: { a: AnnotData; f: FieldInfo; value: FieldValue | undefined; disabled: boolean; style: React.CSSProperties; scale: number }) {
+function Widget({ a, f, value, disabled, reason, style, scale }: { a: AnnotData; f: FieldInfo; value: FieldValue | undefined; disabled: boolean; reason?: string; style: React.CSSProperties; scale: number }) {
   const set = (v: FieldValue, history = true) => useStore.getState().setFormValue(f.name, v, { history });
   const checkpoint = () => useStore.getState().checkpoint();
   const h = Number(style.height);
@@ -133,7 +135,7 @@ function Widget({ a, f, value, disabled, style, scale }: { a: AnnotData; f: Fiel
   const da = a.defaultAppearanceData?.fontSize;
   const fontSize = da ? da * scale : Math.max(8 * scale, Math.min(h * 0.65, 12 * scale));
   const textStyle: React.CSSProperties = { ...style, fontSize, textAlign: (['left', 'center', 'right'] as const)[a.textAlignment ?? 0] };
-  const common = { className: 'widget', disabled, title: f.name, onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
+  const common = { className: 'widget', disabled, title: reason ?? f.name, onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
 
   if (f.kind === 'text') {
     return a.multiLine ? (
@@ -144,7 +146,7 @@ function Widget({ a, f, value, disabled, style, scale }: { a: AnnotData; f: Fiel
   }
   if (f.kind === 'checkbox') {
     return (
-      <label className="widget widget-check" style={style} title={f.name} onPointerDown={(e) => e.stopPropagation()}>
+      <label className="widget widget-check" style={style} title={reason ?? f.name} onPointerDown={(e) => e.stopPropagation()}>
         <input type="checkbox" disabled={disabled} checked={value === true} onChange={(e) => set(e.target.checked)} />
       </label>
     );
@@ -152,7 +154,7 @@ function Widget({ a, f, value, disabled, style, scale }: { a: AnnotData; f: Fiel
   if (f.kind === 'radio') {
     const on = a.buttonValue ?? a.exportValue ?? '';
     return (
-      <label className="widget widget-check radio" style={style} title={`${f.name}: ${on}`} onPointerDown={(e) => e.stopPropagation()}>
+      <label className="widget widget-check radio" style={style} title={reason ?? `${f.name}: ${on}`} onPointerDown={(e) => e.stopPropagation()}>
         <input type="radio" name={`radio-${f.name}`} disabled={disabled} checked={value === on} onChange={() => set(on)} />
       </label>
     );
