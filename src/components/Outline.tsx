@@ -1,23 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useStore } from '../store/store';
-import type { PDFDocumentProxy } from '../lib/pdfjs';
+import { resolveDest } from '../lib/pdfjs';
 
 interface Node {
   title: string;
   dest: unknown;
   items: Node[];
-}
-
-async function resolveDest(pdf: PDFDocumentProxy, dest: unknown): Promise<{ page: number; y?: number } | null> {
-  const explicit = typeof dest === 'string' ? await pdf.getDestination(dest) : (dest as unknown[] | null);
-  if (!Array.isArray(explicit) || !explicit.length) return null;
-  const [ref, kind, ...args] = explicit as [unknown, { name?: string } | undefined, ...unknown[]];
-  const page = typeof ref === 'number' ? ref : await pdf.getPageIndex(ref as Parameters<PDFDocumentProxy['getPageIndex']>[0]);
-  let y: number | undefined;
-  if (kind?.name === 'XYZ' && typeof args[1] === 'number') y = args[1];
-  else if ((kind?.name === 'FitH' || kind?.name === 'FitBH') && typeof args[0] === 'number') y = args[0];
-  return { page, y };
 }
 
 function Item({ node, depth }: { node: Node; depth: number }) {

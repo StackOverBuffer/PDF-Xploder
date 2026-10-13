@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
-import { importForEditing, load as loadPdfLib } from '../lib/pdfOps';
+import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -11,6 +11,7 @@ interface Snapshot {
   bytes: Uint8Array;
   pageIds: string[];
   annotations: Record<string, Annotation[]>;
+  formValues: Record<string, FieldValue>;
 }
 
 export interface ToolStyle {
@@ -62,6 +63,11 @@ interface State {
   pageIds: string[];
   geoms: PageGeom[];
   annotations: Record<string, Annotation[]>;
+  /** Form fields of the current bytes (loaded asynchronously after each change). */
+  fields: FieldInfo[];
+  /** Form values edited since the bytes were last written; applied on save. */
+  formValues: Record<string, FieldValue>;
+  highlightFields: boolean;
   /** Bumped whenever `pdf` is replaced, so caches can be invalidated. */
   docVersion: number;
   editable: boolean;
@@ -93,10 +99,11 @@ interface Actions {
   openDocument(bytes: Uint8Array, name: string): Promise<void>;
   closeDocument(): void;
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
-  commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>): Promise<void>;
+  commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>, formValues?: Record<string, FieldValue>): Promise<void>;
   addAnnotation(pageIndex: number, a: Annotation): void;
   updateAnnotation(pageId: string, id: string, patch: Partial<Annotation>, opts?: { history?: boolean }): void;
   deleteAnnotation(pageId: string, id: string): void;
+  setFormValue(name: string, value: FieldValue, opts?: { history?: boolean }): void;
   /** Push the current state onto the undo stack (used before a drag starts). */
   checkpoint(): void;
   undo(): Promise<void>;
@@ -128,6 +135,8 @@ const initialDoc = {
   pageIds: [],
   geoms: [],
   annotations: {},
+  fields: [],
+  formValues: {},
   editable: true,
   dirty: false,
   past: [],
@@ -159,7 +168,7 @@ export const useStore = create<Store>()((set, get) => {
 
   function snapshot(): Snapshot {
     const s = get();
-    return { bytes: s.bytes!, pageIds: s.pageIds, annotations: s.annotations };
+    return { bytes: s.bytes!, pageIds: s.pageIds, annotations: s.annotations, formValues: s.formValues };
   }
 
   function pushHistory() {
@@ -188,7 +197,7 @@ export const useStore = create<Store>()((set, get) => {
       s.pdf?.destroy();
       set({ pdf, geoms, bytes: snap.bytes, docVersion: s.docVersion + 1 });
     }
-    set({ pageIds: snap.pageIds, annotations: snap.annotations, selected: null, editing: null, dirty: true, search: { ...get().search, hits: [], index: -1 } });
+    set({ pageIds: snap.pageIds, annotations: snap.annotations, formValues: snap.formValues, selected: null, editing: null, dirty: true, search: { ...get().search, hits: [], index: -1 } });
     set({ currentPage: Math.min(get().currentPage, snap.pageIds.length - 1) });
   }
 
@@ -202,6 +211,7 @@ export const useStore = create<Store>()((set, get) => {
     tool: 'select',
     styles: DEFAULT_STYLES,
     author: readAuthor(),
+    highlightFields: true,
     sidebar: 'pages',
 
     async openDocument(bytes, name) {
@@ -258,7 +268,7 @@ export const useStore = create<Store>()((set, get) => {
       set({ ...initialDoc, docVersion: get().docVersion + 1 });
     },
 
-    async commitBytes(bytes, pageIds, annotations) {
+    async commitBytes(bytes, pageIds, annotations, formValues) {
       const s = get();
       const { pdf, geoms } = await loadPdfJs(bytes);
       pushHistory();
@@ -275,6 +285,7 @@ export const useStore = create<Store>()((set, get) => {
         geoms,
         pageIds: ids,
         annotations: kept,
+        formValues: formValues ?? s.formValues,
         docVersion: s.docVersion + 1,
         selected: null,
         selectedPages: s.selectedPages.filter((i) => i < ids.length),
@@ -309,6 +320,11 @@ export const useStore = create<Store>()((set, get) => {
         annotations: { ...get().annotations, [pageId]: list.filter((a) => a.id !== id) },
         selected: get().selected?.id === id ? null : get().selected,
       });
+    },
+
+    setFormValue(name, value, opts = {}) {
+      if (opts.history !== false) pushHistory();
+      set({ formValues: { ...get().formValues, [name]: value }, dirty: true });
     },
 
     checkpoint: pushHistory,

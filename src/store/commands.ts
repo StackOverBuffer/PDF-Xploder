@@ -45,9 +45,14 @@ export async function newDocument() {
   await S().run('Creating…', async () => S().openDocument(await ops.createBlankDocument(), 'Untitled.pdf'));
 }
 
-export async function buildOutput(flatten = false): Promise<Uint8Array> {
+/** The document bytes with pending form edits applied (annotations not included). */
+export async function currentBytes(): Promise<Uint8Array> {
   const s = S();
-  return ops.exportWithAnnotations(s.bytes!, annotationsByPage(s), { flatten });
+  return Object.keys(s.formValues).length ? ops.setFormValues(s.bytes!, s.formValues) : s.bytes!;
+}
+
+export async function buildOutput(flatten = false): Promise<Uint8Array> {
+  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten });
 }
 
 export async function save() {
@@ -191,7 +196,7 @@ export async function extract(pages = targetPages()) {
   if (!S().bytes) return;
   await S().run('Extracting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(s.bytes!, annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
     const out = await ops.extractPages(output, pages);
     const label = pages.length === 1 ? `p${pages[0] + 1}` : `p${pages[0] + 1}-${pages[pages.length - 1] + 1}`;
     downloadBlob(out, `${baseName(s.fileName)}-${label}.pdf`);
@@ -202,7 +207,7 @@ export async function split(every: number) {
   if (!S().bytes || every < 1) return;
   await S().run('Splitting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(s.bytes!, annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
     const parts = await ops.splitEvery(output, every);
     parts.forEach((p, i) => downloadBlob(p, `${baseName(s.fileName)}-part${i + 1}.pdf`));
   });
@@ -217,7 +222,7 @@ export async function exportPageImage(page = S().currentPage, dpi = 150) {
   if (!S().bytes) return;
   await S().run('Rendering image…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(s.bytes!, annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
     const { pdf } = await openPdf(output, () => null);
     try {
       const canvas = await renderToCanvas(await pdf.getPage(page + 1), dpi / 72);
@@ -246,11 +251,19 @@ export async function setMetadata(m: ops.Metadata) {
   await S().run('Updating properties…', async () => S().commitBytes(await ops.setMetadata(S().bytes!, m)));
 }
 
-export async function fillForm(values: Record<string, ops.FieldValue>, flatten = false) {
+/** Write the pending form values into the document, optionally flattening the form. */
+export async function fillForm(flatten = false) {
   if (!requireEditable()) return;
   await S().run(flatten ? 'Flattening form…' : 'Updating form…', async () =>
-    S().commitBytes(await ops.setFormValues(S().bytes!, values, { flatten })),
+    S().commitBytes(await ops.setFormValues(S().bytes!, S().formValues, { flatten }), undefined, undefined, {}),
   );
+}
+
+export function resetFormEdits() {
+  const s = S();
+  if (!Object.keys(s.formValues).length) return;
+  s.checkpoint();
+  useStore.setState({ formValues: {} });
 }
 
 /** Flatten the current annotations into page content (cannot be edited afterwards, except via undo). */
@@ -280,7 +293,7 @@ export async function applyRedactions() {
   if (!pages.length) return s.notify('Mark areas with the Redact tool first.');
   if (!confirm(`Apply redactions on ${pages.length} page(s)? Those pages will be converted to images: their text will no longer be selectable or searchable.`)) return;
   await s.run('Applying redactions…', async () => {
-    const flat = await ops.exportWithAnnotations(s.bytes!, byPage.map((l, i) => (pages.includes(i) ? l : [])), { flatten: true, burnRedactions: true });
+    const flat = await ops.exportWithAnnotations(await currentBytes(), byPage.map((l, i) => (pages.includes(i) ? l : [])), { flatten: true, burnRedactions: true });
     const { pdf } = await openPdf(flat, () => null);
     const images: { index: number; png: Uint8Array }[] = [];
     try {

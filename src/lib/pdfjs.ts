@@ -79,3 +79,15 @@ export async function renderToCanvas(page: PDFPageProxy, scale: number): Promise
   await page.render({ canvasContext: ctx, viewport }).promise;
   return canvas;
 }
+
+/** Resolve a named or explicit destination to a 0-based page index and optional user-space y. */
+export async function resolveDest(pdf: PDFDocumentProxy, dest: unknown): Promise<{ page: number; y?: number } | null> {
+  const explicit = typeof dest === 'string' ? await pdf.getDestination(dest) : (dest as unknown[] | null);
+  if (!Array.isArray(explicit) || !explicit.length) return null;
+  const [ref, kind, ...args] = explicit as [unknown, { name?: string } | undefined, ...unknown[]];
+  const page = typeof ref === 'number' ? ref : await pdf.getPageIndex(ref as Parameters<PDFDocumentProxy['getPageIndex']>[0]);
+  let y: number | undefined;
+  if (kind?.name === 'XYZ' && typeof args[1] === 'number') y = args[1];
+  else if ((kind?.name === 'FitH' || kind?.name === 'FitBH') && typeof args[0] === 'number') y = args[0];
+  return { page, y };
+}

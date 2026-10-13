@@ -198,6 +198,19 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .textbox.empty { color: #9aa0aa !important; font-style: italic; }
 .textbox.editing { resize: none; background: rgba(255,255,255,0.85); outline: 1px dashed var(--accent); border-radius: 0; display: block; }
 
+/* form fields and links */
+.widget-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.viewer.tool-select .widget-layer > *, .viewer.tool-hand .widget-layer > .pdf-link { pointer-events: auto; }
+.widget { position: absolute; margin: 0; padding: 0 3px; border: 1px solid transparent; border-radius: 0; background: transparent; color: #000; font-family: Helvetica, Arial, sans-serif; line-height: 1.15; resize: none; outline: none; }
+.widget:focus, .widget:focus-within { border-color: var(--accent); background: rgba(255, 255, 255, 0.9); }
+.highlight-fields .widget { background: rgba(204, 215, 255, 0.55); }
+.highlight-fields .widget:disabled { background: rgba(220, 220, 220, 0.5); }
+.widget-check { display: flex; align-items: center; justify-content: center; padding: 0; }
+.widget-check input { width: 80%; height: 80%; margin: 0; accent-color: #1d3557; }
+select.widget { padding: 0; }
+.pdf-link { position: absolute; cursor: pointer; }
+.pdf-link:hover { background: rgba(26, 95, 180, 0.12); outline: 1px solid rgba(26, 95, 180, 0.4); }
+
 /* ---------------------------------------------------------- status bar */
 .statusbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 10px; background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; }
 .statusbar button { border: none; background: none; padding: 3px; }

@@ -1,4 +1,4 @@
-import { PDFDocument, PDFHexString, PDFName, PDFRef, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, StandardFonts, rgb } from 'pdf-lib';
 import { singleFontEngine, wrapLines } from './appearance';
 
 /** A small multi-page document with text, a form and bookmarks, for trying the editor out. */
@@ -48,6 +48,17 @@ export async function createSampleDocument(): Promise<Uint8Array> {
   plan.addToPage(last, { x: 130, y: 258, width: 150, height: 22 });
   last.drawText('I agree to the terms', { x: 160, y: 225, size: 12, font });
   form.createCheckBox('Agree').addToPage(last, { x: 130, y: 222, width: 16, height: 16 });
+
+  // Links: one to the form on page 3, one to a web page.
+  const first = doc.getPage(0);
+  const link = (x: number, y: number, label: string, target: Record<string, unknown>) => {
+    const w = font.widthOfTextAtSize(label, 12);
+    first.drawText(label, { x, y, size: 12, font, color: rgb(0.1, 0.37, 0.71) });
+    first.drawLine({ start: { x, y: y - 2 }, end: { x: x + w, y: y - 2 }, thickness: 0.6, color: rgb(0.1, 0.37, 0.71) });
+    first.node.addAnnot(doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [x, y - 4, x + w, y + 12], Border: [0, 0, 0], ...target } as never)));
+  };
+  link(50, 570, 'Jump to the form on page 3', { Dest: [pageRefs[2], 'XYZ', null, 380, null] });
+  link(260, 570, 'Project on GitHub', { A: { Type: 'Action', S: 'URI', URI: PDFString.of('https://github.com/StackOverBuffer/awesome-pdf') } });
 
   // Bookmarks (pdf-lib has no high-level outline API, so build the dictionaries directly).
   const ctx = doc.context;

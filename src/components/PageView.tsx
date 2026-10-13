@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef } from 'react';
-import { TextLayer } from 'pdfjs-dist';
+import { AnnotationMode, TextLayer } from 'pdfjs-dist';
 import { useStore } from '../store/store';
 import { viewSize } from '../lib/geometry';
 import { AnnotationLayer } from './AnnotationLayer';
+import { WidgetLayer } from './WidgetLayer';
 import { registerTextLayer } from '../lib/textSelection';
 
 interface Props {
@@ -45,7 +46,8 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         canvas.className = 'page-canvas';
-        const task = page.render({ canvasContext: canvas.getContext('2d')!, viewport });
+        // Form fields are drawn as live HTML controls by WidgetLayer, so leave them off the canvas.
+        const task = page.render({ canvasContext: canvas.getContext('2d')!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
         renderTask = task;
         await task.promise;
         if (cancelled) return;
@@ -80,6 +82,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
     <div className="page" data-index={index} style={{ width: w, height: h }}>
       <div className="canvas-host" ref={canvasHost} />
       <div className="textLayer" ref={textRef} />
+      {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
       {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}
       <div className="page-label">{index + 1}</div>
     </div>

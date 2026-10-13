@@ -13,6 +13,7 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
 import { createSampleDocument } from './lib/sample';
+import { getFormFields } from './lib/pdfOps';
 import type { Tool } from './lib/types';
 
 const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
@@ -37,7 +38,8 @@ function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      const typing = t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName);
+      const textInput = t.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'color', 'button'].includes((t as HTMLInputElement).type);
+      const typing = t.isContentEditable || textInput || ['TEXTAREA', 'SELECT'].includes(t.tagName);
       const s = useStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       if (useDialog.getState().open) return;
@@ -104,6 +106,25 @@ function Welcome() {
   );
 }
 
+/** Keep the store's list of form fields in sync with the document bytes. */
+function useFormFields() {
+  const bytes = useStore((s) => s.bytes);
+  const editable = useStore((s) => s.editable);
+  useEffect(() => {
+    let live = true;
+    if (!bytes || !editable) {
+      useStore.setState({ fields: [] });
+      return;
+    }
+    getFormFields(bytes)
+      .then((fields) => live && useStore.setState({ fields }))
+      .catch(() => live && useStore.setState({ fields: [] }));
+    return () => {
+      live = false;
+    };
+  }, [bytes, editable]);
+}
+
 export function App() {
   const hasDoc = useStore((s) => !!s.pdf);
   const sidebar = useStore((s) => s.sidebar);
@@ -112,6 +133,7 @@ export function App() {
   const dirty = useStore((s) => s.dirty);
   const [showProps, setShowProps] = useState(true);
   useShortcuts();
+  useFormFields();
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
