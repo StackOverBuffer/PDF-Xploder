@@ -79,12 +79,19 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ⬜ Comment replies/status, summarize comments, import/export FDF/XFDF
 
 ### Organize pages
-- ✅ Rotate, delete, duplicate, insert blank pages
-- ✅ Insert pages from other PDFs, combine files (drop several PDFs at once)
-- ✅ Reorder by drag and drop in thumbnails (multi-select with Ctrl/Shift), reverse order
-- ✅ Extract pages to a new file, split every N pages
-- ✅ Crop pages (margins measured as displayed)
-- ⬜ Resize pages / change page boxes, N-up, interleave/merge odd–even scans
+The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page commands act on the thumbnail selection (or the current page), and every dialog accepts ranges like `1-3, 5`.
+- ✅ Insert blank pages (count, size, position), pages from another PDF (any range of it), images as pages, a page from a clipboard image; merge several files at a chosen position
+- ✅ Delete pages (with odd/even subsets) and delete blank pages; extract pages (one file or one per page, optionally deleting them); move pages to a position
+- ✅ Split by number of pages, into single pages, by page ranges, by top-level bookmarks or by maximum file size
+- ✅ Duplicate pages (copies, collated or not, after each page / after the range / start / end), replace pages with pages of another file, swap two groups of pages, reverse the order of the selection or the document
+- ✅ Overlay or underlay the pages of another PDF (first page on all, page by page, or repeating; fit, opacity), upright on rotated pages
+- ✅ Find duplicate pages, by content (structural hash of content and resources) or by appearance (small renderings), then select or delete them
+- ✅ Reorder by drag and drop in thumbnails (multi-select with Ctrl/Shift)
+- ✅ Rotate pages (direction, odd/even, portrait/landscape only); crop pages or remove white margins automatically (from the rendered page)
+- ✅ Resize pages to a paper size (scale the content or only change the page box, with an anchor), add margins, normalise pages (media box = crop box, bake the page rotation into the content, one common size); comments move with the content
+- ✅ Watermarks (in front of or behind the content), backgrounds (colour and/or image), headers and footers at six positions, Bates numbering: all written as `/Artifact <</Type /Pagination /Subtype …>>` marked content, so *Remove* finds exactly these marks (and Acrobat's or PDF-XChange's)
+- ✅ Page labels (*Seiten nummerieren*): ranges with decimal, roman or letter numbering, prefix and start number
+- ⬜ N-up, interleave odd/even scans, page labels in the status bar
 
 ### Edit content
 - ✅ **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several

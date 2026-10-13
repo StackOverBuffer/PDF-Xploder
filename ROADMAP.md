@@ -81,7 +81,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Generate Bookmarks from Page Text / Table of Contents / Text File | ⬜ |
 | Merge Duplicate Bookmarks | ⬜ |
 | Remove Actions from Bookmarks | ⬜ |
-| Remove Pages that Bookmarks Point to | ⬜ |
+| Remove Pages that Bookmarks Point to | ⬜ (splitting by bookmarks exists) |
 | Set the Zoom Type for Bookmarks | ⬜ |
 | Sort Document Pages by Bookmarks | ⬜ |
 | Use Selected Text to Update Bookmark Targets | 🟡 new bookmarks take the selected text as title |
@@ -95,7 +95,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | PDF to PDF/A / PDF/X | ⬜ |
 | PDF to Plain Text | ⬜ |
 | Export PDFs to WebP Images | ⬜ (PNG/JPEG export exists) |
-| Image Files to PDF | 🟡 images can be added to pages; 🔧 images as new pages |
+| Image Files to PDF | ✅ images as new pages (Organize → Insert) |
 | Text, Markdown, CSV, RTF to PDF | ⬜ |
 | Word, Excel, PowerPoint, Publisher, Visio to PDF | 🚫 needs the Office applications or a server-side converter |
 | Windows Metafiles / XPS to PDF | ⬜ |
@@ -105,9 +105,9 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Feature | Status |
 |---|---|
 | Create a New PDF File | ✅ |
-| Combine Existing Files into a New PDF | ✅ open several files at once; 🔧 merge dialog |
-| Create a PDF from Clipboard Content | ⬜ |
-| Create a PDF from an Image File | ⬜ |
+| Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position |
+| Create a PDF from Clipboard Content | 🟡 insert a clipboard image as a page |
+| Create a PDF from an Image File | 🟡 insert images as pages into a new document |
 | Create a PDF from Text / Markdown / CSV / RTF | ⬜ |
 | Create a PDF from Scanned Content | 🟡 webcam/scanner capture is not available in browsers; 🔧 OCR of scanned PDFs |
 | Create New Documents from Web Page URLs | 🚫 cross-origin pages cannot be fetched from the browser |
@@ -135,7 +135,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Feature | Status |
 |---|---|
 | Ribbon UI | ✅ PDF-XChange style tabs, groups, split buttons and menus |
-| Set the UI Language | ✅ German/English, following the browser; 🔧 remaining panels and dialogs |
+| Set the UI Language | ✅ German/English throughout, following the browser |
 | Dark Page Mode | 🟡 inverted page colours |
 | Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |
 | Right-to-Left Page Layout | ⬜ |
@@ -173,10 +173,10 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Enhanced Colour Options for Objects | 🟡 fill/stroke colours |
 | Text List Formatting, Tab Stops, Overtype | ⬜ |
 | Paste Copied Text as Plain Text / Paste Options | 🟡 paste objects, paste in place |
-| Crop Pages, Partial Cropping, Crop to White Margins | ✅ crop dialog; 🔧 white margins |
+| Crop Pages, Partial Cropping, Crop to White Margins | ✅ |
 | Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ |
-| Delete Empty Pages, Merge, Normalize, Overlay, Replace, Resize, Swap Pages, Set Margins, Split by Size | 🔧 |
-| Normalize Media Box Offsets | 🔧 |
+| Delete Empty Pages, Merge, Normalize, Overlay, Replace, Resize, Swap Pages, Set Margins, Split by Size | ✅ |
+| Normalize Media Box Offsets | ✅ |
 | Split Pages by Guide Lines | ⬜ |
 | Select Pages Options for Thumbnails | 🟡 multi-select with Ctrl/Shift |
 | Redact Documents | ✅ |
@@ -191,7 +191,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Correct/Deskew Scans, Draw Lines for Tables in OCR, Updated OCR Engine | 🔧 |
 | Rename Documents | ⬜ |
 | Insert RTF/Text Files | ⬜ |
-| Shrink Page Content in Headers/Footers/Bates | 🔧 |
+| Shrink Page Content in Headers/Footers/Bates | 🟡 resize pages / add margins first |
 | Simultaneous Editing of Identical Images | ⬜ |
 | Edit PDF Portfolios | ⬜ |
 | Export Content to MS Office Formats | ⬜ |
@@ -202,8 +202,8 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 | Feature | Status |
 |---|---|
-| Add/Remove Watermarks | ✅ add; 🔧 remove |
-| Add Backgrounds | 🔧 |
+| Add/Remove Watermarks | ✅ |
+| Add Backgrounds | ✅ colour or image, removable |
 | Add Barcodes | ⬜ |
 | Add JavaScript | ⬜ |
 | Convert Document Colours | ⬜ |
@@ -223,8 +223,8 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Feature | Status |
 |---|---|
 | Add Images | ✅ as comments or page content |
-| Add/Remove Bates Numbering, Headers and Footers | ✅ headers/footers; 🔧 Bates numbering, removal |
-| Create Number Ranges (page labels) | 🔧 |
+| Add/Remove Bates Numbering, Headers and Footers | ✅ |
+| Create Number Ranges (page labels) | ✅ |
 | Crop Documents | ✅ |
 | Digitally Sign | ✅ PKCS#12 certificates, visible or invisible |
 | Email Documents | 🟡 system share sheet where supported |
@@ -255,12 +255,12 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Colorize Documents | ⬜ |
 | Distribute Objects Horizontally/Vertically | ✅ |
 | Edit the Layer Property of Images and XForms | ✅ |
-| Find Duplicate Pages | 🔧 |
+| Find Duplicate Pages | ✅ by content or appearance |
 | Generate Links from Barcodes | ⬜ (barcode recognition exists, Chrome on macOS/Android/ChromeOS) |
 | Go to Next/Previous Bookmark Using Hotkeys | ⬜ |
 | Password Strength Indicator | ⬜ |
 | Remove Broken Named Destinations | ⬜ |
-| Resize Pages to Match Existing Page Sizes | 🔧 |
+| Resize Pages to Match Existing Page Sizes | ✅ |
 | Right-to-Left Text | ⬜ |
 | Specify the Visibility of New Watermarks | ⬜ |
 | Translate Documents | ⬜ |
