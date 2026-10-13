@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
+import { withViewRotation, normRot } from '../lib/geometry';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 import { ALL_PERMISSIONS, allPermissionsGranted, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
@@ -31,7 +32,7 @@ export interface SearchHit {
   context: string;
 }
 
-export type SidebarTab = 'pages' | 'outline' | 'comments' | 'forms' | 'search' | 'signatures';
+export type SidebarTab = 'pages' | 'outline' | 'comments' | 'attachments' | 'forms' | 'search' | 'signatures';
 
 export interface ScrollRequest {
   page: number;
@@ -107,6 +108,8 @@ interface State {
 
   scale: number;
   fit: 'width' | 'page' | null;
+  /** Extra clockwise rotation of the display only (the document is unchanged). */
+  viewRotation: number;
   currentPage: number;
   scrollRequest: ScrollRequest | null;
 
@@ -143,6 +146,8 @@ interface Actions {
   setTool(t: Tool): void;
   setStyle(tool: string, patch: Partial<ToolStyle>): void;
   setScale(s: number, fit?: State['fit']): void;
+  /** Rotate the view (not the document) by a multiple of 90°. */
+  rotateView(delta: number): void;
   setCurrentPage(p: number): void;
   goToPage(p: number, y?: number): void;
   select(sel: State['selected']): void;
@@ -189,6 +194,7 @@ const initialDoc = {
   currentPage: 0,
   scrollRequest: null,
   search: { query: '', hits: [], index: -1, matchCase: false },
+  viewRotation: 0,
 } satisfies Partial<State>;
 
 function readAuthor(): string {
@@ -200,13 +206,13 @@ function readAuthor(): string {
 }
 
 export const useStore = create<Store>()((set, get) => {
-  async function loadPdfJs(bytes: Uint8Array, knownPassword?: string) {
+  async function loadPdfJs(bytes: Uint8Array, knownPassword?: string, viewRotation = get().viewRotation) {
     let tries = 0;
     const { pdf, password } = await openPdf(bytes, (retry) => {
       if (knownPassword !== undefined && tries++ === 0) return knownPassword;
       return window.prompt(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:');
     });
-    const geoms = await pageGeoms(pdf);
+    const geoms = withViewRotation(await pageGeoms(pdf), viewRotation);
     return { pdf, geoms, password };
   }
 
@@ -264,7 +270,7 @@ export const useStore = create<Store>()((set, get) => {
       const original = bytes;
       let loaded;
       try {
-        loaded = await loadPdfJs(bytes, opts.password);
+        loaded = await loadPdfJs(bytes, opts.password, 0);
       } catch (e) {
         if (e instanceof PasswordCancelled) return;
         throw e;
@@ -322,7 +328,7 @@ export const useStore = create<Store>()((set, get) => {
         try {
           const imp = await importForEditing(bytes, () => uid('annot'));
           if (imp.count) {
-            const reloaded = await loadPdfJs(imp.bytes);
+            const reloaded = await loadPdfJs(imp.bytes, undefined, 0);
             loaded.pdf.destroy();
             loaded = { ...reloaded, password: loaded.password };
             bytes = imp.bytes;
@@ -481,6 +487,11 @@ export const useStore = create<Store>()((set, get) => {
       }),
     setStyle: (tool, patch) => set({ styles: { ...get().styles, [tool]: { ...get().styles[tool], ...patch } } }),
     setScale: (scale, fit = null) => set({ scale: Math.min(8, Math.max(0.1, scale)), fit }),
+    rotateView: (delta) => {
+      const s = get();
+      const viewRotation = normRot(s.viewRotation + delta);
+      set({ viewRotation, geoms: withViewRotation(s.geoms, viewRotation), docVersion: s.docVersion + 1, selected: null });
+    },
     setCurrentPage: (currentPage) => set({ currentPage }),
     goToPage: (page, y) => {
       const p = Math.max(0, Math.min(page, get().pageIds.length - 1));

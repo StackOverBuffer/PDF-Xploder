@@ -5,6 +5,24 @@ export function normRot(r: number): number {
   return (((Math.round(r / 90) * 90) % 360) + 360) % 360;
 }
 
+/** The page's own rotation (/Rotate), without any view rotation. */
+export function pageRot(g: PageGeom): number {
+  return g.pageRotation ?? g.rotation;
+}
+
+/** The geometry of the page itself, as other renderers and the file see it. */
+export function pageGeom(g: PageGeom): PageGeom {
+  return g.pageRotation === undefined ? g : { view: g.view, rotation: g.pageRotation };
+}
+
+/** Apply a display-only rotation on top of each page's own rotation. */
+export function withViewRotation(geoms: PageGeom[], viewRotation: number): PageGeom[] {
+  return geoms.map((g) => {
+    const own = pageRot(g);
+    return viewRotation ? { view: g.view, rotation: normRot(own + viewRotation), pageRotation: own } : { view: g.view, rotation: own };
+  });
+}
+
 /** Size of the page as displayed (after rotation) at scale 1. */
 export function viewSize(g: PageGeom): { width: number; height: number } {
   const w = g.view[2] - g.view[0];
@@ -89,7 +107,7 @@ export function rectContains(r: Rect, p: Pt): boolean {
 
 /** Geometry of the page as it was oriented when an annotation was created. */
 export function frameGeom(g: PageGeom, rot: number | undefined): PageGeom {
-  return rot === undefined ? g : { view: g.view, rotation: normRot(rot) };
+  return rot === undefined ? pageGeom(g) : { view: g.view, rotation: normRot(rot) };
 }
 
 /**

@@ -16,8 +16,10 @@ export interface Rect {
 export interface PageGeom {
   /** Visible page box [x0, y0, x1, y1] in user space (crop box). */
   view: [number, number, number, number];
-  /** Page rotation in degrees, one of 0/90/180/270. */
+  /** Displayed rotation in degrees, one of 0/90/180/270 (page rotation plus view rotation). */
   rotation: number;
+  /** The page's own /Rotate when the view is rotated on top of it. */
+  pageRotation?: number;
 }
 
 interface AnnotBase {
@@ -117,8 +119,13 @@ export type Annotation =
 export type AnnotType = Annotation['type'];
 
 export type Tool =
+  /** Select and move comments ("Edit Comments"). */
   | 'select'
+  /** Select page text only; comments are not picked up. */
+  | 'selectText'
   | 'hand'
+  /** Drag a box to copy that part of the page as an image. */
+  | 'snapshot'
   | 'highlight'
   | 'underline'
   | 'strikeout'

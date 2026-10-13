@@ -42,14 +42,23 @@ created at, and turn with the page like printed content would.
 
 ✅ done · 🟡 partial · ⬜ not started
 
+### Ribbon
+- ✅ PDF-XChange style ribbon: File, Home, View, Comment, Protect, Form, Organize, Convert, Share, Review, Accessibility tabs
+- ✅ Home tab laid out like PDF-XChange: Tools (Hand, Select Text, Edit Comments, Snapshot/Clipboard/Find menus), View (zoom box with presets, 1:1, fit page/width, rotate view, pane toggles), Objects (Edit Text, Edit Objects, Add, Select)
+- ✅ Big, small and icon buttons, split buttons with drop-down menus
+- ✅ German and English interface for the ribbon (follows the browser language; switch under View → Language)
+
 ### View & navigate
 - ✅ Continuous scrolling, lazy page rendering, HiDPI canvases
 - ✅ Zoom in/out, presets, fit width, fit page, Ctrl+wheel zoom
-- ✅ Hand (pan) and select tools, text selection & copy
+- ✅ Hand (pan), Select Text and Edit Comments tools, text selection & copy
+- ✅ Snapshot tool: drag a box to copy that part of the page (with comments) to the clipboard as an image; copy/save a whole page as an image
+- ✅ Attachments pane: list, save, add and remove embedded files
 - ✅ Page thumbnails, bookmarks (outline) pane, comments pane
 - ✅ Find text with match list, next/previous, match case, highlight all matches
 - ✅ Go to page, first/previous/next/last, keyboard shortcuts
-- ⬜ Single-page / two-page / facing layouts, rotate view (without changing the file)
+- ✅ Rotate view (without changing the file); new comments follow the orientation on screen
+- ⬜ Single-page / two-page / facing layouts
 - ✅ Clickable links (internal destinations, named actions, web links with confirmation)
 - ⬜ Multiple documents in tabs, split view, full-screen / presentation mode
 
@@ -112,6 +121,8 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - ✅ Export the current page as PNG
 - ⬜ Export to other image formats / Office formats, optimize/compress, PDF/A
 - ⬜ OCR for scanned documents
+- ✅ Share the PDF via the system share sheet (where the browser supports it)
+- ✅ Accessibility: quick check (tags, language, title, text, field tooltips, permissions) with one-click fixes; read aloud; inverted page colours
 - ⬜ Multiple documents in tabs, autosave (e.g. IndexedDB)
 
 ## Notes
@@ -125,7 +136,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 
 `Ctrl+O` open · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
-`V` select · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
+`V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
 
 Edit objects tool: arrow keys nudge (Shift ×10) · `Del` delete · `Ctrl+D` duplicate · `Ctrl+A` select all on the page · double-click text to edit · `Esc` deselect

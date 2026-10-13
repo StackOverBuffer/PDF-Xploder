@@ -1,61 +1,260 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
+  CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
+  LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
+  BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, Check,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed, useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
+import * as extra from '../store/extras';
+import { selectContent, type ContentFilter } from '../store/content';
 import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
+import { goToHit } from './SearchPanel';
+import { formatPercent, parsePercent, useLang, useT } from '../lib/i18n';
 import type { Tool } from '../lib/types';
 
-type TabName = 'File' | 'Home' | 'Comment' | 'Organize' | 'Edit' | 'Form' | 'Protect' | 'View';
-const TABS: TabName[] = ['File', 'Home', 'Comment', 'Organize', 'Edit', 'Form', 'Protect', 'View'];
+type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility';
+const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility'];
 
-function Btn({ icon, label, onClick, active, disabled, title }: { icon: ReactNode; label: string; onClick: () => void; active?: boolean; disabled?: boolean; title?: string }) {
-  return (
-    <button className={`rbtn ${active ? 'active' : ''}`} onClick={onClick} disabled={disabled} title={title ?? label}>
-      {icon}
-      <span>{label}</span>
-    </button>
+const S = useStore.getState;
+
+// ---------------------------------------------------------------- menus
+
+type MenuItem = { label: string; icon?: ReactNode; onClick: () => void; disabled?: boolean; checked?: boolean; hint?: string } | null;
+
+/** A drop-down menu below `anchor`, rendered at the top level so the ribbon's scrolling does not clip it. */
+function MenuPopup({ anchor, items, onClose }: { anchor: DOMRect; items: MenuItem[]; onClose: () => void }) {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: anchor.left, top: anchor.bottom + 2 });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    setPos({
+      left: Math.max(4, Math.min(anchor.left, window.innerWidth - w - 4)),
+      top: anchor.bottom + h + 2 > window.innerHeight ? Math.max(4, anchor.top - h - 2) : anchor.bottom + 2,
+    });
+  }, [anchor]);
+
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Defer so the click that opened the menu does not close it.
+    const id = setTimeout(() => window.addEventListener('pointerdown', onDown, true));
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onClose);
+    ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const buttons = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(i + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+  };
+
+  return createPortal(
+    <div ref={ref} className="rmenu" role="menu" style={pos} onKeyDown={onKeyDown}>
+      {items.map((it, i) =>
+        it === null ? (
+          <div key={i} className="rmenu-sep" role="separator" />
+        ) : (
+          <button
+            key={i}
+            role={it.checked === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={it.checked}
+            disabled={it.disabled}
+            onClick={() => {
+              onClose();
+              it.onClick();
+            }}
+          >
+            <span className="rmenu-icon">{it.checked ? <Check size={14} /> : it.icon}</span>
+            <span className="rmenu-label">{t(it.label)}</span>
+            {it.hint && <span className="rmenu-hint">{it.hint}</span>}
+          </button>
+        ),
+      )}
+    </div>,
+    document.body,
   );
 }
 
-function Group({ label, children }: { label: string; children: ReactNode }) {
+// ---------------------------------------------------------------- buttons
+
+interface BtnProps {
+  icon: ReactNode;
+  label: string;
+  /** Without onClick a button with a menu just opens it; with both it is a split button. */
+  onClick?: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  title?: string;
+  menu?: MenuItem[] | (() => MenuItem[]);
+  /** big: icon above label; small: icon beside label; icon: icon only. */
+  size?: 'big' | 'small' | 'icon';
+  /** Keyboard shortcut shown in the tooltip. */
+  keys?: string;
+}
+
+function Btn({ icon, label, onClick, active, disabled, title, menu, size = 'big', keys }: BtnProps) {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const text = t(label);
+  const tip = `${title ? t(title) : text}${keys ? ` (${keys})` : ''}`;
+  const open = () => setAnchor(anchor ? null : ref.current!.getBoundingClientRect());
+  const split = !!menu && !!onClick;
+  const caret = <ChevronDown className="caret" size={10} />;
   return (
-    <div className="rgroup">
-      <div className="rgroup-items">{children}</div>
-      <div className="rgroup-label">{label}</div>
+    <div ref={ref} className={`rbtn-wrap size-${size} ${split ? 'split' : ''} ${active ? 'active' : ''}`}>
+      <button
+        className={`rbtn size-${size} ${active ? 'active' : ''}`}
+        disabled={disabled}
+        title={tip}
+        aria-label={size === 'icon' ? tip : undefined}
+        aria-pressed={active}
+        aria-haspopup={menu && !onClick ? 'menu' : undefined}
+        aria-expanded={menu && !onClick ? !!anchor : undefined}
+        onClick={onClick ?? open}
+      >
+        {icon}
+        {size !== 'icon' && <span className="rlabel">{text}{menu && !onClick && caret}</span>}
+        {size === 'icon' && menu && !onClick && caret}
+      </button>
+      {split && (
+        <button className="rbtn-caret" disabled={disabled} title={tip} aria-label={`${tip} – ${t('More')}`} aria-haspopup="menu" aria-expanded={!!anchor} onClick={open}>
+          {size === 'big' && <span className="rlabel-hidden">{text}</span>}
+          {caret}
+        </button>
+      )}
+      {anchor && menu && <MenuPopup anchor={anchor} items={typeof menu === 'function' ? menu() : menu} onClose={() => setAnchor(null)} />}
     </div>
   );
 }
 
-function ToolBtn({ tool, icon, label }: { tool: Tool; icon: ReactNode; label: string }) {
-  const current = useStore((s) => s.tool);
-  const hasDoc = useStore((s) => !!s.pdf);
-  // Selecting page content is fine read-only (e.g. to export an image).
-  const viewOnly = tool === 'select' || tool === 'hand' || tool === 'content';
-  const permitted = useStore((s) => allowed(s, tool === 'sign' ? 'fillForms' : tool.startsWith('field') ? 'designForms' : tool.startsWith('content') ? 'modify' : 'annotate'));
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  const t = useT();
   return (
-    <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !permitted)} onClick={() => {
-      useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool);
-      if (tool.startsWith('field')) useStore.setState({ formDesign: true });
-    }} />
+    <div className="rgroup" role="group" aria-label={t(label)}>
+      <div className="rgroup-items">{children}</div>
+      <div className="rgroup-label">{t(label)}</div>
+    </div>
   );
 }
 
-function SidebarBtn({ tab, icon, label }: { tab: SidebarTab; icon: ReactNode; label: string }) {
-  const sidebar = useStore((s) => s.sidebar);
-  return <Btn icon={icon} label={label} active={sidebar === tab} onClick={() => useStore.getState().setSidebar(sidebar === tab ? null : tab)} />;
+/** Small buttons stacked in a column (up to three rows, as in PDF-XChange). */
+const Stack = ({ children }: { children: ReactNode }) => <div className="rstack">{children}</div>;
+const Row = ({ children }: { children: ReactNode }) => <div className="rrow">{children}</div>;
+
+/** Which permission a tool needs, or null when it only views. */
+function toolPermission(tool: Tool) {
+  if (tool === 'select' || tool === 'selectText' || tool === 'hand' || tool === 'content') return null;
+  if (tool === 'snapshot') return 'copy' as const;
+  if (tool === 'sign') return 'fillForms' as const;
+  if (tool.startsWith('field')) return 'designForms' as const;
+  if (tool.startsWith('content')) return 'modify' as const;
+  return 'annotate' as const;
 }
 
-const I = 18;
+function useToolState(tool: Tool) {
+  const current = useStore((s) => s.tool);
+  const hasDoc = useStore((s) => !!s.pdf);
+  const need = toolPermission(tool);
+  const permitted = useStore((s) => need === null || allowed(s, need));
+  return {
+    active: current === tool,
+    disabled: !hasDoc || !permitted,
+    activate: () => {
+      const s = S();
+      const sticky = need === null || tool === 'snapshot';
+      s.setTool(s.tool === tool && !sticky ? 'select' : tool);
+      if (tool.startsWith('field')) useStore.setState({ formDesign: true });
+    },
+  };
+}
+
+function ToolBtn({ tool, icon, label, size, menu, title, keys }: { tool: Tool; icon: ReactNode; label: string; size?: BtnProps['size']; menu?: BtnProps['menu']; title?: string; keys?: string }) {
+  const st = useToolState(tool);
+  return <Btn icon={icon} label={label} size={size} menu={menu} title={title} keys={keys} active={st.active} disabled={st.disabled} onClick={st.activate} />;
+}
+
+function SidebarBtn({ tab, icon, label, size }: { tab: SidebarTab; icon: ReactNode; label: string; size?: BtnProps['size'] }) {
+  const sidebar = useStore((s) => s.sidebar);
+  const hasDoc = useStore((s) => !!s.pdf);
+  return <Btn icon={icon} label={label} size={size} active={sidebar === tab} disabled={!hasDoc} onClick={() => S().setSidebar(sidebar === tab ? null : tab)} />;
+}
+
+/** Editable zoom level with a preset list, between zoom out and zoom in. */
+function ZoomBox() {
+  const lang = useLang((l) => l.lang);
+  const t = useT();
+  const scale = useStore((s) => s.scale);
+  const fit = useStore((s) => s.fit);
+  const hasDoc = useStore((s) => !!s.pdf);
+  const [text, setText] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const commit = () => {
+    const v = text === null ? null : parsePercent(text);
+    if (v) S().setScale(v);
+    setText(null);
+  };
+  const presets: MenuItem[] = [
+    ...[0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 8].map((z) => ({ label: formatPercent(lang, z), checked: !fit && Math.abs(scale - z) < 0.001, onClick: () => S().setScale(z) })),
+    null,
+    { label: 'Fit page', checked: fit === 'page', onClick: () => S().setScale(scale, 'page') },
+    { label: 'Fit width', checked: fit === 'width', onClick: () => S().setScale(scale, 'width') },
+  ];
+  return (
+    <div className="rzoom" ref={ref}>
+      <input
+        aria-label={t('Zoom level')}
+        title={t('Zoom level')}
+        disabled={!hasDoc}
+        value={hasDoc ? text ?? formatPercent(lang, scale) : ''}
+        onChange={(e) => setText(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') {
+            setText(null);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+      <button disabled={!hasDoc} aria-label={t('Zoom level')} aria-haspopup="menu" onClick={() => setAnchor(anchor ? null : ref.current!.getBoundingClientRect())}><ChevronDown size={12} /></button>
+      {anchor && <MenuPopup anchor={anchor} items={presets} onClose={() => setAnchor(null)} />}
+    </div>
+  );
+}
+
+const L = 24; // big button icon size
+const I = 16; // small button icon size
 
 export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleProps: () => void }) {
+  const t = useT();
+  const lang = useLang((l) => l.lang);
+  const setLang = useLang((l) => l.setLang);
   const [tab, setTab] = useState<TabName>('Home');
   const hasDoc = useStore((s) => !!s.pdf);
   const editable = useStore((s) => s.editable);
@@ -65,10 +264,14 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const dirty = useStore((s) => s.dirty);
   const scale = useStore((s) => s.scale);
   const fit = useStore((s) => s.fit);
+  const tool = useStore((s) => s.tool);
   const stampLabel = useStore((s) => s.styles.stamp.stampLabel);
   const lock = useStore((s) => !!s.lock);
+  const hits = useStore((s) => s.search.hits.length);
+  const hitIndex = useStore((s) => s.search.index);
   const show = useDialog((d) => d.show);
-  const S = useStore.getState;
+  const reading = extra.useExtras((x) => x.reading);
+  const invert = extra.useExtras((x) => x.invert);
   const noDoc = !hasDoc;
   const canModify = useCan('modify');
   const canAssemble = useCan('assemble');
@@ -81,206 +284,323 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const contentFilter = useStore((s) => s.contentFilter);
   const highlightFields = useStore((s) => s.highlightFields);
 
+  const editObjects = (f: ContentFilter) => {
+    useStore.setState({ contentFilter: f, contentSelection: null });
+    S().setTool('content');
+  };
+  const contentTool = tool === 'content';
+  const objectMenu: MenuItem[] = [
+    { label: 'All objects', icon: <SquareDashedMousePointer size={14} />, checked: contentTool && contentFilter === 'all', onClick: () => editObjects('all') },
+    { label: 'Text objects', icon: <Type size={14} />, checked: contentTool && contentFilter === 'text', onClick: () => editObjects('text') },
+    { label: 'Image objects', icon: <ImageIcon size={14} />, checked: contentTool && contentFilter === 'image', onClick: () => editObjects('image') },
+    { label: 'Shape objects', icon: <Square size={14} />, checked: contentTool && contentFilter === 'shape', onClick: () => editObjects('shape') },
+  ];
+  const addMenu: MenuItem[] = [
+    { label: 'Text', icon: <TypeOutline size={14} />, disabled: !canModify, onClick: () => S().setTool('contentText') },
+    { label: 'Image', icon: <ImagePlus size={14} />, disabled: !canModify, onClick: cmd.addContentImage },
+    null,
+    { label: 'Rectangle', icon: <Square size={14} />, disabled: !canModify, onClick: () => S().setTool('contentRect') },
+    { label: 'Ellipse', icon: <Circle size={14} />, disabled: !canModify, onClick: () => S().setTool('contentEllipse') },
+    { label: 'Line', icon: <Minus size={14} />, disabled: !canModify, onClick: () => S().setTool('contentLine') },
+  ];
+  const selectMenu: MenuItem[] = [
+    { label: 'Select all', icon: <BoxSelect size={14} />, hint: 'Ctrl+A', onClick: () => selectContent('all') },
+    { label: 'Invert selection', onClick: () => selectContent('invert') },
+    { label: 'Select none', hint: 'Esc', onClick: () => selectContent('none') },
+  ];
+
   return (
     <header className="ribbon">
       <div className="titlebar">
         <div className="brand">Awesome&nbsp;PDF</div>
         <div className="quick">
-          <button title="Open (Ctrl+O)" onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
-          <button title="Save (Ctrl+S)" disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>
-          <button title="Print (Ctrl+P)" disabled={!canPrint} onClick={cmd.print}><Printer size={16} /></button>
+          <button title={`${t('Open')} (Ctrl+O)`} onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
+          <button title={`${t('Save')} (Ctrl+S)`} disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>
+          <button title={`${t('Print')} (Ctrl+P)`} disabled={!canPrint} onClick={cmd.print}><Printer size={16} /></button>
           <button title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => S().run('Undoing…', () => S().undo())}><Undo2 size={16} /></button>
           <button title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={() => S().run('Redoing…', () => S().redo())}><Redo2 size={16} /></button>
         </div>
         <div className="doc-title">{fileName ? `${fileName}${dirty ? ' •' : ''}` : ''}{hasDoc && !editable ? ' (read-only)' : ''}</div>
       </div>
       <nav className="tabs-row" role="tablist">
-        {TABS.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={`rtab ${tab === t ? 'active' : ''} ${t === 'File' ? 'file' : ''}`} onClick={() => setTab(t)}>{t}</button>
+        {TABS.map((n) => (
+          <button key={n} role="tab" aria-selected={tab === n} className={`rtab ${tab === n ? 'active' : ''} ${n === 'File' ? 'file' : ''}`} onClick={() => setTab(n)}>{t(n)}</button>
         ))}
       </nav>
-      <div className="rbody">
+      <div className="rbody" role="tabpanel">
         {tab === 'File' && (
           <>
             <Group label="Document">
-              <Btn icon={<FilePlus size={I} />} label="New" onClick={cmd.newDocument} />
-              <Btn icon={<FolderOpen size={I} />} label="Open" onClick={cmd.openFromDialog} />
-              <Btn icon={<Save size={I} />} label="Save" disabled={noDoc} onClick={cmd.save} />
-              <Btn icon={<SaveAll size={I} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
-              <Btn icon={<Layers size={I} />} label="Save flattened" title="Save a copy with comments burnt into the pages" disabled={noDoc} onClick={cmd.saveFlattenedCopy} />
-              <Btn icon={<X size={I} />} label="Close" disabled={noDoc} onClick={() => (!S().dirty || confirm('Discard unsaved changes?')) && S().closeDocument()} />
+              <Btn icon={<FilePlus size={L} />} label="New" onClick={cmd.newDocument} />
+              <Btn icon={<FolderOpen size={L} />} label="Open" onClick={cmd.openFromDialog} />
+              <Btn icon={<Save size={L} />} label="Save" disabled={noDoc} onClick={cmd.save} />
+              <Btn icon={<SaveAll size={L} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
+              <Btn icon={<X size={L} />} label="Close" disabled={noDoc} onClick={() => (!S().dirty || confirm('Discard unsaved changes?')) && S().closeDocument()} />
             </Group>
             <Group label="Output">
-              <Btn icon={<Printer size={I} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
-              <Btn icon={<ImageIcon size={I} />} label="Page to PNG" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
+              <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
+              <Btn icon={<Share2 size={L} />} label="Share file" disabled={noDoc} onClick={extra.shareFile} />
             </Group>
             <Group label="Info">
-              <Btn icon={<Info size={I} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
+              <Btn icon={<Info size={L} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
             </Group>
           </>
         )}
         {tab === 'Home' && (
           <>
             <Group label="Tools">
-              <ToolBtn tool="hand" icon={<Hand size={I} />} label="Hand" />
-              <ToolBtn tool="select" icon={<MousePointer2 size={I} />} label="Select" />
-            </Group>
-            <Group label="Zoom">
-              <Btn icon={<ZoomOut size={I} />} label="Out" disabled={noDoc} onClick={() => S().setScale(scale / 1.2)} />
-              <Btn icon={<ZoomIn size={I} />} label="In" disabled={noDoc} onClick={() => S().setScale(scale * 1.2)} />
-              <Btn icon={<MoveHorizontal size={I} />} label="Fit width" active={fit === 'width'} disabled={noDoc} onClick={() => S().setScale(scale, 'width')} />
-              <Btn icon={<Maximize size={I} />} label="Fit page" active={fit === 'page'} disabled={noDoc} onClick={() => S().setScale(scale, 'page')} />
-            </Group>
-            <Group label="Comment">
-              <ToolBtn tool="highlight" icon={<Highlighter size={I} />} label="Highlight" />
-              <ToolBtn tool="text" icon={<Type size={I} />} label="Text box" />
-              <ToolBtn tool="note" icon={<StickyNote size={I} />} label="Note" />
-            </Group>
-            <Group label="Find">
-              <Btn icon={<Search size={I} />} label="Search" disabled={noDoc} onClick={() => S().setSidebar('search')} />
-            </Group>
-            <Group label="Pages">
-              <Btn icon={<RotateCcw size={I} />} label="Rotate left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)} />
-              <Btn icon={<RotateCw size={I} />} label="Rotate right" disabled={!canAssemble} onClick={() => cmd.rotate(90)} />
-            </Group>
-          </>
-        )}
-        {tab === 'Comment' && (
-          <>
-            <Group label="Text markup">
-              <ToolBtn tool="highlight" icon={<Highlighter size={I} />} label="Highlight" />
-              <ToolBtn tool="underline" icon={<Underline size={I} />} label="Underline" />
-              <ToolBtn tool="strikeout" icon={<Strikethrough size={I} />} label="Strikeout" />
-            </Group>
-            <Group label="Drawing">
-              <ToolBtn tool="ink" icon={<Pencil size={I} />} label="Pencil" />
-              <ToolBtn tool="rect" icon={<Square size={I} />} label="Rectangle" />
-              <ToolBtn tool="ellipse" icon={<Circle size={I} />} label="Ellipse" />
-              <ToolBtn tool="line" icon={<Minus size={I} />} label="Line" />
-              <ToolBtn tool="arrow" icon={<MoveUpRight size={I} />} label="Arrow" />
-            </Group>
-            <Group label="Text">
-              <ToolBtn tool="text" icon={<Type size={I} />} label="Text box" />
-              <ToolBtn tool="note" icon={<StickyNote size={I} />} label="Note" />
-            </Group>
-            <Group label="Stamp">
-              <ToolBtn tool="stamp" icon={<Stamp size={I} />} label="Stamp" />
-              <select className="rselect" disabled={!canAnnotate} value={stampLabel} onChange={(e) => { S().setStyle('stamp', { stampLabel: e.target.value }); S().setTool('stamp'); }}>
-                {STAMPS.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </Group>
-            <Group label="Manage">
-              <SidebarBtn tab="comments" icon={<MessageSquare size={I} />} label="Comments" />
-              <Btn icon={<Layers size={I} />} label="Flatten" disabled={!canModify} onClick={cmd.flattenAnnotations} />
-            </Group>
-          </>
-        )}
-        {tab === 'Organize' && (
-          <>
-            <Group label="Rotate">
-              <Btn icon={<RotateCcw size={I} />} label="Left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)} />
-              <Btn icon={<RotateCw size={I} />} label="Right" disabled={!canAssemble} onClick={() => cmd.rotate(90)} />
-            </Group>
-            <Group label="Insert">
-              <Btn icon={<FilePlus2 size={I} />} label="Blank page" disabled={!canAssemble} onClick={() => cmd.insertBlank()} />
-              <Btn icon={<FileInput size={I} />} label="From file" disabled={!canAssemble} onClick={() => cmd.insertFromFile()} />
-              <Btn icon={<Copy size={I} />} label="Duplicate" disabled={!canAssemble} onClick={() => cmd.duplicate()} />
-            </Group>
-            <Group label="Pages">
-              <Btn icon={<Trash2 size={I} />} label="Delete" disabled={!canAssemble} onClick={() => cmd.deletePages()} />
-              <Btn icon={<FileOutput size={I} />} label="Extract" disabled={!canCopy} onClick={() => cmd.extract()} />
-              <Btn icon={<Scissors size={I} />} label="Split" disabled={!canCopy} onClick={() => show('split')} />
-              <Btn icon={<ArrowDownUp size={I} />} label="Reverse" disabled={!canAssemble} onClick={cmd.reverseOrder} />
-              <Btn icon={<Crop size={I} />} label="Crop" disabled={!canModify} onClick={() => show('crop')} />
+              <ToolBtn tool="hand" icon={<Hand size={L} />} label="Hand" keys="H" />
+              <ToolBtn tool="selectText" icon={<TextSelect size={L} />} label="Select Text" keys="X" />
+              <ToolBtn tool="select" icon={<MousePointer2 size={L} />} label="Edit Comments" keys="V" />
+              <Stack>
+                <ToolBtn tool="snapshot" size="small" icon={<Camera size={I} />} label="Snapshot" keys="G" menu={[
+                  { label: 'Snapshot tool', icon: <Camera size={14} />, hint: 'G', disabled: !canCopy, onClick: () => S().setTool('snapshot') },
+                  { label: 'Copy page as image', icon: <ClipboardCopy size={14} />, disabled: !canCopy, onClick: () => extra.copyPageImage() },
+                  { label: 'Save page as image', icon: <FileImage size={14} />, disabled: !canCopy, onClick: () => cmd.exportPageImage() },
+                ]} />
+                <Btn size="small" icon={<Clipboard size={I} />} label="Clipboard" disabled={noDoc} menu={[
+                  { label: 'Copy selected text', icon: <ClipboardCopy size={14} />, hint: 'Ctrl+C', disabled: !canCopy, onClick: extra.copySelectedText },
+                  { label: 'Copy page as image', icon: <ImageIcon size={14} />, disabled: !canCopy, onClick: () => extra.copyPageImage() },
+                  null,
+                  { label: 'Paste image as comment', icon: <ClipboardPaste size={14} />, disabled: !canAnnotate, onClick: extra.pasteImage },
+                ]} />
+                <Btn size="small" icon={<Search size={I} />} label="Find" disabled={noDoc} menu={[
+                  { label: 'Find…', icon: <Search size={14} />, hint: 'Ctrl+F', onClick: () => { S().setSidebar('search'); requestAnimationFrame(() => window.dispatchEvent(new Event('awesome-pdf:focus-search'))); } },
+                  { label: 'Next result', icon: <ChevronDown size={14} />, disabled: !hits, onClick: () => goToHit(hitIndex + 1) },
+                  { label: 'Previous result', icon: <ChevronUp size={14} />, disabled: !hits, onClick: () => goToHit(hitIndex - 1) },
+                ]} />
+              </Stack>
             </Group>
             <Group label="View">
-              <SidebarBtn tab="pages" icon={<LayoutGrid size={I} />} label="Thumbnails" />
+              <Stack>
+                <Row>
+                  <Btn size="icon" icon={<ZoomOut size={I} />} label="Zoom out" keys="Ctrl −" disabled={noDoc} onClick={() => S().setScale(scale / 1.2)} />
+                  <ZoomBox />
+                  <Btn size="icon" icon={<ZoomIn size={I} />} label="Zoom in" keys="Ctrl +" disabled={noDoc} onClick={() => S().setScale(scale * 1.2)} />
+                </Row>
+                <Row>
+                  <Btn size="icon" icon={<span className="one-to-one">1:1</span>} label="Actual size" active={!fit && Math.abs(scale - 1) < 0.001} disabled={noDoc} onClick={() => S().setScale(1)} />
+                  <Btn size="icon" icon={<Maximize size={I} />} label="Fit page" active={fit === 'page'} disabled={noDoc} onClick={() => S().setScale(scale, 'page')} />
+                  <Btn size="icon" icon={<MoveHorizontal size={I} />} label="Fit width" keys="Ctrl+0" active={fit === 'width'} disabled={noDoc} onClick={() => S().setScale(scale, 'width')} />
+                  <Btn size="icon" icon={<RotateCcw size={I} />} label="Rotate view left" disabled={noDoc} onClick={() => S().rotateView(-90)} />
+                  <Btn size="icon" icon={<RotateCw size={I} />} label="Rotate view right" disabled={noDoc} onClick={() => S().rotateView(90)} />
+                </Row>
+                <Row>
+                  <SidebarBtn size="icon" tab="outline" icon={<Bookmark size={I} />} label="Bookmarks" />
+                  <SidebarBtn size="icon" tab="pages" icon={<LayoutGrid size={I} />} label="Thumbnails" />
+                  <SidebarBtn size="icon" tab="comments" icon={<MessageSquare size={I} />} label="Comments" />
+                  <SidebarBtn size="icon" tab="attachments" icon={<Paperclip size={I} />} label="Attachments" />
+                  <SidebarBtn size="icon" tab="forms" icon={<FormInput size={I} />} label="Form fields" />
+                </Row>
+              </Stack>
             </Group>
-          </>
-        )}
-        {tab === 'Edit' && (
-          <>
-            <Group label="Edit content">
-              <ToolBtn tool="content" icon={<SquareDashedMousePointer size={I} />} label="Edit objects" />
-              <select className="rselect" title="What the Edit objects tool selects" disabled={!hasDoc} value={contentFilter} onChange={(e) => { useStore.setState({ contentFilter: e.target.value as typeof contentFilter, contentSelection: null }); S().setTool('content'); }}>
-                <option value="all">All</option><option value="text">Text</option><option value="image">Images</option><option value="shape">Shapes</option>
-              </select>
-            </Group>
-            <Group label="Add to page">
-              <ToolBtn tool="contentText" icon={<TypeOutline size={I} />} label="Text" />
-              <Btn icon={<ImagePlus size={I} />} label="Image" disabled={!canModify} onClick={cmd.addContentImage} />
-              <ToolBtn tool="contentRect" icon={<Square size={I} />} label="Rectangle" />
-              <ToolBtn tool="contentEllipse" icon={<Circle size={I} />} label="Ellipse" />
-              <ToolBtn tool="contentLine" icon={<Minus size={I} />} label="Line" />
-            </Group>
-            <Group label="Comments">
-              <ToolBtn tool="text" icon={<Type size={I} />} label="Text box" />
-              <Btn icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
-              <Btn icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
-            </Group>
-            <Group label="Page marks">
-              <Btn icon={<Droplets size={I} />} label="Watermark" disabled={!canModify} onClick={() => show('watermark')} />
-              <Btn icon={<Heading size={I} />} label="Header/Footer" disabled={!canModify} onClick={() => show('headerFooter')} />
-            </Group>
-          </>
-        )}
-        {tab === 'Form' && (
-          <>
-            <Group label="Fill">
-              <SidebarBtn tab="forms" icon={<FormInput size={I} />} label="Form fields" />
-              <Btn icon={<Highlighter size={I} />} label="Highlight" active={highlightFields} disabled={noDoc} onClick={() => useStore.setState({ highlightFields: !highlightFields })} />
-            </Group>
-            <Group label="Design">
-              <Btn icon={<PencilRuler size={I} />} label="Edit form" active={formDesign} disabled={!canDesign} title="Select, move and change form fields" onClick={() => useStore.setState({ formDesign: !formDesign, selectedField: null })} />
-              <ToolBtn tool="fieldText" icon={<TextCursorInput size={I} />} label="Text field" />
-              <ToolBtn tool="fieldCheckbox" icon={<SquareCheck size={I} />} label="Check box" />
-              <ToolBtn tool="fieldRadio" icon={<CircleDot size={I} />} label="Radio" />
-              <ToolBtn tool="fieldDropdown" icon={<ChevronDownSquare size={I} />} label="Dropdown" />
-              <ToolBtn tool="fieldList" icon={<List size={I} />} label="List box" />
-            </Group>
-            <Group label="Lock">
-              <Btn icon={<PencilLine size={I} />} label="Make editable" disabled={!canDesign} title="Clear read-only, value locks and Locked on every field" onClick={() => cmd.makeAllFieldsEditable()} />
-              <Btn icon={<LockOpen size={I} />} label="Unlock all" disabled={!canDesign} title="Clear only the Locked property of every field" onClick={() => cmd.setAllFieldsLocked(false)} />
-              <Btn icon={<Lock size={I} />} label="Lock all" disabled={!canDesign} title="Set the Locked property on every field" onClick={() => cmd.setAllFieldsLocked(true)} />
-            </Group>
-            <Group label="Finish">
-              <Btn icon={<Layers size={I} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
-            </Group>
-          </>
-        )}
-        {tab === 'Protect' && (
-          <>
-            <Group label="Redaction">
-              <ToolBtn tool="redact" icon={<EraserIcon size={I} />} label="Mark area" />
-              <Btn icon={<ShieldCheck size={I} />} label="Apply" disabled={!canModify} onClick={cmd.applyRedactions} />
-            </Group>
-            <Group label="Security">
-              <Btn icon={<Lock size={I} />} label="Password" disabled={noDoc} title="Passwords and encryption" onClick={() => show('security')} />
-              <Btn icon={<ListChecks size={I} />} label="Permissions" disabled={noDoc} title="What others may do with the document" onClick={() => show('permissions')} />
-              {lock && <Btn icon={<KeyRound size={I} />} label="Unlock" onClick={() => show('security')} />}
-            </Group>
-            <Group label="Digital signatures">
-              <ToolBtn tool="sign" icon={<FileSignature size={I} />} label="Sign" />
-              <Btn icon={<FileKey2 size={I} />} label="Sign invisibly" disabled={!canSign} onClick={() => show('sign')} />
-              <SidebarBtn tab="signatures" icon={<ShieldCheck size={I} />} label="Signatures" />
+            <Group label="Objects">
+              <Btn icon={<Type size={L} />} label="Edit Text" active={contentTool && contentFilter === 'text'} disabled={noDoc} onClick={() => editObjects('text')} />
+              <Btn icon={<SquareDashedMousePointer size={L} />} label="Edit Objects" active={contentTool && contentFilter !== 'text'} disabled={noDoc} onClick={() => editObjects(contentFilter === 'text' ? 'all' : contentFilter)} menu={objectMenu} />
+              <Btn icon={<SquarePlus size={L} />} label="Add" active={tool === 'contentText' || tool === 'contentRect' || tool === 'contentEllipse' || tool === 'contentLine'} disabled={!canModify} menu={addMenu} />
+              <Btn icon={<BoxSelect size={L} />} label="Select" disabled={noDoc} menu={selectMenu} />
             </Group>
           </>
         )}
         {tab === 'View' && (
           <>
             <Group label="Panes">
-              <SidebarBtn tab="pages" icon={<LayoutGrid size={I} />} label="Thumbnails" />
-              <SidebarBtn tab="outline" icon={<ListTree size={I} />} label="Bookmarks" />
-              <SidebarBtn tab="comments" icon={<MessageSquare size={I} />} label="Comments" />
-              <SidebarBtn tab="search" icon={<Search size={I} />} label="Search" />
-              <Btn icon={<PanelLeft size={I} />} label="Sidebar" onClick={() => S().setSidebar(S().sidebar ? null : 'pages')} />
-              <Btn icon={<PanelRight size={I} />} label="Properties" active={showProps} onClick={toggleProps} />
+              <SidebarBtn tab="pages" icon={<LayoutGrid size={L} />} label="Thumbnails" />
+              <SidebarBtn tab="outline" icon={<ListTree size={L} />} label="Bookmarks" />
+              <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments" />
+              <SidebarBtn tab="attachments" icon={<Paperclip size={L} />} label="Attachments" />
+              <SidebarBtn tab="search" icon={<Search size={L} />} label="Search" />
+              <Stack>
+                <Btn size="small" icon={<PanelLeft size={I} />} label="Sidebar" disabled={noDoc} onClick={() => S().setSidebar(S().sidebar ? null : 'pages')} />
+                <Btn size="small" icon={<PanelRight size={I} />} label="Properties" active={showProps} onClick={toggleProps} />
+              </Stack>
             </Group>
             <Group label="Zoom">
-              {[0.5, 1, 1.5, 2].map((z) => <Btn key={z} icon={<span className="zoom-chip">{z * 100}%</span>} label="" disabled={noDoc} active={!fit && Math.abs(scale - z) < 0.01} onClick={() => S().setScale(z)} />)}
+              <Stack>
+                <Row>
+                  <Btn size="icon" icon={<ZoomOut size={I} />} label="Zoom out" disabled={noDoc} onClick={() => S().setScale(scale / 1.2)} />
+                  <ZoomBox />
+                  <Btn size="icon" icon={<ZoomIn size={I} />} label="Zoom in" disabled={noDoc} onClick={() => S().setScale(scale * 1.2)} />
+                </Row>
+                <Btn size="small" icon={<Maximize size={I} />} label="Fit page" active={fit === 'page'} disabled={noDoc} onClick={() => S().setScale(scale, 'page')} />
+                <Btn size="small" icon={<MoveHorizontal size={I} />} label="Fit width" active={fit === 'width'} disabled={noDoc} onClick={() => S().setScale(scale, 'width')} />
+              </Stack>
+            </Group>
+            <Group label="Rotate">
+              <Btn icon={<RotateCcw size={L} />} label="Rotate view left" disabled={noDoc} onClick={() => S().rotateView(-90)} />
+              <Btn icon={<RotateCw size={L} />} label="Rotate view right" disabled={noDoc} onClick={() => S().rotateView(90)} />
+            </Group>
+            <Group label="Language">
+              <Btn icon={<Languages size={L} />} label={lang === 'de' ? 'Deutsch' : 'English'} menu={[
+                { label: 'Deutsch', checked: lang === 'de', onClick: () => setLang('de') },
+                { label: 'English', checked: lang === 'en', onClick: () => setLang('en') },
+              ]} />
             </Group>
             <Group label="Help">
-              <Btn icon={<Keyboard size={I} />} label="Shortcuts" onClick={() => show('shortcuts')} />
+              <Btn icon={<Keyboard size={L} />} label="Shortcuts" onClick={() => show('shortcuts')} />
+            </Group>
+          </>
+        )}
+        {tab === 'Comment' && (
+          <>
+            <Group label="Text markup">
+              <ToolBtn tool="highlight" icon={<Highlighter size={L} />} label="Highlight" />
+              <ToolBtn tool="underline" icon={<Underline size={L} />} label="Underline" />
+              <ToolBtn tool="strikeout" icon={<Strikethrough size={L} />} label="Strikeout" />
+            </Group>
+            <Group label="Drawing">
+              <ToolBtn tool="ink" icon={<Pencil size={L} />} label="Pencil" />
+              <ToolBtn tool="rect" icon={<Square size={L} />} label="Rectangle" />
+              <ToolBtn tool="ellipse" icon={<Circle size={L} />} label="Ellipse" />
+              <Stack>
+                <ToolBtn size="small" tool="line" icon={<Minus size={I} />} label="Line" />
+                <ToolBtn size="small" tool="arrow" icon={<MoveUpRight size={I} />} label="Arrow" />
+              </Stack>
+            </Group>
+            <Group label="Text">
+              <ToolBtn tool="text" icon={<Type size={L} />} label="Text box" />
+              <ToolBtn tool="note" icon={<StickyNote size={L} />} label="Note" />
+            </Group>
+            <Group label="Stamp">
+              <ToolBtn tool="stamp" icon={<Stamp size={L} />} label="Stamp" menu={STAMPS.map((l) => ({ label: l, checked: stampLabel === l, onClick: () => { S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } }))} />
+              <Stack>
+                <Btn size="small" icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
+                <Btn size="small" icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
+              </Stack>
+            </Group>
+            <Group label="Manage">
+              <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments" />
+              <Btn icon={<Layers size={L} />} label="Flatten" disabled={!canModify} onClick={cmd.flattenAnnotations} />
+            </Group>
+          </>
+        )}
+        {tab === 'Protect' && (
+          <>
+            <Group label="Redaction">
+              <ToolBtn tool="redact" icon={<EraserIcon size={L} />} label="Mark area" />
+              <Btn icon={<ShieldCheck size={L} />} label="Apply" disabled={!canModify} onClick={cmd.applyRedactions} />
+            </Group>
+            <Group label="Security">
+              <Btn icon={<Lock size={L} />} label="Password" disabled={noDoc} title="Passwords and encryption" onClick={() => show('security')} />
+              <Btn icon={<ListChecks size={L} />} label="Permissions" disabled={noDoc} title="What others may do with the document" onClick={() => show('permissions')} />
+              {lock && <Btn icon={<KeyRound size={L} />} label="Unlock" onClick={() => show('security')} />}
+            </Group>
+            <Group label="Digital signatures">
+              <ToolBtn tool="sign" icon={<FileSignature size={L} />} label="Sign" />
+              <Btn icon={<FileKey2 size={L} />} label="Sign invisibly" disabled={!canSign} onClick={() => show('sign')} />
+              <SidebarBtn tab="signatures" icon={<ShieldCheck size={L} />} label="Signatures" />
+            </Group>
+          </>
+        )}
+        {tab === 'Form' && (
+          <>
+            <Group label="Fill">
+              <SidebarBtn tab="forms" icon={<FormInput size={L} />} label="Form fields" />
+              <Btn icon={<Highlighter size={L} />} label="Highlight" active={highlightFields} disabled={noDoc} onClick={() => useStore.setState({ highlightFields: !highlightFields })} />
+            </Group>
+            <Group label="Design">
+              <Btn icon={<PencilRuler size={L} />} label="Edit form" active={formDesign} disabled={!canDesign} title="Select, move and change form fields" onClick={() => useStore.setState({ formDesign: !formDesign, selectedField: null })} />
+              <ToolBtn tool="fieldText" icon={<TextCursorInput size={L} />} label="Text field" />
+              <ToolBtn tool="fieldCheckbox" icon={<SquareCheck size={L} />} label="Check box" />
+              <ToolBtn tool="fieldRadio" icon={<CircleDot size={L} />} label="Radio" />
+              <Stack>
+                <ToolBtn size="small" tool="fieldDropdown" icon={<ChevronDownSquare size={I} />} label="Dropdown" />
+                <ToolBtn size="small" tool="fieldList" icon={<List size={I} />} label="List box" />
+              </Stack>
+            </Group>
+            <Group label="Lock">
+              <Btn icon={<PencilLine size={L} />} label="Make editable" disabled={!canDesign} title="Clear read-only, value locks and Locked on every field" onClick={() => cmd.makeAllFieldsEditable()} />
+              <Stack>
+                <Btn size="small" icon={<LockOpen size={I} />} label="Unlock all" disabled={!canDesign} title="Clear only the Locked property of every field" onClick={() => cmd.setAllFieldsLocked(false)} />
+                <Btn size="small" icon={<Lock size={I} />} label="Lock all" disabled={!canDesign} title="Set the Locked property on every field" onClick={() => cmd.setAllFieldsLocked(true)} />
+              </Stack>
+            </Group>
+            <Group label="Finish">
+              <Btn icon={<Layers size={L} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
+            </Group>
+          </>
+        )}
+        {tab === 'Organize' && (
+          <>
+            <Group label="Pages">
+              <Btn icon={<FilePlus2 size={L} />} label="Insert" disabled={!canAssemble} onClick={() => cmd.insertFromFile()} menu={[
+                { label: 'Blank page', icon: <FilePlus2 size={14} />, onClick: () => cmd.insertBlank() },
+                { label: 'From file', icon: <FileInput size={14} />, onClick: () => cmd.insertFromFile() },
+              ]} />
+              <Btn icon={<Trash2 size={L} />} label="Delete" disabled={!canAssemble} onClick={() => cmd.deletePages()} />
+              <Btn icon={<FileOutput size={L} />} label="Extract" disabled={!canCopy} onClick={() => cmd.extract()} />
+              <Btn icon={<Scissors size={L} />} label="Split" disabled={!canCopy} onClick={() => show('split')} />
+              <Stack>
+                <Btn size="small" icon={<Copy size={I} />} label="Duplicate" disabled={!canAssemble} onClick={() => cmd.duplicate()} />
+                <Btn size="small" icon={<ArrowDownUp size={I} />} label="Reverse" disabled={!canAssemble} onClick={cmd.reverseOrder} />
+                <Btn size="small" icon={<Crop size={I} />} label="Crop" disabled={!canModify} onClick={() => show('crop')} />
+              </Stack>
+            </Group>
+            <Group label="Rotate">
+              <Btn icon={<RotateCcw size={L} />} label="Rotate left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)} />
+              <Btn icon={<RotateCw size={L} />} label="Rotate right" disabled={!canAssemble} onClick={() => cmd.rotate(90)} />
+            </Group>
+            <Group label="Page marks">
+              <Btn icon={<Droplets size={L} />} label="Watermark" disabled={!canModify} onClick={() => show('watermark')} />
+              <Btn icon={<Heading size={L} />} label="Header/Footer" disabled={!canModify} onClick={() => show('headerFooter')} />
+            </Group>
+            <Group label="View">
+              <SidebarBtn tab="pages" icon={<LayoutGrid size={L} />} label="Thumbnails" />
+            </Group>
+          </>
+        )}
+        {tab === 'Convert' && (
+          <>
+            <Group label="Convert">
+              <Btn icon={<FileImage size={L} />} label="To image" title="Save the current page as a PNG image" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
+              <ToolBtn tool="snapshot" icon={<Camera size={L} />} label="Region to image" title="Drag a box to copy that part of the page as an image" />
+            </Group>
+            <Group label="Flatten">
+              <Btn icon={<Layers size={L} />} label="Flatten comments" disabled={!canModify} onClick={cmd.flattenAnnotations} />
+              <Btn icon={<FormInput size={L} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
+              <Btn icon={<SaveAll size={L} />} label="Flattened copy" title="Save a copy with comments burnt into the pages" disabled={noDoc} onClick={cmd.saveFlattenedCopy} />
+            </Group>
+          </>
+        )}
+        {tab === 'Share' && (
+          <>
+            <Group label="Send">
+              <Btn icon={<Share2 size={L} />} label="Share file" title="Send the PDF with another app (mail, messenger…)" disabled={noDoc} onClick={extra.shareFile} />
+              <Btn icon={<SaveAll size={L} />} label="Download" disabled={noDoc} onClick={cmd.saveAs} />
+              <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
+            </Group>
+            <Group label="Attachments">
+              <Btn icon={<Paperclip size={L} />} label="Attach file" disabled={!canModify} onClick={extra.attachFiles} />
+              <SidebarBtn tab="attachments" icon={<ListTree size={L} />} label="Attachments" />
+            </Group>
+          </>
+        )}
+        {tab === 'Review' && (
+          <>
+            <Group label="Comments">
+              <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments list" />
+              <ToolBtn tool="note" icon={<StickyNote size={L} />} label="Note" />
+              <ToolBtn tool="highlight" icon={<Highlighter size={L} />} label="Highlight" />
+            </Group>
+            <Group label="Signatures">
+              <SidebarBtn tab="signatures" icon={<ShieldCheck size={L} />} label="Validate" />
+            </Group>
+            <Group label="Document">
+              <SidebarBtn tab="search" icon={<Search size={L} />} label="Search" />
+              <Btn icon={<Info size={L} />} label="Document properties" disabled={noDoc} onClick={() => show('metadata')} />
+            </Group>
+          </>
+        )}
+        {tab === 'Accessibility' && (
+          <>
+            <Group label="Check">
+              <Btn icon={<Accessibility size={L} />} label="Accessibility check" disabled={noDoc} onClick={() => show('accessibility')} />
+            </Group>
+            <Group label="Reading">
+              <Btn icon={reading ? <VolumeX size={L} /> : <Volume2 size={L} />} label={reading ? 'Stop reading' : 'Read aloud'} active={reading} disabled={noDoc} onClick={extra.toggleReadAloud} />
+            </Group>
+            <Group label="Display">
+              <Btn icon={<Contrast size={L} />} label="Invert colours" active={invert} disabled={noDoc} onClick={extra.toggleInvert} />
             </Group>
           </>
         )}

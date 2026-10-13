@@ -7,6 +7,7 @@ import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
 import { addField } from '../store/commands';
+import { snapshotRegion } from '../store/extras';
 import type { NewFieldKind } from '../lib/forms';
 
 interface Props {
@@ -21,7 +22,7 @@ interface Props {
 const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
   fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
 };
-const DRAW_TOOLS: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
+const DRAW_TOOLS: Tool[] = ['snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
 
 type Draft =
@@ -43,13 +44,14 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const editable = useCan('annotate');
   const canDesign = useCan('designForms');
   const canSign = useCan('fillForms');
+  const canCopy = useCan('copy');
   const hits = useStore((s) => s.search.hits);
   const hitIndex = useStore((s) => s.search.index);
   const svgRef = useRef<SVGSVGElement>(null);
   const [draft, setDraft] = useState<Draft>(null);
   const drag = useRef<Drag>(null);
 
-  const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : editable);
+  const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : tool === 'snapshot' ? canCopy : editable);
 
   /** Pointer position in view space (scale 1). */
   const viewPt = (e: { clientX: number; clientY: number }): Pt => {
@@ -119,6 +121,11 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20], sign: [200, 60],
       fieldText: [180, 22], fieldCheckbox: [14, 14], fieldRadio: [14, 14], fieldDropdown: [140, 22], fieldList: [140, 60],
     };
+    if (tool === 'snapshot') {
+      // The tool stays active, as in PDF-XChange, so several regions can be copied in a row.
+      if (!click) snapshotRegion(index, viewRectToPdf(geom, { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy }));
+      return;
+    }
     const [dw, dh] = defaults[tool] ?? [100, 70];
     const box: VRect = click
       ? { left: d.start.x, top: d.start.y, width: dw, height: dh }

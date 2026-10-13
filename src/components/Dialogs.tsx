@@ -5,9 +5,11 @@ import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
+import { fixAccessibility, runAccessibilityCheck } from '../store/extras';
+import type { CheckResult } from '../lib/accessibility';
 import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign';
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility';
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -290,7 +292,7 @@ function SignatureDialog({ close }: { close: () => void }) {
 const SHORTCUTS: [string, string][] = [
   ['Ctrl+O', 'Open'], ['Ctrl+S', 'Save'], ['Ctrl+P', 'Print'], ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'], ['Ctrl+F', 'Find'], ['Ctrl+G', 'Go to page'],
   ['Ctrl + / Ctrl −', 'Zoom in / out'], ['Ctrl+0', 'Fit width'], ['Delete', 'Delete selected annotation'], ['Esc', 'Select tool / deselect'],
-  ['V', 'Select'], ['H', 'Hand'], ['Shift+H', 'Highlight'], ['U', 'Underline'], ['K', 'Strikeout'], ['P', 'Pencil'], ['R', 'Rectangle'], ['O', 'Ellipse'],
+  ['V', 'Edit comments'], ['X', 'Select text'], ['G', 'Snapshot'], ['H', 'Hand'], ['Shift+H', 'Highlight'], ['U', 'Underline'], ['K', 'Strikeout'], ['P', 'Pencil'], ['R', 'Rectangle'], ['O', 'Ellipse'],
   ['L', 'Line'], ['A', 'Arrow'], ['T', 'Text box'], ['N', 'Sticky note'], ['S', 'Stamp'], ['PageUp / PageDown', 'Previous / next page'],
 ];
 
@@ -298,6 +300,44 @@ function ShortcutsDialog({ close }: { close: () => void }) {
   return (
     <Modal title="Keyboard shortcuts" onClose={close}>
       <table className="shortcuts"><tbody>{SHORTCUTS.map(([k, v]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{v}</td></tr>)}</tbody></table>
+    </Modal>
+  );
+}
+
+const STATUS_ICON = { pass: '✓', warn: '!', fail: '✕' } as const;
+
+function AccessibilityDialog({ close }: { close: () => void }) {
+  const [results, setResults] = useState<CheckResult[] | null>(null);
+  const [error, setError] = useState('');
+  const canModify = useCan('modify');
+  const docVersion = useStore((s) => s.docVersion);
+  useEffect(() => {
+    let live = true;
+    runAccessibilityCheck().then((r) => live && setResults(r)).catch((e) => live && setError(String((e as Error).message ?? e)));
+    return () => {
+      live = false;
+    };
+  }, [docVersion]);
+  const fails = results?.filter((r) => r.status !== 'pass').length ?? 0;
+  return (
+    <Modal title="Accessibility check" onClose={close} footer={<button className="primary" onClick={close}>Close</button>}>
+      {error ? <p className="error-text">{error}</p> : !results ? <p className="muted">Checking…</p> : (
+        <>
+          <p className="muted small">{fails ? `${fails} of ${results.length} checks need attention.` : 'All checks passed.'} This is a quick structural check, not a full PDF/UA validation.</p>
+          <ul className="a11y-results">
+            {results.map((r) => (
+              <li key={r.id} className={`a11y-${r.status}`}>
+                <span className="a11y-icon" aria-label={r.status}>{STATUS_ICON[r.status]}</span>
+                <div>
+                  <div className="a11y-label">{r.label}</div>
+                  <div className="muted small">{r.detail}</div>
+                </div>
+                {r.fix && <button disabled={!canModify} onClick={() => fixAccessibility(r.fix!)}>Fix</button>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Modal>
   );
 }
@@ -315,6 +355,7 @@ export function Dialogs() {
     case 'goto': return <GotoDialog close={close} />;
     case 'security': return <SecurityDialog close={close} />;
     case 'permissions': return <PermissionsDialog close={close} />;
+    case 'accessibility': return <AccessibilityDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     default: return null;
   }

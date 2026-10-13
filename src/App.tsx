@@ -1,6 +1,6 @@
 import { can } from './store/permissions';
 import { useEffect, useState } from 'react';
-import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature } from 'lucide-react';
+import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
 import { useStore, type SidebarTab } from './store/store';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
@@ -8,6 +8,7 @@ import { Viewer } from './components/Viewer';
 import { Thumbnails } from './components/Thumbnails';
 import { Outline } from './components/Outline';
 import { CommentsPanel } from './components/CommentsPanel';
+import { AttachmentsPanel } from './components/AttachmentsPanel';
 import { FormsPanel } from './components/FormsPanel';
 import { SearchPanel } from './components/SearchPanel';
 import { DocBanner, SignaturesPanel } from './components/SignaturesPanel';
@@ -22,13 +23,14 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'pages', icon: LayoutGrid, label: 'Pages' },
   { tab: 'outline', icon: ListTree, label: 'Bookmarks' },
   { tab: 'comments', icon: MessageSquare, label: 'Comments' },
+  { tab: 'attachments', icon: Paperclip, label: 'Attachments' },
   { tab: 'forms', icon: FormInput, label: 'Form fields' },
   { tab: 'search', icon: Search, label: 'Search' },
   { tab: 'signatures', icon: FileSignature, label: 'Signatures' },
 ];
 
 const TOOL_KEYS: Record<string, Tool> = {
-  v: 'select', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
+  v: 'select', x: 'selectText', g: 'snapshot', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
   l: 'line', a: 'arrow', t: 'text', n: 'note', s: 'stamp',
 };
 
@@ -82,7 +84,7 @@ function useShortcuts() {
         s.goToPage(s.currentPage - 1);
       } else if (!e.altKey && TOOL_KEYS[e.key]) {
         const tool = TOOL_KEYS[e.key];
-        if (tool === 'select' || tool === 'hand' || can('annotate')) s.setTool(tool);
+        if (['select', 'selectText', 'hand'].includes(tool) || (tool === 'snapshot' ? can('copy') : can('annotate'))) s.setTool(tool);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -173,6 +175,7 @@ export function App() {
             {sidebar === 'pages' && <Thumbnails />}
             {sidebar === 'outline' && <Outline />}
             {sidebar === 'comments' && <CommentsPanel />}
+            {sidebar === 'attachments' && <AttachmentsPanel />}
             {sidebar === 'forms' && <FormsPanel />}
             {sidebar === 'search' && <SearchPanel />}
             {sidebar === 'signatures' && <SignaturesPanel />}

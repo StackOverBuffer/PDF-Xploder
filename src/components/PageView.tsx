@@ -32,7 +32,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
 
   useEffect(() => {
     if (!visible || !pdf) return;
-    const key = `${docVersion}:${scale}`;
+    const key = `${docVersion}:${scale}:${geom.rotation}`;
     if (rendered.current === key) return;
     let cancelled = false;
     let renderTask: { cancel(): void } | null = null;
@@ -42,7 +42,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
         const page = await pdf.getPage(index + 1);
         if (cancelled) return;
         const dpr = Math.min(window.devicePixelRatio || 1, 3);
-        const viewport = page.getViewport({ scale: scale * dpr });
+        const viewport = page.getViewport({ scale: scale * dpr, rotation: geom.rotation });
         // Render into a fresh canvas and swap it in when done, so zooming does not flash white.
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(viewport.width);
@@ -63,7 +63,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
         textLayer = new TextLayer({
           textContentSource: page.streamTextContent(),
           container: textDiv,
-          viewport: page.getViewport({ scale }),
+          viewport: page.getViewport({ scale, rotation: geom.rotation }),
         });
         await textLayer.render();
         const end = document.createElement('div');
@@ -78,7 +78,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
       renderTask?.cancel();
       textLayer?.cancel();
     };
-  }, [pdf, docVersion, index, scale, visible]);
+  }, [pdf, docVersion, index, scale, visible, geom.rotation]);
 
   return (
     <div className="page" data-index={index} style={{ width: w, height: h }}>

@@ -40,6 +40,16 @@ export async function runSearch(query: string, matchCase: boolean): Promise<Sear
   return hits;
 }
 
+/** Show search hit `index` (wrapping around). */
+export function goToHit(index: number) {
+  const s = useStore.getState();
+  const hits = s.search.hits;
+  if (!hits.length) return;
+  const i = (index + hits.length) % hits.length;
+  s.setSearch({ index: i });
+  s.goToPage(hits[i].page, s.geoms[hits[i].page].rotation === 0 ? hits[i].rect.y : undefined);
+}
+
 export function SearchPanel() {
   const search = useStore((s) => s.search);
   const docVersion = useStore((s) => s.docVersion);
@@ -55,14 +65,7 @@ export function SearchPanel() {
     return () => window.removeEventListener('awesome-pdf:focus-search', onFocus);
   }, []);
 
-  const go = (index: number) => {
-    const s = useStore.getState();
-    const hits = s.search.hits;
-    if (!hits.length) return;
-    const i = (index + hits.length) % hits.length;
-    s.setSearch({ index: i });
-    s.goToPage(hits[i].page, s.geoms[hits[i].page].rotation === 0 ? hits[i].rect.y : undefined);
-  };
+  const go = goToHit;
 
   const submit = async (matchCase = search.matchCase) => {
     setRunning(true);

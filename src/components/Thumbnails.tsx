@@ -31,7 +31,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
     (async () => {
       try {
         const page = await pdf.getPage(index + 1);
-        const viewport = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 2) });
+        const viewport = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 2), rotation: geom.rotation });
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
@@ -47,7 +47,7 @@ const Thumb = memo(function Thumb({ index }: { index: number }) {
       cancelled = true;
       task?.cancel();
     };
-  }, [inView, pdf, docVersion, index, scale]);
+  }, [inView, pdf, docVersion, index, scale, geom.rotation]);
 
   return <div ref={hostRef} className="thumb-canvas" style={{ width: THUMB_W, height: Math.round(height * scale) }} />;
 });

@@ -7,7 +7,7 @@ import { requirePermission } from './permissions';
 import { describeObjects, editPage, loadForEditing, readPage, writePage, type ContentEdit, type ObjectInfo } from '../lib/content/page';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import { downloadBlob, baseName } from '../lib/download';
-import { pdfRectToView, viewSize } from '../lib/geometry';
+import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import type { Rect } from '../lib/types';
 
 const S = () => useStore.getState();
@@ -109,7 +109,7 @@ export async function exportRegionAsImage(page: number, rect: Rect, label = 'sel
     const s = S();
     const scale = 300 / 72;
     const canvas = await renderToCanvas(await s.pdf!.getPage(page + 1), scale);
-    const g = s.geoms[page];
+    const g = pageGeom(s.geoms[page]);
     const v = pdfRectToView(g, rect);
     const vs = viewSize(g);
     const sx = canvas.width / vs.width;
@@ -129,4 +129,17 @@ export function imageBytes(src: string): { bytes: Uint8Array; png: boolean } {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return { bytes, png: head.includes('png') };
+}
+
+/** Select all, none, or the inverse of the selection among the current page's objects (respecting the filter). */
+export async function selectContent(mode: 'all' | 'none' | 'invert') {
+  const s = S();
+  if (!s.pdf) return;
+  if (s.tool !== 'content') s.setTool('content');
+  const page = s.currentPage;
+  if (mode === 'none') return useStore.setState({ contentSelection: null });
+  const objects = (await pageObjects(page)).filter((o) => matchesFilter(o, S().contentFilter));
+  const current = S().contentSelection?.page === page ? S().contentSelection!.ids : [];
+  const ids = mode === 'all' ? objects.map((o) => o.id) : objects.map((o) => o.id).filter((id) => !current.includes(id));
+  useStore.setState({ contentSelection: ids.length ? { page, ids } : null, selected: null });
 }

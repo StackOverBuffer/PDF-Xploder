@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useStore } from '../store/store';
-import { viewSize } from '../lib/geometry';
+import { pageRot, viewSize } from '../lib/geometry';
 
 export function StatusBar() {
   const current = useStore((s) => s.currentPage);
@@ -31,7 +31,7 @@ export function StatusBar() {
         <button onClick={() => S().goToPage(count - 1)} disabled={current >= count - 1} title="Last page"><ChevronLast size={16} /></button>
       </div>
       <div className="muted small">
-        {busy ?? (size ? `${(size.width / 72).toFixed(2)} × ${(size.height / 72).toFixed(2)} in${geom.rotation ? ` · rotated ${geom.rotation}°` : ''}` : '')}
+        {busy ?? (size ? `${(size.width / 72).toFixed(2)} × ${(size.height / 72).toFixed(2)} in${pageRot(geom) ? ` · rotated ${pageRot(geom)}°` : ''}${geom.pageRotation !== undefined ? ' · view rotated' : ''}` : '')}
       </div>
       <div className="zoom">
         <button onClick={() => S().setScale(scale / 1.2)} title="Zoom out"><ZoomOut size={16} /></button>
