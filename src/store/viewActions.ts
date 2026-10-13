@@ -1,6 +1,6 @@
 /** Zooming around a point or into a box (Zoom tool, context menu). */
 import { useStore } from './store';
-import { viewSize, type VRect } from '../lib/geometry';
+import { viewSize, viewToPdf, type VRect } from '../lib/geometry';
 import type { Pt } from '../lib/types';
 
 const S = () => useStore.getState();
@@ -36,4 +36,18 @@ export function zoomToBox(page: number, box: VRect) {
   const page1 = viewSize(g);
   S().setScale(Math.max(fit, Math.min(viewer.clientWidth / page1.width, 1) * 0.5));
   centreOn(page, { x: box.left + box.width / 2, y: box.top + box.height / 2 });
+}
+
+/** The page and user-space top of what is at the top of the viewer now (a bookmark target). */
+export function currentViewTarget(): { page: number; y?: number } {
+  const s = S();
+  const page = s.currentPage;
+  const viewer = document.querySelector<HTMLElement>('.viewer');
+  const pageEl = viewer?.querySelector<HTMLElement>(`.page[data-index="${page}"]`);
+  const g = s.geoms[page];
+  if (!viewer || !pageEl || !g) return { page };
+  const top = Math.max(0, (viewer.getBoundingClientRect().top - pageEl.getBoundingClientRect().top) / s.scale);
+  const p = viewToPdf(g, { x: 0, y: top });
+  // Destinations give a top only for upright pages.
+  return g.rotation === 0 ? { page, y: Math.round(p.y) } : { page };
 }

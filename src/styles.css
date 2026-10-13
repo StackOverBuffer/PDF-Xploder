@@ -163,7 +163,16 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 /* outline */
 .outline, .outline ul { list-style: none; margin: 0; padding: 0; }
 .outline { padding: 6px; overflow-y: auto; }
-.outline-row { display: flex; align-items: center; }
+.outline-row { display: flex; align-items: center; border-radius: 3px; border: 1px solid transparent; min-height: 24px; }
+.outline:focus { outline: none; }
+.outline-row.selected { background: var(--accent-soft); }
+.outline:focus .outline-row.selected { border-color: var(--accent); }
+.outline-row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.outline-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.outline-row.drop-inside { background: var(--accent-soft); border-color: var(--accent); }
+.outline-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline-rename { flex: 1; min-width: 0; font-size: 12.5px; padding: 1px 4px; }
+.swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); }
 .twisty { width: 20px; flex-shrink: 0; border: none; background: none; padding: 0; display: inline-flex; }
 
 /* comments */

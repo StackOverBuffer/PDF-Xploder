@@ -302,6 +302,14 @@ const DE: Record<string, string> = {
   'Wrong certificate password.': 'Falsches Zertifikatskennwort.', 'Only RSA certificates can be used for signing at the moment.': 'Zum Signieren können derzeit nur RSA-Zertifikate verwendet werden.',
   'Field names must be non-empty and contain no dots.': 'Feldnamen dürfen nicht leer sein und keine Punkte enthalten.', 'No such widget.': 'Dieses Widget gibt es nicht.',
   'The radio group has no buttons on a page.': 'Die Optionsfeldgruppe hat keine Schaltflächen auf einer Seite.', 'Nothing selected': 'Nichts ausgewählt',
+  // Bookmarks pane
+  'Go to bookmark': 'Zum Lesezeichen gehen', 'Add bookmark': 'Lesezeichen hinzufügen', 'Add child bookmark': 'Untergeordnetes Lesezeichen hinzufügen',
+  'Set destination to current view': 'Ziel auf aktuelle Ansicht setzen', Rename: 'Umbenennen', Bold: 'Fett', Italic: 'Kursiv',
+  Default: 'Standard', 'Move up': 'Nach oben', 'Move down': 'Nach unten', Indent: 'Einrücken', Outdent: 'Ausrücken',
+  'Expand all': 'Alle erweitern', 'Collapse all': 'Alle reduzieren', Untitled: 'Ohne Titel', '(untitled)': '(ohne Titel)',
+  'Use + to add one for the current view.': 'Mit + fügen Sie eines für die aktuelle Ansicht hinzu.',
+  'Delete “{title}” and its {count} sub-bookmark(s)?': '„{title}“ und {count} untergeordnete(s) Lesezeichen löschen?',
+  'Updating bookmarks…': 'Lesezeichen werden aktualisiert…',
 };
 
 export default DE;
