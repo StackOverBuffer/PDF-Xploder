@@ -7,7 +7,6 @@ import { create } from 'zustand';
 import { styleFor, uid, useStore } from '../store/store';
 import { can, useCan } from '../store/permissions';
 import { viewRectToPdf, type VRect } from '../lib/geometry';
-import { mergeLineRects } from './Viewer';
 import { tr } from '../lib/i18n';
 import { useContextMenu } from './Menu';
 import { textSelectionMenu } from './contextMenus';
@@ -27,41 +26,53 @@ interface Seg {
   text: string;
 }
 
-/** Characters of a page's text layer whose centres fall inside `box` (view space, scale 1). */
+/**
+ * Words of a page's text layer covered by `box` (view space, scale 1). Whole
+ * words are selected, so a rectangle drawn a little too tight (common with OCR
+ * text, whose invisible glyphs never match the scan exactly) does not cut words
+ * or drop them: a word counts when the box covers half its width (or the box
+ * lies within the word) and a good part of its height.
+ */
 export function textInBox(pageEl: HTMLElement, box: VRect, scale: number): { rects: VRect[]; text: string } {
   const pr = pageEl.getBoundingClientRect();
   const toLocal = (r: DOMRect): VRect => ({ left: (r.left - pr.left) / scale, top: (r.top - pr.top) / scale, width: r.width / scale, height: r.height / scale });
-  const inside = (r: VRect) => {
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    return cx >= box.left && cx <= box.left + box.width && cy >= box.top && cy <= box.top + box.height;
+  const overlap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+  const covered = (r: VRect) => {
+    const hx = overlap(r.left, r.left + r.width, box.left, box.left + box.width);
+    const vy = overlap(r.top, r.top + r.height, box.top, box.top + box.height);
+    const horiz = hx >= r.width * 0.5 || (box.width > 0 && hx >= box.width * 0.9);
+    const vert = vy >= r.height * 0.35 || (box.height > 0 && vy >= box.height * 0.9);
+    return horiz && vert && hx > 0 && vy > 0;
   };
-  const overlaps = (r: VRect) => r.left < box.left + box.width && r.left + r.width > box.left && r.top < box.top + box.height && r.top + r.height > box.top;
+  const near = (r: VRect) => r.left < box.left + box.width + r.height && r.left + r.width > box.left - r.height && r.top < box.top + box.height && r.top + r.height > box.top;
+  const union = (a: VRect, b: VRect): VRect => {
+    const left = Math.min(a.left, b.left);
+    const top = Math.min(a.top, b.top);
+    return { left, top, width: Math.max(a.left + a.width, b.left + b.width) - left, height: Math.max(a.top + a.height, b.top + b.height) - top };
+  };
   const segs: Seg[] = [];
   const range = document.createRange();
   for (const span of pageEl.querySelectorAll<HTMLElement>('.textLayer span:not(.markedContent)')) {
     const node = span.firstChild;
-    if (!node || node.nodeType !== Node.TEXT_NODE || !overlaps(toLocal(span.getBoundingClientRect()))) continue;
+    if (!node || node.nodeType !== Node.TEXT_NODE || !near(toLocal(span.getBoundingClientRect()))) continue;
     const s = node.textContent ?? '';
-    let cur: Seg | null = null;
-    for (let i = 0; i < s.length; i++) {
+    // Split the span into words; each word's box is the union of its characters.
+    let word: Seg | null = null;
+    const flush = () => {
+      if (word && covered(word.r)) segs.push(word);
+      word = null;
+    };
+    for (let i = 0; i <= s.length; i++) {
+      if (i === s.length || /\s/.test(s[i])) {
+        flush();
+        continue;
+      }
       range.setStart(node, i);
       range.setEnd(node, i + 1);
       const r = toLocal(range.getBoundingClientRect());
-      if (r.width <= 0 || r.height <= 0 || !inside(r)) {
-        if (cur) segs.push(cur);
-        cur = null;
-        continue;
-      }
-      if (cur) {
-        const right = Math.max(cur.r.left + cur.r.width, r.left + r.width);
-        const left = Math.min(cur.r.left, r.left);
-        const top = Math.min(cur.r.top, r.top);
-        const bottom = Math.max(cur.r.top + cur.r.height, r.top + r.height);
-        cur = { r: { left, top, width: right - left, height: bottom - top }, text: cur.text + s[i] };
-      } else cur = { r, text: s[i] };
+      if (r.width <= 0 || r.height <= 0) continue;
+      word = word ? { r: union(word.r, r), text: word.text + s[i] } : { r, text: s[i] };
     }
-    if (cur) segs.push(cur);
   }
   // Reading order: lines from top to bottom, left to right within a line.
   segs.sort((a, b) => a.r.top + a.r.height / 2 - (b.r.top + b.r.height / 2));
@@ -74,17 +85,24 @@ export function textInBox(pageEl: HTMLElement, box: VRect, scale: number): { rec
     else lines.push([sg]);
   }
   let text = '';
+  const rects: VRect[] = [];
   for (const line of lines) {
     line.sort((a, b) => a.r.left - b.r.left);
     let prev: Seg | null = null;
     for (const sg of line) {
-      if (prev && sg.r.left - (prev.r.left + prev.r.width) > sg.r.height * 0.2 && !/\s$/.test(prev.text) && !/^\s/.test(sg.text)) text += ' ';
+      const gap = prev ? sg.r.left - (prev.r.left + prev.r.width) : 0;
+      // Pieces of one word split across spans join without a space.
+      if (prev && gap > sg.r.height * 0.15) text += ' ';
       text += sg.text;
+      // One highlight rect per run of words, covering the spaces between them.
+      const last = rects[rects.length - 1];
+      if (prev && last && gap < sg.r.height * 1.2) rects[rects.length - 1] = union(last, sg.r);
+      else rects.push({ ...sg.r });
       prev = sg;
     }
-    text = text.replace(/[ \t]+$/, '') + '\n';
+    text += '\n';
   }
-  return { rects: mergeLineRects(segs.map((s) => s.r)), text: text.trim() };
+  return { rects, text: text.trim() };
 }
 
 /** Select all text on a page. */
