@@ -7,8 +7,7 @@
  *   Noto Sans SC        Chinese ideographs, Japanese kana   } fetched on demand from
  *   Noto Sans KR        Korean hangul                       } jsDelivr, only when needed
  */
-import fontkit from '@pdf-lib/fontkit';
-import { PDFDocument, PDFFont, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFFont, StandardFonts } from '@cantoo/pdf-lib';
 import { singleFontEngine, type TextEngine } from './appearance';
 import { subsetFont } from './subset';
 
@@ -55,9 +54,9 @@ function parsed(key: FontKey) {
   if (!p) {
     let b = bytesCache.get(key);
     if (!b) bytesCache.set(key, (b = source(key)));
-    p = b.then((bytes) => {
+    p = Promise.all([b, loadFontkit()]).then(([bytes, fontkit]) => {
       if (!bytes) return null;
-      const f = fontkit.create(bytes as never) as unknown as { hasGlyphForCodePoint(cp: number): boolean };
+      const f = (fontkit as unknown as { create(b: Uint8Array): { hasGlyphForCodePoint(cp: number): boolean } }).create(bytes);
       return { bytes, has: (cp: number) => f.hasGlyphForCodePoint(cp) };
     }).catch(() => null);
     parsedCache.set(key, p);
@@ -76,6 +75,10 @@ function lazyStandardEngine(doc: PDFDocument, weight: 'regular' | 'bold'): TextE
   const get = () => (inner ??= singleFontEngine(doc.embedStandardFont(weight === 'bold' ? StandardFonts.HelveticaBold : StandardFonts.Helvetica)));
   return { runs: (t) => get().runs(t), width: (t, s) => get().width(t, s) };
 }
+
+// fontkit is only needed once custom fonts are embedded, so load it on demand.
+let fontkitPromise: Promise<unknown> | null = null;
+export const loadFontkit = () => (fontkitPromise ??= import('@pdf-lib/fontkit').then((m) => m.default ?? m)) as Promise<Parameters<PDFDocument['registerFontkit']>[0]>;
 
 const isSpace = (cp: number) => cp === 10 || cp === 13 || cp === 9 || cp === 32;
 
@@ -115,7 +118,7 @@ export async function createTextEngine(doc: PDFDocument, texts: string[], weight
   const perFont = new Map<number, Set<number>>([[0, new Set([32, 63 /* '?' fallback */])]]);
   for (const [cp, i] of pick) if (i >= 0) (perFont.get(i) ?? perFont.set(i, new Set()).get(i)!).add(cp);
 
-  doc.registerFontkit(fontkit);
+  doc.registerFontkit(await loadFontkit());
   const fonts: PDFFont[] = [];
   for (const [i, cps] of perFont) {
     let bytes = chain[i].bytes;

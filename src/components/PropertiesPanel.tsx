@@ -130,7 +130,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
 
 const TOOL_NAMES: Record<string, string> = {
   highlight: 'Highlight', underline: 'Underline', strikeout: 'Strikeout', ink: 'Pencil', rect: 'Rectangle', ellipse: 'Ellipse',
-  line: 'Line', arrow: 'Arrow', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact',
+  line: 'Line', arrow: 'Arrow', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature',
 };
 
 const TOOL_HINTS: Record<string, string> = {
@@ -145,6 +145,7 @@ const TOOL_HINTS: Record<string, string> = {
   text: 'Click or drag to place a text box, then type.',
   note: 'Click to place a sticky note.',
   stamp: 'Click or drag to place the stamp.',
+  sign: 'Drag a box where the signature should appear.',
   redact: 'Drag over content to mark it for redaction.',
 };
 

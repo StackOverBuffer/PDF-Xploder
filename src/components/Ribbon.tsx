@@ -4,7 +4,7 @@ import {
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import * as cmd from '../store/commands';
@@ -59,6 +59,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const scale = useStore((s) => s.scale);
   const fit = useStore((s) => s.fit);
   const stampLabel = useStore((s) => s.styles.stamp.stampLabel);
+  const lock = useStore((s) => !!s.lock);
   const show = useDialog((d) => d.show);
   const S = useStore.getState;
   const noDoc = !hasDoc;
@@ -208,7 +209,13 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Btn icon={<ShieldCheck size={I} />} label="Apply" disabled={noEdit} onClick={cmd.applyRedactions} />
             </Group>
             <Group label="Security">
-              <Btn icon={<Lock size={I} />} label="Password" disabled title="Encryption is on the roadmap" onClick={() => {}} />
+              <Btn icon={<Lock size={I} />} label="Password" disabled={noDoc || (!editable && !lock)} title="Password protection and permissions" onClick={() => show('security')} />
+              {lock && <Btn icon={<KeyRound size={I} />} label="Unlock" onClick={() => show('security')} />}
+            </Group>
+            <Group label="Digital signatures">
+              <ToolBtn tool="sign" icon={<FileSignature size={I} />} label="Sign" />
+              <Btn icon={<FileKey2 size={I} />} label="Sign invisibly" disabled={noEdit} onClick={() => show('sign')} />
+              <SidebarBtn tab="signatures" icon={<ShieldCheck size={I} />} label="Signatures" />
             </Group>
           </>
         )}

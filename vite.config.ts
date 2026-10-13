@@ -10,7 +10,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           pdfjs: ['pdfjs-dist'],
-          'pdf-lib': ['pdf-lib'],
+          'pdf-lib': ['@cantoo/pdf-lib'],
           react: ['react', 'react-dom'],
         },
       },

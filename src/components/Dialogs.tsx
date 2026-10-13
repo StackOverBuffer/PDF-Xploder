@@ -4,16 +4,18 @@ import { X } from 'lucide-react';
 import { useStore } from '../store/store';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
+import { SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto';
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'sign';
 
-export const useDialog = create<{ open: DialogName | null; show(d: DialogName): void; close(): void }>()((set) => ({
+export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
-  show: (open) => set({ open }),
-  close: () => set({ open: null }),
+  payload: undefined,
+  show: (open, payload) => set({ open, payload }),
+  close: () => set({ open: null, payload: undefined }),
 }));
 
-function Modal({ title, children, onClose, footer, wide }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean }) {
+export function Modal({ title, children, onClose, footer, wide }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -310,6 +312,8 @@ export function Dialogs() {
     case 'signature': return <SignatureDialog close={close} />;
     case 'shortcuts': return <ShortcutsDialog close={close} />;
     case 'goto': return <GotoDialog close={close} />;
+    case 'security': return <SecurityDialog close={close} />;
+    case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     default: return null;
   }
 }

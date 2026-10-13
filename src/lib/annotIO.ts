@@ -17,7 +17,7 @@ import {
   PDFRawStream,
   PDFRef,
   PDFString,
-} from 'pdf-lib';
+} from '@cantoo/pdf-lib';
 import { hexToRgbTuple } from './color';
 import { buildAppearance, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';

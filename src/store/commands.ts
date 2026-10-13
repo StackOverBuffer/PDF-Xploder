@@ -3,6 +3,8 @@ import * as ops from '../lib/pdfOps';
 import { annotationsByPage, uid, useStore } from './store';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
+import { encrypt } from '../lib/security';
+import { signPdf, type SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation } from '../lib/types';
 
@@ -51,14 +53,34 @@ export async function currentBytes(): Promise<Uint8Array> {
   return Object.keys(s.formValues).length ? ops.setFormValues(s.bytes!, s.formValues) : s.bytes!;
 }
 
+/** The document with annotations and form values, unencrypted (for print, export, extract…). */
 export async function buildOutput(flatten = false): Promise<Uint8Array> {
   return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten });
 }
 
+/**
+ * The bytes to write when saving. An unchanged document is written back
+ * byte-for-byte, so signatures and encryption survive; otherwise the
+ * document is rebuilt and the security settings applied.
+ */
+export async function buildFileForSave(): Promise<Uint8Array> {
+  const s = S();
+  if (!s.dirty && s.originalBytes) return s.originalBytes;
+  const out = await buildOutput();
+  return s.security ? encrypt(out, s.security) : out;
+}
+
+/** Ask before a save that would invalidate digital signatures. */
+function confirmBreakingSignatures(): boolean {
+  const s = S();
+  if (!s.dirty || !s.signatures.length) return true;
+  return confirm('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?');
+}
+
 export async function save() {
-  if (!S().bytes) return;
+  if (!S().bytes || !confirmBreakingSignatures()) return;
   await S().run('Saving…', async () => {
-    const out = await buildOutput();
+    const out = await buildFileForSave();
     downloadBlob(out, S().fileName || 'document.pdf');
     S().markSaved();
   });
@@ -359,5 +381,24 @@ export async function insertImageFromFile() {
   await S().run('Loading image…', async () => {
     const img = await normaliseImage(await readAsDataUrl(f));
     placeImage(img.src, img.width * 0.75, img.height * 0.75);
+  });
+}
+
+// ---------------------------------------------------------------- security
+
+/** Apply a digital signature, download the signed file and reopen it. */
+export async function signDocument(o: SignOptions) {
+  const s = S();
+  if (!s.bytes) return;
+  if (s.security) return s.notify('Remove password protection before signing (signing encrypted files is not supported yet).', 'error');
+  if (!requireEditable() || !confirmBreakingSignatures()) return;
+  await s.run('Signing…', async () => {
+    const base = !s.dirty && s.originalBytes ? s.originalBytes : await buildOutput();
+    const signed = await signPdf(base, o);
+    const name = /-signed\.pdf$/i.test(s.fileName) ? s.fileName : `${baseName(s.fileName || 'document')}-signed.pdf`;
+    downloadBlob(signed, name);
+    await S().openDocument(signed, name);
+    S().setSidebar('signatures');
+    S().notify('Signed and saved. Further changes will invalidate the signature unless you sign again.');
   });
 }

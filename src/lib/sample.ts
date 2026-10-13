@@ -1,4 +1,4 @@
-import { PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, StandardFonts, rgb } from '@cantoo/pdf-lib';
 import { singleFontEngine, wrapLines } from './appearance';
 
 /** A small multi-page document with text, a form and bookmarks, for trying the editor out. */

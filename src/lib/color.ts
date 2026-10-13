@@ -1,4 +1,4 @@
-import { rgb, type RGB } from 'pdf-lib';
+import { rgb, type RGB } from '@cantoo/pdf-lib';
 
 export function hexToRgbTuple(hex: string): [number, number, number] {
   let h = hex.trim().replace(/^#/, '');

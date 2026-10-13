@@ -211,6 +211,27 @@ select.widget { padding: 0; }
 .pdf-link { position: absolute; cursor: pointer; }
 .pdf-link:hover { background: rgba(26, 95, 180, 0.12); outline: 1px solid rgba(26, 95, 180, 0.4); }
 
+/* security & signatures */
+.main { flex-direction: column; }
+.doc-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: #e8f5e9; color: #1b5e20; flex-shrink: 0; flex-wrap: wrap; }
+.doc-banner.warn { background: #fff8e1; color: #7a4f01; }
+.doc-banner.bad { background: #ffebee; color: #b71c1c; }
+.doc-banner button { margin-left: auto; padding: 2px 10px; }
+.sig-icon.ok, .sig-status.ok { color: #2e7d32; }
+.sig-icon.warn, .sig-status.warn { color: #b26a00; }
+.sig-icon.bad, .sig-status.bad { color: var(--danger); }
+.sig-icon { flex-shrink: 0; margin-top: 2px; }
+.sig-status { font-size: 12px; font-weight: 600; }
+.sig-details { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin: 6px 0; }
+.sig-details dt { color: var(--muted); }
+.sig-details dd { margin: 0; word-break: break-word; }
+.error-text { color: var(--danger); }
+.warn-text { color: #b26a00; }
+.perm-list { display: flex; flex-direction: column; gap: 4px; padding-left: 120px; }
+.identity { padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.subpanel { border: 1px dashed var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.modal .row.inline { gap: 8px; }
+
 /* ---------------------------------------------------------- status bar */
 .statusbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 10px; background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; }
 .statusbar button { border: none; background: none; padding: 3px; }

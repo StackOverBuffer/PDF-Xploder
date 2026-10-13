@@ -4,6 +4,7 @@ import { frameGeom, frameMatrix, pdfRectToView, pdfToView, rectFromPoints, viewR
 import { hasRect, resizePatch, translatePatch, viewBounds } from '../lib/annotGeom';
 import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
+import { useDialog } from './Dialogs';
 
 interface Props {
   index: number;
@@ -14,7 +15,7 @@ interface Props {
   height: number;
 }
 
-const DRAW_TOOLS: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact'];
+const DRAW_TOOLS: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign'];
 const EMPTY: Annotation[] = [];
 
 type Draft =
@@ -106,13 +107,17 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       store.addAnnotation(index, { ...base(tool), type: tool, width: st.width, p1: viewToPdf(geom, d.start), p2: viewToPdf(geom, d.end) });
       return;
     }
-    const defaults: Record<string, [number, number]> = { text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20] };
+    const defaults: Record<string, [number, number]> = { text: [200, 40], stamp: [160, 50], rect: [100, 70], ellipse: [100, 70], redact: [120, 20], sign: [200, 60] };
     const [dw, dh] = defaults[tool] ?? [100, 70];
     const box: VRect = click
       ? { left: d.start.x, top: d.start.y, width: dw, height: dh }
       : { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy };
     const rect = viewRectToPdf(geom, box);
     switch (tool) {
+      case 'sign':
+        store.setTool('select');
+        useDialog.getState().show('sign', { page: index, rect });
+        break;
       case 'rect':
       case 'ellipse':
         store.addAnnotation(index, { ...base(tool), type: tool, rect, width: st.width, fill: st.fill });

@@ -5,24 +5,25 @@
  */
 import {
   PDFCheckBox,
+  PDFDict,
   PDFDocument,
   PDFDropdown,
   PDFName,
   PDFOptionList,
   PDFPage,
   PDFRadioGroup,
+  PDFRef,
   PDFTextField,
   degrees,
   drawObject,
   popGraphicsState,
   pushGraphicsState,
-} from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+} from '@cantoo/pdf-lib';
 import { hexToRgb } from './color';
 import { normRot, viewRectToPdf, viewSize, viewToPdf, type VRect } from './geometry';
 import type { Annotation, PageGeom, Pt } from './types';
 import { buildAppearance, type DrawContext, type TextEngine } from './appearance';
-import { createTextEngine, loadFontBytes } from './fonts';
+import { createTextEngine, loadFontBytes, loadFontkit } from './fonts';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
@@ -81,8 +82,20 @@ export async function reorderPages(bytes: Uint8Array, order: number[]): Promise<
   if (order.length !== pages.length || new Set(order).size !== pages.length) {
     throw new Error('Invalid page order');
   }
-  for (let i = pages.length - 1; i >= 0; i--) doc.removePage(i);
-  order.forEach((old, i) => doc.insertPage(i, pages[old]));
+  // Rebuild the page tree as a single flat node. Attributes pages inherit from
+  // intermediate nodes are copied onto each page first so nothing is lost.
+  const rootRef = doc.catalog.get(PDFName.of('Pages')) as PDFRef;
+  const root = doc.context.lookup(rootRef, PDFDict);
+  for (const page of pages) {
+    for (const key of ['Resources', 'MediaBox', 'CropBox', 'Rotate']) {
+      const name = PDFName.of(key);
+      const v = page.node.getInheritableAttribute(name);
+      if (v && !page.node.get(name)) page.node.set(name, v);
+    }
+    page.node.set(PDFName.of('Parent'), rootRef);
+  }
+  root.set(PDFName.of('Kids'), doc.context.obj(order.map((i) => pages[i].ref)));
+  root.set(PDFName.of('Count'), doc.context.obj(pages.length));
   return save(doc);
 }
 
@@ -355,7 +368,7 @@ export async function setFormValues(
   if (needsUnicode) {
     const fontBytes = await loadFontBytes('sans');
     if (fontBytes) {
-      doc.registerFontkit(fontkit);
+      doc.registerFontkit(await loadFontkit());
       // Not subset: the font must contain every glyph a later edit of the field may need.
       form.updateFieldAppearances(await doc.embedFont(fontBytes, { subset: false }));
     }

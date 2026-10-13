@@ -31,7 +31,7 @@ import {
   setStrokingColor,
   stroke,
   type Color,
-} from 'pdf-lib';
+} from '@cantoo/pdf-lib';
 import { hexToRgb } from './color';
 import { frameGeom, pdfRectToView, pdfToView, viewToPdf } from './geometry';
 import type { Annotation, PageGeom, Pt, Rect } from './types';

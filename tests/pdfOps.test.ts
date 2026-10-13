@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString, StandardFonts } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import * as ops from '../src/lib/pdfOps';
 import type { Annotation } from '../src/lib/types';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search } from 'lucide-react';
+import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature } from 'lucide-react';
 import { useStore, type SidebarTab } from './store/store';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
@@ -9,6 +9,7 @@ import { Outline } from './components/Outline';
 import { CommentsPanel } from './components/CommentsPanel';
 import { FormsPanel } from './components/FormsPanel';
 import { SearchPanel } from './components/SearchPanel';
+import { DocBanner, SignaturesPanel } from './components/SignaturesPanel';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
@@ -22,6 +23,7 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'comments', icon: MessageSquare, label: 'Comments' },
   { tab: 'forms', icon: FormInput, label: 'Form fields' },
   { tab: 'search', icon: Search, label: 'Search' },
+  { tab: 'signatures', icon: FileSignature, label: 'Signatures' },
 ];
 
 const TOOL_KEYS: Record<string, Tool> = {
@@ -168,9 +170,10 @@ export function App() {
             {sidebar === 'comments' && <CommentsPanel />}
             {sidebar === 'forms' && <FormsPanel />}
             {sidebar === 'search' && <SearchPanel />}
+            {sidebar === 'signatures' && <SignaturesPanel />}
           </aside>
         )}
-        <main className="main">{hasDoc ? <Viewer /> : <Welcome />}</main>
+        <main className="main">{hasDoc ? <><DocBanner /><Viewer /></> : <Welcome />}</main>
         {hasDoc && showProps && <PropertiesPanel />}
       </div>
       {hasDoc && <StatusBar />}

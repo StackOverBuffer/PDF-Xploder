@@ -17,7 +17,10 @@ Click **Try a sample** on the start screen for a document with text, a form and 
 | Layer | Where | What |
 | --- | --- | --- |
 | Rendering | `src/lib/pdfjs.ts`, `src/components/PageView.tsx` | [pdf.js](https://mozilla.github.io/pdf.js/) renders pages to canvas plus a selectable text layer. Pages are rendered lazily as they scroll into view. |
-| Editing | `src/lib/pdfOps.ts` | [pdf-lib](https://pdf-lib.js.org/) implements every document change as `bytes → bytes`: page operations, watermarks, headers/footers, metadata, forms and flattening annotations on export. DOM-free and unit-tested. |
+| Editing | `src/lib/pdfOps.ts` | [@cantoo/pdf-lib](https://github.com/cantoo-scribe/pdf-lib) (a maintained pdf-lib fork with encryption and incremental saving) implements every document change as `bytes → bytes`: page operations, watermarks, headers/footers, metadata, forms and annotation export. DOM-free and unit-tested. |
+| Annotations I/O | `src/lib/appearance.ts`, `src/lib/annotIO.ts` | Every annotation gets an appearance stream. Saving writes native PDF annotations (`/Highlight`, `/Ink`, `/FreeText`, …); flattening paints the same appearance into the page. On open, supported annotations from any producer are imported for editing. |
+| Fonts | `src/lib/fonts.ts`, `src/lib/subset.ts` | Added text uses a Noto fallback stack (Noto Sans and Symbols 2 bundled; CJK fetched on demand), subset with HarfBuzz `hb-subset` (WebAssembly). |
+| Security | `src/lib/security.ts`, `src/lib/signature.ts`, `src/lib/der.ts` | AES-256/128 encryption and permissions; PKCS#7 digital signatures appended as incremental updates (signing via node-forge), verified with a small DER reader and Web Crypto. |
 | State | `src/store/store.ts` | A zustand store holding the PDF bytes, a stable id per page and the annotations keyed by page id, so annotations follow their page through reorders. Every change pushes an immutable snapshot for undo/redo. |
 | Commands | `src/store/commands.ts` | User-level actions (save, rotate, redact, …) that glue the UI, store and operations together. |
 | Annotations | `src/components/AnnotationLayer.tsx` | An SVG overlay per page for drawing, selecting, moving and resizing annotations. |
@@ -39,7 +42,7 @@ created at, and turn with the page like printed content would.
 - ✅ Find text with match list, next/previous, match case, highlight all matches
 - ✅ Go to page, first/previous/next/last, keyboard shortcuts
 - ⬜ Single-page / two-page / facing layouts, rotate view (without changing the file)
-- ⬜ Clickable links and an interactive annotation layer for existing PDF annotations
+- ✅ Clickable links (internal destinations, named actions, web links with confirmation)
 - ⬜ Multiple documents in tabs, split view, full-screen / presentation mode
 
 ### Comment & markup
@@ -49,10 +52,8 @@ created at, and turn with the page like printed content would.
 - ✅ Stamps (Approved, Draft, Confidential, … or custom text)
 - ✅ Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
 - ✅ Comment text and author on every annotation; comments list
-- ✅ Flatten annotations into page content
-- 🟡 Export: annotations are flattened into the page on save; sticky notes are written as real PDF `/Text` annotations with an appearance stream
-- ⬜ Save other markups as native, editable PDF annotations (`/Highlight`, `/Ink`, `/FreeText`, …)
-- ⬜ Import and edit annotations already present in a PDF
+- ✅ Saved as native, editable PDF annotations with appearance streams (or flattened on request)
+- ✅ Import and edit annotations already present in a PDF (Highlight, Underline, Squiggly, StrikeOut, Ink, Square, Circle, Line, FreeText, Text, Redact), with lossless round trips of our own
 - ⬜ Callouts, polygons, polylines, clouds, measurement tools (distance, perimeter, area)
 - ⬜ Comment replies/status, summarize comments, import/export FDF/XFDF
 
@@ -68,31 +69,40 @@ created at, and turn with the page like printed content would.
 - ✅ Add text boxes, images and signatures (draw, type, or upload)
 - ✅ Watermarks (text, size, colour, opacity, angle, page range)
 - ✅ Headers/footers with page numbers, dates, title and Bates numbering
+- ✅ Unicode text: Latin, Greek, Cyrillic, symbols and, when online, Chinese, Japanese and Korean
 - ⬜ Edit existing page text and images in place
 - ⬜ Background colours/images, add shapes as page content (non-annotation)
-- ⬜ Unicode fonts for added text (currently the PDF standard fonts, so non-Latin characters become `?` on export)
 
 ### Forms
-- ✅ Fill text fields, checkboxes, radio groups, dropdowns and list boxes
-- ✅ Flatten forms
-- ⬜ Fill fields directly on the page
+- ✅ Fill text fields, checkboxes, radio buttons, dropdowns and list boxes directly on the page or in the Form fields pane (undoable, saved with the document; Unicode values supported)
+- ✅ Highlight fillable fields, flatten forms
 - ⬜ Design forms (create/edit fields), JavaScript actions, calculations
 
 ### Protect & sign
 - ✅ Secure redaction: marked pages are flattened and rasterised so the underlying text and graphics are really removed
-- ✅ Visual signatures
-- 🟡 Password-protected PDFs open read-only (pdf-lib cannot write encrypted files)
-- ⬜ Encrypt with passwords/permissions, remove security
-- ⬜ Certificate-based digital signatures and signature validation
+- ✅ Visual (image) signatures
+- ✅ Password protection: open password, permissions password and permissions, AES-256 or AES-128
+- ✅ Open encrypted PDFs; documents restricting edits open read-only until unlocked with the owner password
+- ✅ Certificate-based digital signatures (PKCS#7 detached, SHA-256) from .p12/.pfx files, visible or invisible, as incremental updates so earlier signatures stay valid; self-signed test certificates can be created in the app
+- ✅ Signature validation: integrity, signature (RSA and ECDSA) and coverage; signer, issuer, time, reason
+- 🟡 Signer identity is not checked against trusted certificates (no trust list, revocation or timestamp checks yet)
+- ⬜ Signing password-protected files, long-term validation (LTV), timestamps
 - ⬜ Search & redact, sanitize document (metadata, hidden data)
 
 ### Document & output
-- ✅ New blank document, open (picker or drag & drop), save, save as, print
+- ✅ New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
+- ✅ Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
 - ✅ Document properties (title, author, subject, keywords, creator, producer)
 - ✅ Export the current page as PNG
 - ⬜ Export to other image formats / Office formats, optimize/compress, PDF/A
 - ⬜ OCR for scanned documents
-- ⬜ Persist annotations in progress (e.g. IndexedDB autosave)
+- ⬜ Multiple documents in tabs, autosave (e.g. IndexedDB)
+
+## Notes
+
+- **Fonts.** Noto Sans, Noto Sans Symbols 2 (bundled in `public/fonts`) and Noto Sans SC/KR (fetched from jsDelivr only when text needs them) are licensed under the SIL Open Font License; see `public/fonts/OFL.txt`. Offline, CJK characters fall back to `?`.
+- **node-forge.** `npm audit` flags node-forge for GHSA-86w9-cpqp-85rv, a flaw in its RSA signature *verification*. The app uses forge only to read .p12 files and create signatures; all verification goes through Web Crypto.
+- **Saving signed documents.** Edits to a signed document are saved by rewriting the file, which invalidates existing signatures (the app asks first). Sign again after editing.
 
 ## Keyboard shortcuts
 

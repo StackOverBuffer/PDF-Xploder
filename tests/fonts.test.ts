@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, PDFName, PDFDict } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFDict } from '@cantoo/pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { readFileSync } from 'node:fs';
 import { createTextEngine } from '../src/lib/fonts';

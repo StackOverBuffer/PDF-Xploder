@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
+import { ALL_PERMISSIONS, decrypt, inspectEncryption, opensWith, restrictsEditing, type EncryptionInfo, type SecuritySettings } from '../lib/security';
+import { verifySignatures, type SignatureInfo } from '../lib/signature';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -29,7 +31,7 @@ export interface SearchHit {
   context: string;
 }
 
-export type SidebarTab = 'pages' | 'outline' | 'comments' | 'forms' | 'search';
+export type SidebarTab = 'pages' | 'outline' | 'comments' | 'forms' | 'search' | 'signatures';
 
 export interface ScrollRequest {
   page: number;
@@ -72,6 +74,15 @@ interface State {
   docVersion: number;
   editable: boolean;
   dirty: boolean;
+  /** The file exactly as opened; saved verbatim while nothing changed (keeps signatures valid). */
+  originalBytes: Uint8Array | null;
+  /** Encryption of the file as opened. */
+  encryption: EncryptionInfo | null;
+  /** Encryption to apply on save, or null for none. */
+  security: SecuritySettings | null;
+  /** Set while a restricted document is open read-only, pending the owner password. */
+  lock: { userPassword: string; needsUserPassword: boolean } | null;
+  signatures: SignatureInfo[];
   past: Snapshot[];
   future: Snapshot[];
 
@@ -96,7 +107,10 @@ interface State {
 }
 
 interface Actions {
-  openDocument(bytes: Uint8Array, name: string): Promise<void>;
+  openDocument(bytes: Uint8Array, name: string, opts?: { password?: string; ownerPassword?: string }): Promise<void>;
+  /** Lift permission restrictions with the owner password; resolves false if it is wrong. */
+  unlock(ownerPassword: string): Promise<boolean>;
+  setSecurity(s: SecuritySettings | null): void;
   closeDocument(): void;
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
   commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>, formValues?: Record<string, FieldValue>): Promise<void>;
@@ -137,6 +151,11 @@ const initialDoc = {
   annotations: {},
   fields: [],
   formValues: {},
+  originalBytes: null,
+  encryption: null,
+  security: null,
+  lock: null,
+  signatures: [],
   editable: true,
   dirty: false,
   past: [],
@@ -158,12 +177,14 @@ function readAuthor(): string {
 }
 
 export const useStore = create<Store>()((set, get) => {
-  async function loadPdfJs(bytes: Uint8Array) {
-    const { pdf } = await openPdf(bytes, (retry) =>
-      window.prompt(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'),
-    );
+  async function loadPdfJs(bytes: Uint8Array, knownPassword?: string) {
+    let tries = 0;
+    const { pdf, password } = await openPdf(bytes, (retry) => {
+      if (knownPassword !== undefined && tries++ === 0) return knownPassword;
+      return window.prompt(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:');
+    });
     const geoms = await pageGeoms(pdf);
-    return { pdf, geoms };
+    return { pdf, geoms, password };
   }
 
   function snapshot(): Snapshot {
@@ -214,21 +235,55 @@ export const useStore = create<Store>()((set, get) => {
     highlightFields: true,
     sidebar: 'pages',
 
-    async openDocument(bytes, name) {
+    async openDocument(bytes, name, opts = {}) {
+      const original = bytes;
       let loaded;
       try {
-        loaded = await loadPdfJs(bytes);
+        loaded = await loadPdfJs(bytes, opts.password);
       } catch (e) {
         if (e instanceof PasswordCancelled) return;
         throw e;
       }
-      // pdf-lib cannot write encrypted files; such documents open read-only.
-      let editable = true;
+      let encryption: EncryptionInfo = { encrypted: false, permissions: ALL_PERMISSIONS };
       try {
-        const doc = await loadPdfLib(bytes);
-        editable = !doc.isEncrypted;
+        encryption = await inspectEncryption(bytes);
       } catch {
-        editable = false;
+        /* damaged: handled below */
+      }
+      let editable = true;
+      let security: SecuritySettings | null = null;
+      let lock: State['lock'] = null;
+      const userPassword = loaded.password ?? '';
+      if (encryption.encrypted) {
+        const owner = opts.ownerPassword;
+        if (restrictsEditing(encryption.permissions) && owner === undefined) {
+          // Respect the author's restrictions until the owner password is given.
+          editable = false;
+          lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
+        } else {
+          try {
+            const plain = await decrypt(bytes, owner ?? userPassword);
+            const reloaded = await loadPdfJs(plain);
+            loaded.pdf.destroy();
+            loaded = { ...reloaded, password: loaded.password };
+            bytes = plain;
+            security = {
+              userPassword,
+              ownerPassword: owner ?? userPassword,
+              permissions: encryption.permissions,
+              algorithm: encryption.algorithm === 'AES-128' ? 'AES-128' : 'AES-256',
+            };
+          } catch (e) {
+            console.warn('Could not decrypt for editing', e);
+            editable = false;
+          }
+        }
+      } else {
+        try {
+          await loadPdfLib(bytes);
+        } catch {
+          editable = false;
+        }
       }
       const pageIds = loaded.geoms.map(() => uid('page'));
       const annotations: Record<string, Annotation[]> = {};
@@ -239,7 +294,7 @@ export const useStore = create<Store>()((set, get) => {
           if (imp.count) {
             const reloaded = await loadPdfJs(imp.bytes);
             loaded.pdf.destroy();
-            loaded = reloaded;
+            loaded = { ...reloaded, password: loaded.password };
             bytes = imp.bytes;
             imp.annotations.forEach((list, i) => list.length && (annotations[pageIds[i]] = list));
           }
@@ -251,16 +306,43 @@ export const useStore = create<Store>()((set, get) => {
       set({
         ...initialDoc,
         bytes,
+        originalBytes: original,
         fileName: name,
         pdf: loaded.pdf,
         geoms: loaded.geoms,
         pageIds,
         annotations,
         editable,
+        encryption,
+        security,
+        lock,
         docVersion: get().docVersion + 1,
         fit: 'width',
+        sidebar: get().sidebar,
       });
-      if (!editable) get().notify('This document is encrypted or damaged: it is open read-only.', 'error');
+      if (!editable && !lock) get().notify('This document is damaged or uses unsupported encryption: it is open read-only.', 'error');
+      verifySignatures(original)
+        .then((signatures) => {
+          if (get().originalBytes !== original) return;
+          set({ signatures });
+          if (signatures.length && get().sidebar !== 'signatures') set({ sidebar: 'signatures' });
+        })
+        .catch((e) => console.warn('Signature check failed', e));
+    },
+
+    async unlock(ownerPassword) {
+      const s = get();
+      if (!s.lock || !s.originalBytes) return false;
+      // With an empty open password any password that decrypts is the owner's;
+      // otherwise it must also differ from the open password.
+      const differs = s.lock.needsUserPassword ? ownerPassword !== s.lock.userPassword : ownerPassword !== '';
+      if (!differs || !(await opensWith(s.originalBytes, ownerPassword))) return false;
+      await get().openDocument(s.originalBytes, s.fileName, { password: s.lock.userPassword, ownerPassword });
+      return true;
+    },
+
+    setSecurity(security) {
+      set({ security, dirty: true });
     },
 
     closeDocument() {

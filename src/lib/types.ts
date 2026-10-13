@@ -130,6 +130,8 @@ export type Tool =
   | 'text'
   | 'note'
   | 'stamp'
-  | 'redact';
+  | 'redact'
+  /** Drag a box for a visible digital signature. */
+  | 'sign';
 
 export const NOTE_SIZE = 20;
