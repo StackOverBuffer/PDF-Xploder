@@ -12,8 +12,25 @@ export function StatusBar() {
   const scale = useStore((s) => s.scale);
   const geom = useStore((s) => s.geoms[s.currentPage]);
   const busy = useStore((s) => s.busy);
-  const [text, setText] = useState(String(current + 1));
-  useEffect(() => setText(String(current + 1)), [current]);
+  const pdf = useStore((s) => s.pdf);
+  // Page labels (e.g. "iv", "A-3"), shown like PDF-XChange: label in the box, number after it.
+  const [labels, setLabels] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setLabels(null);
+    pdf?.getPageLabels().then((l) => live && setLabels(l && l.some((x, i) => x !== String(i + 1)) ? l : null)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [pdf]);
+  const shown = (i: number) => labels?.[i] || String(i + 1);
+  const [text, setText] = useState(shown(current));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setText(shown(current)), [current, labels]);
+  const go = () => {
+    const byLabel = labels?.indexOf(text.trim()) ?? -1;
+    S().goToPage(byLabel >= 0 ? byLabel : Number(text) - 1);
+  };
   const S = useStore.getState;
   const size = geom ? viewSize(geom) : null;
   const inches = (pt: number) => (pt / 72).toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,10 +44,10 @@ export function StatusBar() {
           aria-label={t('Page number')}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && S().goToPage(Number(text) - 1)}
-          onBlur={() => setText(String(current + 1))}
+          onKeyDown={(e) => e.key === 'Enter' && go()}
+          onBlur={() => setText(shown(current))}
         />
-        <span>/ {count}</span>
+        <span>{labels ? `(${current + 1} / ${count})` : `/ ${count}`}</span>
         <button onClick={() => S().goToPage(current + 1)} disabled={current >= count - 1} title={t('Next page')}><ChevronRight size={16} /></button>
         <button onClick={() => S().goToPage(count - 1)} disabled={current >= count - 1} title={t('Last page')}><ChevronLast size={16} /></button>
       </div>
