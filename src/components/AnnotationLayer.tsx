@@ -9,7 +9,10 @@ import { useDialog } from './Dialogs';
 import { addField } from '../store/commands';
 import { snapshotRegion } from '../store/extras';
 import { zoomAt, zoomToBox } from '../store/viewActions';
+import { stampViewSize, usePendingStamp } from '../store/contentActions';
+import { viewSize } from '../lib/geometry';
 import type { NewFieldKind } from '../lib/forms';
+import { useT } from '../lib/i18n';
 
 interface Props {
   index: number;
@@ -52,6 +55,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const [draft, setDraft] = useState<Draft>(null);
   const drag = useRef<Drag>(null);
   const zoomOut = useRef(false);
+  const pending = usePendingStamp((x) => x.stamp);
+  /** Pointer position for the stamp preview that follows the mouse. */
+  const [hover, setHover] = useState<Pt | null>(null);
 
   const drawing = DRAW_TOOLS.includes(tool) && (FIELD_TOOLS[tool] ? canDesign : tool === 'sign' ? canSign : tool === 'snapshot' ? canCopy : tool === 'zoom' ? true : editable);
 
@@ -68,6 +74,10 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const p = viewPt(e);
     zoomOut.current = e.altKey;
+    if (tool === 'stamp' && pending) {
+      placePendingStamp(p);
+      return;
+    }
     if (tool === 'ink') setDraft({ kind: 'ink', points: [p] });
     else if (tool === 'note') createNote(p);
     else setDraft({ kind: 'box', start: p, end: p });
@@ -75,6 +85,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
 
   const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
     if (drag.current) return onDragMove(e);
+    if (tool === 'stamp' && drawing) setHover(viewPt(e));
     if (!draft) return;
     const p = viewPt(e);
     if (draft.kind === 'ink') setDraft({ kind: 'ink', points: [...draft.points, p] });
@@ -102,6 +113,19 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     useStore.getState().setTool('select');
     useStore.getState().select({ pageId, id: a.id });
     requestAnimationFrame(() => document.getElementById('prop-text')?.focus());
+  }
+
+  function placePendingStamp(p: Pt) {
+    const s = pending!;
+    const store = useStore.getState();
+    const { width: w, height: h } = stampViewSize(s, viewSize(geom));
+    const rect = viewRectToPdf(geom, { left: p.x - w / 2, top: p.y - h / 2, width: w, height: h });
+    const a: Annotation = { id: uid('annot'), type: 'image', rect, rot: geom.rotation, src: s.src, color: '#000000', opacity: 1, author: store.author, createdAt: Date.now() };
+    store.addAnnotation(index, a);
+    usePendingStamp.setState({ stamp: null });
+    store.setTool('select');
+    store.select({ pageId, id: a.id });
+    setHover(null);
   }
 
   function commitDraft(d: NonNullable<Draft>) {
@@ -136,7 +160,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     }
     const [dw, dh] = defaults[tool] ?? [100, 70];
     const box: VRect = click
-      ? { left: d.start.x, top: d.start.y, width: dw, height: dh }
+      ? tool === 'stamp'
+        ? { left: d.start.x - dw / 2, top: d.start.y - dh / 2, width: dw, height: dh }
+        : { left: d.start.x, top: d.start.y, width: dw, height: dh }
       : { left: Math.min(d.start.x, d.end.x), top: Math.min(d.start.y, d.end.y), width: dx, height: dy };
     const rect = viewRectToPdf(geom, box);
     const fieldKind = FIELD_TOOLS[tool];
@@ -246,6 +272,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onPointerLeave={() => setHover(null)}
     >
       {pageHits.map(({ h, i }) => {
         const v = pdfRectToView(geom, h.rect);
@@ -264,9 +291,33 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       ))}
       {selected && <Selection a={annots.find((a) => a.id === selected)} geom={geom} scale={S} onResize={startDrag} />}
       {draft && <DraftShape draft={draft} tool={tool} scale={S} />}
+      {tool === 'stamp' && drawing && hover && !draft && <StampPreview at={hover} scale={S} pending={pending} geom={geom} />}
     </svg>
   );
 });
+
+/** The stamp hanging on the pointer: a custom image stamp or the current text stamp. */
+function StampPreview({ at, scale: S, pending, geom }: { at: Pt; scale: number; pending: ReturnType<typeof usePendingStamp.getState>['stamp']; geom: PageGeom }) {
+  if (pending) {
+    const { width: w, height: h } = stampViewSize(pending, viewSize(geom));
+    return <image className="stamp-preview" href={pending.src} x={(at.x - w / 2) * S} y={(at.y - h / 2) * S} width={w * S} height={h * S} preserveAspectRatio="none" />;
+  }
+  // Same drawing as a placed stamp (see AnnotShape), at the default size.
+  const st = styleFor('stamp');
+  const [w, h] = [160, 50];
+  const label = (st.stampLabel || 'Approved').toUpperCase();
+  let size = h * 0.55;
+  const est = label.length * size * 0.68;
+  if (est > w * 0.9) size *= (w * 0.9) / est;
+  const left = at.x - w / 2;
+  const top = at.y - h / 2;
+  return (
+    <g className="stamp-preview" transform={`scale(${S})`}>
+      <rect x={left} y={top} width={w} height={h} fill="transparent" stroke={st.color} strokeWidth={3} />
+      <text x={at.x} y={at.y + size * 0.35} fill={st.color} fontSize={size} fontFamily={FONT} fontWeight="bold" textAnchor="middle">{label}</text>
+    </g>
+  );
+}
 
 function constrain(start: Pt, p: Pt, tool: Tool): Pt {
   const dx = p.x - start.x;
@@ -461,6 +512,7 @@ function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pag
 
 function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type: 'text' }>; pageId: string; scale: number; editing: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const t = useT();
   const style = {
     fontSize: a.fontSize * scale,
     color: a.color,
@@ -475,7 +527,7 @@ function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type:
   if (!editing) {
     return (
       <div className={`textbox ${a.text ? '' : 'empty'}`} style={style}>
-        {a.text || 'Double-click to edit'}
+        {a.text || t('Double-click to edit')}
       </div>
     );
   }

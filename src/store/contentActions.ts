@@ -2,10 +2,10 @@
  * Commands behind the page-object context menu: image tools, object
  * clipboard, arranging, layers, links, bookmarks, stamps and export.
  */
+import { create } from 'zustand';
 import { useStore } from './store';
 import { requirePermission } from './permissions';
 import { applyContentEdits, imageBytes, matchesFilter, pageObjects, type ContentFilter } from './content';
-import { placeImage } from './commands';
 import { createLayer, findLayer, isolateObjects, listLayers, loadForEditing, type LayerInfo, type ObjectInfo, type ContentEdit } from '../lib/content/page';
 import { about, scale as scaleM, translate } from '../lib/content/matrix';
 import { addBookmark, addLink, type LinkTarget } from '../lib/navigation';
@@ -353,8 +353,25 @@ export async function stampFromSelection(page: number, ids: number[], opts: { im
   });
 }
 
+/** A custom stamp waiting to be placed: it follows the pointer until the user clicks on a page. */
+export const usePendingStamp = create<{ stamp: CustomStamp | null }>()(() => ({ stamp: null }));
+
+// Leaving the Stamp tool (Esc, another tool) drops a stamp that was not placed.
+useStore.subscribe((st) => {
+  if (st.tool !== 'stamp' && usePendingStamp.getState().stamp) usePendingStamp.setState({ stamp: null });
+});
+
+/** Pick up a custom stamp: it hangs on the pointer and is placed with the next click. */
 export function placeCustomStamp(s: CustomStamp) {
-  placeImage(s.src, s.width, s.height, { maxW: 10000, maxH: 10000 });
+  if (!requirePermission('annotate')) return;
+  S().setTool('stamp');
+  usePendingStamp.setState({ stamp: s });
+}
+
+/** Size of a stamp on a page (view space): its own size, shrunk to fit within 90% of the page. */
+export function stampViewSize(s: CustomStamp, page: { width: number; height: number }): { width: number; height: number } {
+  const k = Math.min(1, (page.width * 0.9) / s.width, (page.height * 0.9) / s.height);
+  return { width: s.width * k, height: s.height * k };
 }
 
 /** Save the selected objects as their own PDF (cropped to them). */

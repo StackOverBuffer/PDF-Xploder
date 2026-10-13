@@ -18,7 +18,7 @@ import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
 import { goToHit } from './SearchPanel';
 import { OrganizeTab } from './OrganizeTab';
-import { customStamps, deleteCustomStamp, placeCustomStamp } from '../store/contentActions';
+import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } from '../store/contentActions';
 import { tr, useLang, useT } from '../lib/i18n';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
@@ -241,7 +241,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <ToolBtn tool="stamp" icon={<Stamp size={L} />} label="Stamp" menu={() => {
                 const custom = customStamps();
                 return [
-                  ...STAMPS.map((l): MenuItem => ({ label: l, checked: stampLabel === l, onClick: () => { S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } })),
+                  ...STAMPS.map((l): MenuItem => ({ label: l, checked: stampLabel === l, onClick: () => { usePendingStamp.setState({ stamp: null }); S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } })),
                   null,
                   ...(custom.length
                     ? custom.map((c): MenuItem => ({ label: c.name, icon: <img className="stamp-thumb" src={c.src} alt="" />, disabled: !canAnnotate, onClick: () => placeCustomStamp(c) }))
