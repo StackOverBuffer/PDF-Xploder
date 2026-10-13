@@ -70,7 +70,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 | Feature | Status |
 |---|---|
-| Bookmarks Pane to View and Edit Bookmarks | 🟡 view and navigate; add bookmarks from the context menu; no rename/reorder/delete yet |
+| Bookmarks Pane to View and Edit Bookmarks | ✅ add (also as child), rename, delete, drag to reorder or nest, indent/outdent, move, set destination to the current view, bold/italic/colour, keyboard navigation |
 | Add from Bookmark When Setting Link Targets | ⬜ |
 | Add Text to Bookmark Titles / Change Case / Find and Replace / Regex | ⬜ |
 | Bookmark Every Nth Page | ⬜ |
