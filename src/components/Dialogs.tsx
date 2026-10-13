@@ -11,9 +11,10 @@ import { tf, tr, useLang, useT } from '../lib/i18n';
 import { BarcodesDialog, RecompressDialog } from './ContentDialogs';
 import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 import { OrganizeDialog, type OrganizeDialogName } from './OrganizeDialogs';
+import { BOOKMARK_DIALOGS, BookmarkDialog, type BookmarkDialogName } from './BookmarkDialogs';
 import { OcrDialog } from './OcrDialog';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | OrganizeDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -371,6 +372,7 @@ function AccessibilityDialog({ close }: { close: () => void }) {
 
 export function Dialogs() {
   const { open, close } = useDialog();
+  if (open && (BOOKMARK_DIALOGS as string[]).includes(open)) return <BookmarkDialog name={open as BookmarkDialogName} close={close} />;
   switch (open) {
     case 'watermark': return <WatermarkDialog close={close} />;
     case 'headerFooter': return <HeaderFooterDialog close={close} />;

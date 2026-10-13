@@ -158,7 +158,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 `Ctrl+O` open · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
-`V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
+`Alt+PgDn`/`Alt+PgUp` next/previous bookmark · `V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
 
 Edit objects tool: arrow keys nudge (Shift ×10) · `Del` delete · `Ctrl+D` duplicate · `Ctrl+A` select all on the page · double-click text to edit · `Esc` deselect

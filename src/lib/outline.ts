@@ -23,6 +23,8 @@ export interface OutlineNode {
   children: OutlineNode[];
   /** Set when the destination was changed in the editor. */
   destChanged?: boolean;
+  /** Remove the item's action (and destination) when writing. */
+  clearAction?: boolean;
 }
 
 const text = (o: PDFObject | undefined) => (o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : '');
@@ -182,6 +184,10 @@ export function setOutline(doc: PDFDocument, nodes: OutlineNode[]) {
         const v = [1, 3, 5].map((k) => parseInt(n.color!.slice(k, k + 2), 16) / 255);
         d.set(PDFName.of('C'), ctx.obj(v));
       } else d.delete(PDFName.of('C'));
+      if (n.clearAction) {
+        d.delete(PDFName.of('A'));
+        d.delete(PDFName.of('Dest'));
+      }
       const isNew = !(/^(\d+) (\d+) R$/.exec(n.id));
       if ((isNew || n.destChanged) && n.page !== undefined && pages[n.page]) {
         d.delete(PDFName.of('A'));

@@ -18,12 +18,13 @@ import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
 import { goToHit } from './SearchPanel';
 import { OrganizeTab } from './OrganizeTab';
+import { BookmarksTab } from './BookmarksTab';
 import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } from '../store/contentActions';
 import { tr, useLang, useT } from '../lib/i18n';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
-type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility';
-const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility'];
+type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
+const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility', 'Bookmarks', 'Help'];
 
 const S = useStore.getState;
 
@@ -330,6 +331,22 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           </>
         )}
         {tab === 'Organize' && <OrganizeTab />}
+        {tab === 'Bookmarks' && <BookmarksTab />}
+        {tab === 'Help' && (
+          <>
+            <Group label="Help">
+              <Btn icon={<Keyboard size={L} />} label="Shortcuts" onClick={() => show('shortcuts')} />
+              <Btn icon={<ListChecks size={L} />} label="Feature roadmap" title="Which PDF-XChange features are available" onClick={() => window.open('https://github.com/StackOverBuffer/PDF-Xploder/blob/HEAD/ROADMAP.md', '_blank', 'noopener')} />
+              <Btn icon={<MessageSquare size={L} />} label="Report a problem" onClick={() => window.open('https://github.com/StackOverBuffer/PDF-Xploder/issues/new', '_blank', 'noopener')} />
+            </Group>
+            <Group label="Language">
+              <Btn icon={<Languages size={L} />} label={lang === 'de' ? 'Deutsch' : 'English'} menu={[
+                { label: 'Deutsch', checked: lang === 'de', onClick: () => setLang('de') },
+                { label: 'English', checked: lang === 'en', onClick: () => setLang('en') },
+              ]} />
+            </Group>
+          </>
+        )}
         {tab === 'Convert' && (
           <>
             <Group label="OCR">

@@ -69,7 +69,7 @@ async function commitTransformed(res: org.TransformResult) {
 }
 
 /** Insert pages that do not exist yet (new ids) before position `at`. */
-async function commitInserted(bytes: Uint8Array, at: number, count: number) {
+export async function commitInserted(bytes: Uint8Array, at: number, count: number) {
   const ids = [...S().pageIds];
   ids.splice(at, 0, ...Array.from({ length: count }, () => uid('page')));
   await S().commitBytes(bytes, ids);
@@ -232,7 +232,7 @@ export async function splitDocument(m: SplitMethod) {
 
 // ---------------------------------------------------------------- arranging
 
-async function arrange(label: string, layout: org.PageSource[], others: Uint8Array[] = []) {
+export async function arrange(label: string, layout: org.PageSource[], others: Uint8Array[] = []) {
   await run(label, async () => commitLayout(await org.assemblePages(S().bytes!, layout, others), layout));
 }
 

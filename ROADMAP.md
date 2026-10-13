@@ -72,20 +72,20 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 |---|---|
 | Bookmarks Pane to View and Edit Bookmarks | ✅ add (also as child), rename, delete, drag to reorder or nest, indent/outdent, move, set destination to the current view, bold/italic/colour, keyboard navigation |
 | Add from Bookmark When Setting Link Targets | ⬜ |
-| Add Text to Bookmark Titles / Change Case / Find and Replace / Regex | ⬜ |
-| Bookmark Every Nth Page | ⬜ |
-| Build a Table of Contents from Bookmarks | ⬜ |
+| Add Text to Bookmark Titles / Change Case / Find and Replace / Regex | ✅ |
+| Bookmark Every Nth Page | ✅ |
+| Build a Table of Contents from Bookmarks | ✅ contents pages with leader dots, page numbers and links |
 | Convert Bookmark ↔ Named Destinations | ⬜ |
 | Create Links from Bookmarks | ⬜ |
-| Export Bookmarks to HTML / Text | ⬜ |
-| Generate Bookmarks from Page Text / Table of Contents / Text File | ⬜ |
-| Merge Duplicate Bookmarks | ⬜ |
-| Remove Actions from Bookmarks | ⬜ |
-| Remove Pages that Bookmarks Point to | ⬜ (splitting by bookmarks exists) |
+| Export Bookmarks to HTML / Text | ✅ |
+| Generate Bookmarks from Page Text / Table of Contents / Text File | ✅ headings by font size, TOC entries with numbering/indent levels and page offset, indented text |
+| Merge Duplicate Bookmarks | ✅ |
+| Remove Actions from Bookmarks | ✅ |
+| Remove Pages that Bookmarks Point to | ✅ from the bookmark's context menu |
 | Set the Zoom Type for Bookmarks | ⬜ |
-| Sort Document Pages by Bookmarks | ⬜ |
+| Sort Document Pages by Bookmarks | ✅ |
 | Use Selected Text to Update Bookmark Targets | 🟡 new bookmarks take the selected text as title |
-| Validate Bookmarks | ⬜ |
+| Validate Bookmarks | ✅ |
 
 ## 5. Convert documents to and from PDF
 
@@ -257,7 +257,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Edit the Layer Property of Images and XForms | ✅ |
 | Find Duplicate Pages | ✅ by content or appearance |
 | Generate Links from Barcodes | ⬜ (barcode recognition exists, Chrome on macOS/Android/ChromeOS) |
-| Go to Next/Previous Bookmark Using Hotkeys | ⬜ |
+| Go to Next/Previous Bookmark Using Hotkeys | ✅ Alt+PageDown / Alt+PageUp |
 | Password Strength Indicator | ⬜ |
 | Remove Broken Named Destinations | ⬜ |
 | Resize Pages to Match Existing Page Sizes | ✅ |

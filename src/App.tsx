@@ -6,6 +6,7 @@ import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
 import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
 import { addBookmarkAt } from './store/contentActions';
+import { goToBookmark } from './store/bookmarkCommands';
 import { Viewer } from './components/Viewer';
 import { Thumbnails } from './components/Thumbnails';
 import { Outline } from './components/Outline';
@@ -85,6 +86,9 @@ function useShortcuts() {
         if (s.selectedField) useStore.setState({ selectedField: null });
         s.select(null);
         s.setTool('select');
+      } else if (e.altKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
+        e.preventDefault();
+        goToBookmark(e.key === 'PageDown' ? 1 : -1);
       } else if (e.key === 'PageDown') {
         e.preventDefault();
         s.goToPage(s.currentPage + 1);

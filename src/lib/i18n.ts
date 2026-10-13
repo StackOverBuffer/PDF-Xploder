@@ -7,6 +7,7 @@ import DE_ORGANIZE from '../locales/de/organize';
 import DE_CONTEXT from '../locales/de/context';
 import DE_UI from '../locales/de/ui';
 import DE_OCR from '../locales/de/ocr';
+import DE_BOOKMARKS from '../locales/de/bookmarks';
 
 export type Lang = 'en' | 'de';
 
@@ -69,7 +70,7 @@ const DE: Record<string, string> = {
   'Stop reading': 'Vorlesen beenden', Display: 'Anzeige', 'Invert colours': 'Farben umkehren',
 };
 
-const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE_OCR, ...DE } };
+const TABLES: Record<Lang, Record<string, string>> = { en: {}, de: { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE_OCR, ...DE_BOOKMARKS, ...DE } };
 
 function initialLang(): Lang {
   try {

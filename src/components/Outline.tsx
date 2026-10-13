@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronRight, ChevronDown, BookmarkPlus, CornerDownRight, Trash2, Crosshair, ChevronsDownUp, ChevronsUpDown, IndentIncrease,
-  IndentDecrease, ArrowUp, ArrowDown, Pencil, Bold, Italic, Palette, ExternalLink,
+  IndentDecrease, ArrowUp, ArrowDown, Pencil, Bold, Italic, Palette, ExternalLink, FileX2,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -16,6 +16,7 @@ import {
   type OutlineNode,
 } from '../lib/outline';
 import { currentViewTarget } from '../store/viewActions';
+import { deleteBookmarkPages } from '../store/bookmarkCommands';
 import { useTextBox } from './TextBoxSelect';
 import { useContextMenu, type MenuItem } from './Menu';
 
@@ -40,6 +41,7 @@ export function Outline() {
   const t = useT();
   const bytes = useStore((s) => s.bytes);
   const canEdit = useCan('modify');
+  const canAssemble = useCan('assemble');
   const [tree, setTree] = useState<OutlineNode[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export function Outline() {
     { label: 'Collapse all', icon: <ChevronsDownUp size={14} />, onClick: () => setAll(false) },
     null,
     { label: 'Delete', icon: <Trash2 size={14} />, hint: 'Delete', disabled: !canEdit, onClick: () => remove(n.id) },
+    { label: 'Delete pages this bookmark points to', icon: <FileX2 size={14} />, disabled: !canAssemble || n.page === undefined, onClick: () => deleteBookmarkPages(n.id) },
   ];
 
   const onKeyDown = (e: React.KeyboardEvent) => {
