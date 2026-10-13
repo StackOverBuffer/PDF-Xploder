@@ -1,4 +1,4 @@
-# Awesome PDF
+# PDF-Xploder
 
 A browser-based PDF editor aiming for feature parity with **PDF-XChange Editor**.
 Everything runs client-side: documents are never uploaded anywhere.
