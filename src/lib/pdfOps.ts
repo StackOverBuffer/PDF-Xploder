@@ -12,16 +12,17 @@ import {
   PDFPage,
   PDFRadioGroup,
   PDFTextField,
-  StandardFonts,
   degrees,
   drawObject,
   popGraphicsState,
   pushGraphicsState,
 } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { hexToRgb } from './color';
 import { normRot, viewRectToPdf, viewSize, viewToPdf, type VRect } from './geometry';
 import type { Annotation, PageGeom, Pt } from './types';
-import { buildAppearance, singleFontEngine, type DrawContext, type TextEngine } from './appearance';
+import { buildAppearance, type DrawContext, type TextEngine } from './appearance';
+import { createTextEngine, loadFontBytes } from './fonts';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
@@ -200,7 +201,7 @@ export interface WatermarkOptions {
 
 export async function addWatermark(bytes: Uint8Array, o: WatermarkOptions): Promise<Uint8Array> {
   const doc = await load(bytes);
-  const { bold: engine } = await drawContext(doc);
+  const engine = await createTextEngine(doc, [o.text], 'bold');
   const text = o.text;
   for (const page of pickPages(doc, o.pages)) {
     const g = geomOf(page);
@@ -248,12 +249,13 @@ export function formatHeaderFooter(o: HeaderFooterOptions, pageNo: number, pageC
 
 export async function addHeaderFooter(bytes: Uint8Array, o: HeaderFooterOptions): Promise<Uint8Array> {
   const doc = await load(bytes);
-  const { engine } = await drawContext(doc);
   const all = doc.getPages();
   const title = doc.getTitle() ?? '';
-  for (const page of pickPages(doc, o.pages)) {
-    const idx = all.indexOf(page);
-    const text = formatHeaderFooter(o, idx, all.length, title);
+  const targets = pickPages(doc, o.pages);
+  const texts = targets.map((page) => formatHeaderFooter(o, all.indexOf(page), all.length, title));
+  const engine = await createTextEngine(doc, texts);
+  for (const [k, page] of targets.entries()) {
+    const text = texts[k];
     const g = geomOf(page);
     const vs = viewSize(g);
     const tw = engine.width(text, o.fontSize);
@@ -348,6 +350,16 @@ export async function setFormValues(
     else if (f instanceof PDFDropdown) (value ? f.select(String(value)) : f.clear());
     else if (f instanceof PDFOptionList) f.select(Array.isArray(value) ? value : [String(value)]);
   }
+  // Helvetica only covers WinAnsi; use Noto Sans for appearances when values need more.
+  const needsUnicode = Object.values(values).some((v) => [v].flat().some((x) => typeof x === 'string' && /[^\x00-\xff€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/.test(x)));
+  if (needsUnicode) {
+    const fontBytes = await loadFontBytes('sans');
+    if (fontBytes) {
+      doc.registerFontkit(fontkit);
+      // Not subset: the font must contain every glyph a later edit of the field may need.
+      form.updateFieldAppearances(await doc.embedFont(fontBytes, { subset: false }));
+    }
+  }
   if (opts.flatten) form.flatten();
   return save(doc);
 }
@@ -361,11 +373,19 @@ export interface ExportOptions {
   burnRedactions?: boolean;
 }
 
-export async function drawContext(doc: PDFDocument): Promise<DrawContext> {
+/** Text drawn by an annotation, used to decide which fonts to embed. */
+function annotationTexts(list: Annotation[]): { regular: string[]; bold: string[] } {
+  return {
+    regular: list.flatMap((a) => (a.type === 'text' ? [a.text] : [])),
+    bold: list.flatMap((a) => (a.type === 'stamp' ? [a.label.toUpperCase()] : [])),
+  };
+}
+
+export async function drawContext(doc: PDFDocument, texts: { regular?: string[]; bold?: string[] } = {}): Promise<DrawContext> {
   return {
     doc,
-    engine: singleFontEngine(await doc.embedFont(StandardFonts.Helvetica)),
-    bold: singleFontEngine(await doc.embedFont(StandardFonts.HelveticaBold)),
+    engine: await createTextEngine(doc, texts.regular ?? [], 'regular'),
+    bold: await createTextEngine(doc, texts.bold ?? [], 'bold'),
     images: new Map(),
   };
 }
@@ -381,7 +401,7 @@ export async function exportWithAnnotations(
 ): Promise<Uint8Array> {
   if (annotationsByPage.every((l) => l.length === 0)) return bytes;
   const doc = await load(bytes);
-  const ctx = await drawContext(doc);
+  const ctx = await drawContext(doc, annotationTexts(annotationsByPage.flat()));
   const pages = doc.getPages();
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];

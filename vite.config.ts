@@ -17,5 +17,5 @@ export default defineConfig({
     },
   },
   optimizeDeps: { esbuildOptions: { target: 'es2022' } },
-  test: { environment: 'node', include: ['tests/**/*.test.ts'] },
+  test: { environment: 'node', include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup.ts'] },
 });

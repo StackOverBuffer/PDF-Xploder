@@ -296,7 +296,7 @@ function Selection({ a, geom, scale: S, onResize }: { a?: Annotation; geom: Page
   );
 }
 
-const FONT = 'Helvetica, Arial, sans-serif';
+const FONT = "'Noto Sans', 'Noto Sans Symbols 2', sans-serif";
 
 function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pageId: string; geom: PageGeom; scale: number; editing: boolean }) {
   const view = (p: Pt) => {

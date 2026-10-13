@@ -12,6 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
+    "harfbuzzjs": "1.6.1",
     "lucide-react": "0.468.0",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.10.38",
@@ -20,6 +22,7 @@
     "zustand": "5.0.3"
   },
   "devDependencies": {
+    "@types/node": "22.10.7",
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
     "@vitejs/plugin-react": "4.3.4",

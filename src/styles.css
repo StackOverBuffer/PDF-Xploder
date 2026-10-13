@@ -1,3 +1,8 @@
+/* The fonts used for added text in saved PDFs, so on-screen wrapping matches the output. */
+@font-face { font-family: 'Noto Sans'; src: url('/fonts/NotoSans-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Noto Sans'; src: url('/fonts/NotoSans-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Noto Sans Symbols 2'; src: url('/fonts/NotoSansSymbols2-Regular.ttf') format('truetype'); font-display: swap; }
+
 :root {
   --bg: #e9ecf1;
   --panel: #ffffff;
