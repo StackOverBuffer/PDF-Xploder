@@ -367,3 +367,19 @@ export async function setWidgetRect(bytes: Uint8Array, name: string, index: numb
   return saveForm(doc);
 }
 
+
+/** Lock or unlock every field (or the named ones) at once. */
+export async function setFieldsLocked(bytes: Uint8Array, locked: boolean, names?: string[]): Promise<{ bytes: Uint8Array; changed: number }> {
+  const doc = await load(bytes);
+  let changed = 0;
+  for (const f of doc.getForm().getFields()) {
+    if (names && !names.includes(f.getName())) continue;
+    for (const { widget } of widgetsOf(f)) {
+      if (widget.hasFlag(F_LOCKED) !== locked) {
+        widget.setFlagTo(F_LOCKED, locked);
+        changed++;
+      }
+    }
+  }
+  return { bytes: changed ? await saveForm(doc) : bytes, changed };
+}

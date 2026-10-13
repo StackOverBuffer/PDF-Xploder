@@ -253,6 +253,8 @@ select.widget { padding: 0; }
 .field-label { position: absolute; left: 0; bottom: 100%; font-size: 10px; line-height: 1.2; background: #5c6bc0; color: #fff; padding: 0 4px; border-radius: 2px 2px 0 0; white-space: nowrap; display: inline-flex; gap: 2px; align-items: center; pointer-events: none; }
 .field-box.locked .field-label { background: #8d6e63; }
 .field-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #fff; border: 1.5px solid var(--accent); cursor: nwse-resize; }
+.notice { border: 1px solid #f0d78c; background: #fffbea; border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.notice p { margin: 0; }
 .prop-group { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
 .content-layer { position: absolute; inset: 0; z-index: 5; cursor: default; }

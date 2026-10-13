@@ -4,6 +4,27 @@ import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
 import { ContentProperties } from './ContentProperties';
+import { setAllFieldsLocked } from '../store/commands';
+
+function FormDesignHelp() {
+  const fields = useStore((s) => s.fields);
+  const locked = fields.filter((f) => f.props.locked).length;
+  return (
+    <div className="props-body">
+      <div className="props-head"><b>Edit form</b></div>
+      <p className="muted small">Click a field to change its properties; drag it to move it, or use the field tools to add new ones.</p>
+      {locked > 0 && (
+        <div className="notice">
+          <p className="small">
+            <b>{locked} of {fields.length} field(s) are locked</b> (shown with a lock). The document marks them with the PDF “Locked” flag, as set by
+            Acrobat’s “Locked” field property, so they cannot be moved, resized, deleted or changed until they are unlocked. Filling them in is not affected.
+          </p>
+          <button onClick={() => setAllFieldsLocked(false)}>Unlock all fields</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ContentToolHelp() {
   const tool = useStore((s) => s.tool);
@@ -195,6 +216,7 @@ export function PropertiesPanel() {
   const style = useStore((s) => s.styles[tool]);
   const author = useStore((s) => s.author);
   const contentSel = useStore((s) => s.contentSelection);
+  const formDesign = useStore((s) => s.formDesign);
   const field = useStore((s) => (s.selectedField ? s.fields.find((f) => f.name === s.selectedField!.name) : undefined));
 
   return (
@@ -206,6 +228,8 @@ export function PropertiesPanel() {
         <ContentToolHelp />
       ) : field ? (
         <FieldProperties field={field} />
+      ) : formDesign ? (
+        <FormDesignHelp />
       ) : sel && a ? (
         <AnnotationProps pageId={sel.pageId} a={a} />
       ) : style ? (

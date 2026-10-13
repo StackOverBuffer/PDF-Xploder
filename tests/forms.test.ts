@@ -58,6 +58,19 @@ describe('form design', () => {
     expect(doc.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
   });
 
+  it('locks and unlocks all fields at once', async () => {
+    let bytes = await blank();
+    for (const k of ['text', 'checkbox', 'radio'] as const) bytes = (await forms.createField(bytes, k, 0, { x: 10, y: 10, w: 20, h: 20 })).bytes;
+    expect((await forms.getFormFields(bytes)).every((f) => !f.props.locked)).toBe(true);
+    const locked = await forms.setFieldsLocked(bytes, true);
+    expect(locked.changed).toBe(3);
+    expect((await forms.getFormFields(locked.bytes)).every((f) => f.props.locked)).toBe(true);
+    const unlocked = await forms.setFieldsLocked(locked.bytes, false);
+    expect(unlocked.changed).toBe(3);
+    expect((await forms.getFormFields(unlocked.bytes)).some((f) => f.props.locked)).toBe(false);
+    expect((await forms.setFieldsLocked(unlocked.bytes, false)).changed).toBe(0);
+  });
+
   it('renames fields, edits choice options and adds radio buttons', async () => {
     let { bytes } = await forms.createField(await blank(), 'dropdown', 0, { x: 10, y: 300, w: 120, h: 20 });
     bytes = await forms.updateField(bytes, 'Dropdown1', { name: 'Country', options: ['Germany', 'France', ' ', 'Spain'], editable: true, sort: true });

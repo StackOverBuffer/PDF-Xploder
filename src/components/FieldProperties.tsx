@@ -51,7 +51,7 @@ export function FieldProperties({ field }: { field: FieldInfo }) {
 
       <div className="prop-group">
         <Check label="Locked" checked={p.locked} disabled={!canDesign} onChange={(locked) => set({ locked })} hint="The field cannot be moved, resized, deleted or changed until it is unlocked" />
-        {p.locked && <p className="muted small"><Lock size={11} /> Unlock the field to change it.</p>}
+        {p.locked && <p className="muted small"><Lock size={11} /> This field has the PDF “Locked” flag: it cannot be moved, resized, deleted or changed until you untick Locked (or use Form → Unlock all). Filling it in still works.</p>}
       </div>
 
       <Committed label="Name" value={shortName} disabled={disabled} onCommit={(name) => set({ name })} />

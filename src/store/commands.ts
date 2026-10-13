@@ -472,3 +472,14 @@ export async function addContentImage() {
   s.setTool('content');
   await applyContentEdits(index, [{ type: 'addImage', rect, image: imageBytes(img.src) }]);
 }
+
+/** Lock or unlock all form fields (Acrobat's "Locked" field property). */
+export async function setAllFieldsLocked(locked: boolean) {
+  if (!requirePermission('designForms')) return;
+  await S().run(locked ? 'Locking fields…' : 'Unlocking fields…', async () => {
+    const { bytes, changed } = await forms.setFieldsLocked(S().bytes!, locked);
+    if (!changed) return S().notify(locked ? 'All fields are already locked.' : 'No fields are locked.');
+    await S().commitBytes(bytes);
+    S().notify(`${locked ? 'Locked' : 'Unlocked'} ${changed} field widget(s).`);
+  });
+}

@@ -4,7 +4,7 @@ import {
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, LockOpen, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck, CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed, useCan } from '../store/permissions';
@@ -237,6 +237,10 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <ToolBtn tool="fieldRadio" icon={<CircleDot size={I} />} label="Radio" />
               <ToolBtn tool="fieldDropdown" icon={<ChevronDownSquare size={I} />} label="Dropdown" />
               <ToolBtn tool="fieldList" icon={<List size={I} />} label="List box" />
+            </Group>
+            <Group label="Lock">
+              <Btn icon={<LockOpen size={I} />} label="Unlock all" disabled={!canDesign} title="Clear the Locked property of every field" onClick={() => cmd.setAllFieldsLocked(false)} />
+              <Btn icon={<Lock size={I} />} label="Lock all" disabled={!canDesign} title="Set the Locked property on every field" onClick={() => cmd.setAllFieldsLocked(true)} />
             </Group>
             <Group label="Finish">
               <Btn icon={<Layers size={I} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
