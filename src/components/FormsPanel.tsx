@@ -1,4 +1,5 @@
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import { fillForm, resetFormEdits } from '../store/commands';
 
@@ -10,7 +11,8 @@ export function fieldValue(f: FieldInfo, edits: Record<string, FieldValue>): Fie
 export function FormsPanel() {
   const fields = useStore((s) => s.fields);
   const edits = useStore((s) => s.formValues);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('fillForms');
+  const canFlatten = useCan('modify');
   const highlight = useStore((s) => s.highlightFields);
   const set = (name: string, v: FieldValue, history = true) => useStore.getState().setFormValue(name, v, { history });
   const checkpoint = () => useStore.getState().checkpoint();
@@ -56,7 +58,7 @@ export function FormsPanel() {
         <div className="panel-actions">
           <span className="muted small">{pending ? `${pending} field(s) changed — saved with the document.` : 'Fill fields here or directly on the page.'}</span>
           <button disabled={!pending} onClick={resetFormEdits}>Reset changes</button>
-          <button disabled={!editable} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && fillForm(true)}>Flatten form</button>
+          <button disabled={!canFlatten} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && fillForm(true)}>Flatten form</button>
         </div>
       )}
     </div>

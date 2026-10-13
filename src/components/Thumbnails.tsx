@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { RotateCcw, RotateCw, Trash2, FilePlus2, Copy, FileOutput } from 'lucide-react';
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { viewSize } from '../lib/geometry';
 
@@ -57,7 +58,8 @@ export function Thumbnails() {
   const selected = useStore((s) => s.selectedPages);
   const pageIds = useStore((s) => s.pageIds);
   const annotations = useStore((s) => s.annotations);
-  const editable = useStore((s) => s.editable);
+  const canAssemble = useCan('assemble');
+  const canCopy = useCan('copy');
   const [dropAt, setDropAt] = useState<number | null>(null);
   const anchor = useRef(0);
 
@@ -103,12 +105,12 @@ export function Thumbnails() {
   return (
     <div className="panel thumbs-panel">
       <div className="panel-toolbar">
-        <button title="Rotate left" disabled={!editable} onClick={() => cmd.rotate(-90)}><RotateCcw size={16} /></button>
-        <button title="Rotate right" disabled={!editable} onClick={() => cmd.rotate(90)}><RotateCw size={16} /></button>
-        <button title="Insert blank page after" disabled={!editable} onClick={() => cmd.insertBlank()}><FilePlus2 size={16} /></button>
-        <button title="Duplicate" disabled={!editable} onClick={() => cmd.duplicate()}><Copy size={16} /></button>
-        <button title="Extract to new file" onClick={() => cmd.extract()}><FileOutput size={16} /></button>
-        <button title="Delete" disabled={!editable} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
+        <button title="Rotate left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)}><RotateCcw size={16} /></button>
+        <button title="Rotate right" disabled={!canAssemble} onClick={() => cmd.rotate(90)}><RotateCw size={16} /></button>
+        <button title="Insert blank page after" disabled={!canAssemble} onClick={() => cmd.insertBlank()}><FilePlus2 size={16} /></button>
+        <button title="Duplicate" disabled={!canAssemble} onClick={() => cmd.duplicate()}><Copy size={16} /></button>
+        <button title="Extract to new file" disabled={!canCopy} onClick={() => cmd.extract()}><FileOutput size={16} /></button>
+        <button title="Delete" disabled={!canAssemble} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
         <span className="muted small">{n} sel.</span>
       </div>
       <div className="thumbs" onDragLeave={() => setDropAt(null)} onDrop={onDrop}>
@@ -116,7 +118,7 @@ export function Thumbnails() {
           <div
             key={i}
             className={`thumb ${i === current ? 'current' : ''} ${selected.includes(i) ? 'selected' : ''} ${dropAt === i ? 'drop-before' : ''} ${dropAt === i + 1 && i === count - 1 ? 'drop-after' : ''}`}
-            draggable={editable}
+            draggable={canAssemble}
             onDragStart={(e) => onDragStart(e, i)}
             onDragOver={(e) => onDragOver(e, i)}
             onClick={(e) => onClick(e, i)}

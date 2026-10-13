@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import { pdfRectToView } from '../lib/geometry';
 import { resolveDest, type PDFDocumentProxy } from '../lib/pdfjs';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
@@ -76,7 +77,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
   const pdf = useStore((s) => s.pdf);
   const fields = useStore((s) => s.fields);
   const edits = useStore((s) => s.formValues);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('fillForms');
   const highlight = useStore((s) => s.highlightFields);
   const [items, setItems] = useState<AnnotData[]>([]);
 

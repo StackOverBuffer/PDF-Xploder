@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { styleFor, uid, useStore } from '../store/store';
+import { can } from '../store/permissions';
 import { pdfToView, viewRectToPdf, viewSize, type VRect } from '../lib/geometry';
 import { PageView } from './PageView';
 import { openFiles } from '../store/commands';
@@ -157,7 +158,7 @@ export function Viewer() {
   // Text markup: turn the current text selection into highlight/underline/strikeout annotations.
   const onMouseUp = () => {
     const s = useStore.getState();
-    if (!MARKUP.includes(s.tool as TextMarkupKind) || !s.editable) return;
+    if (!MARKUP.includes(s.tool as TextMarkupKind) || !can('annotate')) return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return;
     const rects = selectionTextRects(sel.getRangeAt(0));
@@ -212,6 +213,11 @@ export function Viewer() {
       className={`viewer tool-${tool} ${dragOver ? 'drag-over' : ''}`}
       onScroll={updateVisible}
       onMouseUp={onMouseUp}
+      onCopy={(e) => {
+        if (can('copy')) return;
+        e.preventDefault();
+        useStore.getState().notify('Copying is not allowed by this document’s security settings.', 'error');
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPan}

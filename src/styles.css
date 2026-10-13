@@ -232,6 +232,15 @@ select.widget { padding: 0; }
 .subpanel { border: 1px dashed var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .modal .row.inline { gap: 8px; }
 
+.perm-summary { border-collapse: collapse; width: 100%; }
+.perm-summary td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.perm-summary td.ok { color: #2e7d32; white-space: nowrap; }
+.perm-summary td.bad { color: var(--danger); white-space: nowrap; }
+.perm-summary svg { vertical-align: -2px; }
+.perm-editor { display: flex; flex-direction: column; gap: 6px; }
+.perm-row { display: flex; gap: 8px; align-items: baseline; padding-left: 120px; }
+.modal h3.section { margin: 6px 0 0; font-size: 13px; }
+
 /* ---------------------------------------------------------- status bar */
 .statusbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 10px; background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; }
 .statusbar button { border: none; background: none; padding: 3px; }

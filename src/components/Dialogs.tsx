@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { X } from 'lucide-react';
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
-import { SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
+import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'sign';
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign';
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -161,7 +162,7 @@ function MetadataDialog({ close }: { close: () => void }) {
     const b = useStore.getState().bytes;
     if (b) getMetadata(b).then(setM).catch(() => setM({ title: '', author: '', subject: '', keywords: '', creator: '', producer: '' }));
   }, []);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('modify');
   return (
     <Modal title="Document properties" onClose={close} footer={<><button onClick={close}>Cancel</button><button className="primary" disabled={!m || !editable} onClick={() => { close(); cmd.setMetadata(m!); }}>Save</button></>}>
       <p className="muted small">{name} · {pages} page(s) · {(size / 1024).toFixed(1)} KB</p>
@@ -313,6 +314,7 @@ export function Dialogs() {
     case 'shortcuts': return <ShortcutsDialog close={close} />;
     case 'goto': return <GotoDialog close={close} />;
     case 'security': return <SecurityDialog close={close} />;
+    case 'permissions': return <PermissionsDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     default: return null;
   }

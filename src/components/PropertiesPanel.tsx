@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useStore, type ToolStyle } from '../store/store';
+import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
 import type { Annotation } from '../lib/types';
 
@@ -81,7 +82,7 @@ function StyleEditor({ type, style, onChange }: { type: string; style: Partial<T
 
 function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   const update = (patch: Partial<Annotation>, history = true) => useStore.getState().updateAnnotation(pageId, a.id, patch, { history });
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('annotate');
   const style: Partial<ToolStyle> = {
     color: a.color,
     opacity: a.opacity,

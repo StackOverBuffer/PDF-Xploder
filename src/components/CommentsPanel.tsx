@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import { ANNOT_LABELS, annotSummary } from '../lib/annotGeom';
 import { flattenAnnotations } from '../store/commands';
 
@@ -8,14 +9,15 @@ export function CommentsPanel() {
   const annotations = useStore((s) => s.annotations);
   const geoms = useStore((s) => s.geoms);
   const selected = useStore((s) => s.selected);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('annotate');
+  const canFlatten = useCan('modify');
   const total = pageIds.reduce((n, id) => n + (annotations[id]?.length ?? 0), 0);
 
   return (
     <div className="panel">
       <div className="panel-title">
         Comments <span className="muted">({total})</span>
-        <button className="small-btn" disabled={!editable || !total} onClick={flattenAnnotations} title="Burn all annotations into the page content">Flatten all</button>
+        <button className="small-btn" disabled={!canFlatten || !total} onClick={flattenAnnotations} title="Burn all annotations into the page content">Flatten all</button>
       </div>
       {total === 0 && <p className="muted pad">No comments yet. Use the Comment tab to highlight, draw, or add notes.</p>}
       <div className="comment-list">

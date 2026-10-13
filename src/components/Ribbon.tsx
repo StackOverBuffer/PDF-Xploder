@@ -4,9 +4,10 @@ import {
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, FilePlus2, FileInput, Copy, Trash2,
   FileOutput, Scissors, ArrowDownUp, Crop, ImagePlus, Signature, Droplets, Heading, FormInput, EraserIcon, ShieldCheck,
-  Lock, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
+  Lock, ListChecks, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree, LayoutGrid,
 } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
+import { allowed, useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
@@ -36,9 +37,9 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 function ToolBtn({ tool, icon, label }: { tool: Tool; icon: ReactNode; label: string }) {
   const current = useStore((s) => s.tool);
   const hasDoc = useStore((s) => !!s.pdf);
-  const editable = useStore((s) => s.editable);
   const viewOnly = tool === 'select' || tool === 'hand';
-  return <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !editable)} onClick={() => useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool)} />;
+  const permitted = useStore((s) => allowed(s, tool === 'sign' ? 'fillForms' : tool.startsWith('field') ? 'designForms' : 'annotate'));
+  return <Btn icon={icon} label={label} active={current === tool} disabled={!hasDoc || (!viewOnly && !permitted)} onClick={() => useStore.getState().setTool(current === tool && !viewOnly ? 'select' : tool)} />;
 }
 
 function SidebarBtn({ tab, icon, label }: { tab: SidebarTab; icon: ReactNode; label: string }) {
@@ -63,7 +64,12 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const show = useDialog((d) => d.show);
   const S = useStore.getState;
   const noDoc = !hasDoc;
-  const noEdit = !hasDoc || !editable;
+  const canModify = useCan('modify');
+  const canAssemble = useCan('assemble');
+  const canCopy = useCan('copy');
+  const canPrint = useCan('print');
+  const canAnnotate = useCan('annotate');
+  const canSign = useCan('fillForms');
 
   return (
     <header className="ribbon">
@@ -72,7 +78,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
         <div className="quick">
           <button title="Open (Ctrl+O)" onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
           <button title="Save (Ctrl+S)" disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>
-          <button title="Print (Ctrl+P)" disabled={noDoc} onClick={cmd.print}><Printer size={16} /></button>
+          <button title="Print (Ctrl+P)" disabled={!canPrint} onClick={cmd.print}><Printer size={16} /></button>
           <button title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => S().undo()}><Undo2 size={16} /></button>
           <button title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={() => S().redo()}><Redo2 size={16} /></button>
         </div>
@@ -95,8 +101,8 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Btn icon={<X size={I} />} label="Close" disabled={noDoc} onClick={() => (!S().dirty || confirm('Discard unsaved changes?')) && S().closeDocument()} />
             </Group>
             <Group label="Output">
-              <Btn icon={<Printer size={I} />} label="Print" disabled={noDoc} onClick={cmd.print} />
-              <Btn icon={<ImageIcon size={I} />} label="Page to PNG" disabled={noDoc} onClick={() => cmd.exportPageImage()} />
+              <Btn icon={<Printer size={I} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
+              <Btn icon={<ImageIcon size={I} />} label="Page to PNG" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
             </Group>
             <Group label="Info">
               <Btn icon={<Info size={I} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
@@ -124,8 +130,8 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Btn icon={<Search size={I} />} label="Search" disabled={noDoc} onClick={() => S().setSidebar('search')} />
             </Group>
             <Group label="Pages">
-              <Btn icon={<RotateCcw size={I} />} label="Rotate left" disabled={noEdit} onClick={() => cmd.rotate(-90)} />
-              <Btn icon={<RotateCw size={I} />} label="Rotate right" disabled={noEdit} onClick={() => cmd.rotate(90)} />
+              <Btn icon={<RotateCcw size={I} />} label="Rotate left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)} />
+              <Btn icon={<RotateCw size={I} />} label="Rotate right" disabled={!canAssemble} onClick={() => cmd.rotate(90)} />
             </Group>
           </>
         )}
@@ -149,33 +155,33 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
             </Group>
             <Group label="Stamp">
               <ToolBtn tool="stamp" icon={<Stamp size={I} />} label="Stamp" />
-              <select className="rselect" disabled={noEdit} value={stampLabel} onChange={(e) => { S().setStyle('stamp', { stampLabel: e.target.value }); S().setTool('stamp'); }}>
+              <select className="rselect" disabled={!canAnnotate} value={stampLabel} onChange={(e) => { S().setStyle('stamp', { stampLabel: e.target.value }); S().setTool('stamp'); }}>
                 {STAMPS.map((s) => <option key={s}>{s}</option>)}
               </select>
             </Group>
             <Group label="Manage">
               <SidebarBtn tab="comments" icon={<MessageSquare size={I} />} label="Comments" />
-              <Btn icon={<Layers size={I} />} label="Flatten" disabled={noEdit} onClick={cmd.flattenAnnotations} />
+              <Btn icon={<Layers size={I} />} label="Flatten" disabled={!canModify} onClick={cmd.flattenAnnotations} />
             </Group>
           </>
         )}
         {tab === 'Organize' && (
           <>
             <Group label="Rotate">
-              <Btn icon={<RotateCcw size={I} />} label="Left" disabled={noEdit} onClick={() => cmd.rotate(-90)} />
-              <Btn icon={<RotateCw size={I} />} label="Right" disabled={noEdit} onClick={() => cmd.rotate(90)} />
+              <Btn icon={<RotateCcw size={I} />} label="Left" disabled={!canAssemble} onClick={() => cmd.rotate(-90)} />
+              <Btn icon={<RotateCw size={I} />} label="Right" disabled={!canAssemble} onClick={() => cmd.rotate(90)} />
             </Group>
             <Group label="Insert">
-              <Btn icon={<FilePlus2 size={I} />} label="Blank page" disabled={noEdit} onClick={() => cmd.insertBlank()} />
-              <Btn icon={<FileInput size={I} />} label="From file" disabled={noEdit} onClick={() => cmd.insertFromFile()} />
-              <Btn icon={<Copy size={I} />} label="Duplicate" disabled={noEdit} onClick={() => cmd.duplicate()} />
+              <Btn icon={<FilePlus2 size={I} />} label="Blank page" disabled={!canAssemble} onClick={() => cmd.insertBlank()} />
+              <Btn icon={<FileInput size={I} />} label="From file" disabled={!canAssemble} onClick={() => cmd.insertFromFile()} />
+              <Btn icon={<Copy size={I} />} label="Duplicate" disabled={!canAssemble} onClick={() => cmd.duplicate()} />
             </Group>
             <Group label="Pages">
-              <Btn icon={<Trash2 size={I} />} label="Delete" disabled={noEdit} onClick={() => cmd.deletePages()} />
-              <Btn icon={<FileOutput size={I} />} label="Extract" disabled={noDoc} onClick={() => cmd.extract()} />
-              <Btn icon={<Scissors size={I} />} label="Split" disabled={noDoc} onClick={() => show('split')} />
-              <Btn icon={<ArrowDownUp size={I} />} label="Reverse" disabled={noEdit} onClick={cmd.reverseOrder} />
-              <Btn icon={<Crop size={I} />} label="Crop" disabled={noEdit} onClick={() => show('crop')} />
+              <Btn icon={<Trash2 size={I} />} label="Delete" disabled={!canAssemble} onClick={() => cmd.deletePages()} />
+              <Btn icon={<FileOutput size={I} />} label="Extract" disabled={!canCopy} onClick={() => cmd.extract()} />
+              <Btn icon={<Scissors size={I} />} label="Split" disabled={!canCopy} onClick={() => show('split')} />
+              <Btn icon={<ArrowDownUp size={I} />} label="Reverse" disabled={!canAssemble} onClick={cmd.reverseOrder} />
+              <Btn icon={<Crop size={I} />} label="Crop" disabled={!canModify} onClick={() => show('crop')} />
             </Group>
             <Group label="View">
               <SidebarBtn tab="pages" icon={<LayoutGrid size={I} />} label="Thumbnails" />
@@ -186,12 +192,12 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <>
             <Group label="Add content">
               <ToolBtn tool="text" icon={<Type size={I} />} label="Text" />
-              <Btn icon={<ImagePlus size={I} />} label="Image" disabled={noEdit} onClick={cmd.insertImageFromFile} />
-              <Btn icon={<Signature size={I} />} label="Signature" disabled={noEdit} onClick={() => show('signature')} />
+              <Btn icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
+              <Btn icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
             </Group>
             <Group label="Page marks">
-              <Btn icon={<Droplets size={I} />} label="Watermark" disabled={noEdit} onClick={() => show('watermark')} />
-              <Btn icon={<Heading size={I} />} label="Header/Footer" disabled={noEdit} onClick={() => show('headerFooter')} />
+              <Btn icon={<Droplets size={I} />} label="Watermark" disabled={!canModify} onClick={() => show('watermark')} />
+              <Btn icon={<Heading size={I} />} label="Header/Footer" disabled={!canModify} onClick={() => show('headerFooter')} />
             </Group>
           </>
         )}
@@ -206,15 +212,16 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <>
             <Group label="Redaction">
               <ToolBtn tool="redact" icon={<EraserIcon size={I} />} label="Mark area" />
-              <Btn icon={<ShieldCheck size={I} />} label="Apply" disabled={noEdit} onClick={cmd.applyRedactions} />
+              <Btn icon={<ShieldCheck size={I} />} label="Apply" disabled={!canModify} onClick={cmd.applyRedactions} />
             </Group>
             <Group label="Security">
-              <Btn icon={<Lock size={I} />} label="Password" disabled={noDoc || (!editable && !lock)} title="Password protection and permissions" onClick={() => show('security')} />
+              <Btn icon={<Lock size={I} />} label="Password" disabled={noDoc} title="Passwords and encryption" onClick={() => show('security')} />
+              <Btn icon={<ListChecks size={I} />} label="Permissions" disabled={noDoc} title="What others may do with the document" onClick={() => show('permissions')} />
               {lock && <Btn icon={<KeyRound size={I} />} label="Unlock" onClick={() => show('security')} />}
             </Group>
             <Group label="Digital signatures">
               <ToolBtn tool="sign" icon={<FileSignature size={I} />} label="Sign" />
-              <Btn icon={<FileKey2 size={I} />} label="Sign invisibly" disabled={noEdit} onClick={() => show('sign')} />
+              <Btn icon={<FileKey2 size={I} />} label="Sign invisibly" disabled={!canSign} onClick={() => show('sign')} />
               <SidebarBtn tab="signatures" icon={<ShieldCheck size={I} />} label="Signatures" />
             </Group>
           </>

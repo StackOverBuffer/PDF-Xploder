@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
-import { ALL_PERMISSIONS, decrypt, inspectEncryption, opensWith, restrictsEditing, type EncryptionInfo, type SecuritySettings } from '../lib/security';
+import { ALL_PERMISSIONS, allPermissionsGranted, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import { verifySignatures, type SignatureInfo } from '../lib/signature';
 
 let idCounter = 0;
@@ -78,9 +78,17 @@ interface State {
   originalBytes: Uint8Array | null;
   /** Encryption of the file as opened. */
   encryption: EncryptionInfo | null;
-  /** Encryption to apply on save, or null for none. */
+  /** Current security settings (passwords as far as known), or null for none. */
   security: SecuritySettings | null;
-  /** Set while a restricted document is open read-only, pending the owner password. */
+  /** Whether the user changed `security`; otherwise an encrypted file keeps its original encryption. */
+  securityChanged: boolean;
+  /** Re-encrypt like the opened file on save (see reencryptLike). */
+  keepEncryption: { password: string } | null;
+  /** What the document's security allows in this session. */
+  permissions: Permissions;
+  /** Whether security settings may be changed (owner password known, or nothing restricted). */
+  ownerAccess: boolean;
+  /** Set while a restricted document is open without its owner password. */
   lock: { userPassword: string; needsUserPassword: boolean } | null;
   signatures: SignatureInfo[];
   past: Snapshot[];
@@ -154,6 +162,10 @@ const initialDoc = {
   originalBytes: null,
   encryption: null,
   security: null,
+  securityChanged: false,
+  keepEncryption: null,
+  permissions: ALL_PERMISSIONS,
+  ownerAccess: true,
   lock: null,
   signatures: [],
   editable: true,
@@ -253,30 +265,35 @@ export const useStore = create<Store>()((set, get) => {
       let editable = true;
       let security: SecuritySettings | null = null;
       let lock: State['lock'] = null;
+      let permissions: Permissions = ALL_PERMISSIONS;
+      let ownerAccess = true;
+      let keepEncryption: State['keepEncryption'] = null;
       const userPassword = loaded.password ?? '';
       if (encryption.encrypted) {
         const owner = opts.ownerPassword;
-        if (restrictsEditing(encryption.permissions) && owner === undefined) {
-          // Respect the author's restrictions until the owner password is given.
+        const restricted = !allPermissionsGranted(encryption.permissions);
+        // Without the owner password the author's restrictions apply, action by action.
+        ownerAccess = owner !== undefined || !restricted;
+        permissions = owner !== undefined ? ALL_PERMISSIONS : encryption.permissions;
+        if (!ownerAccess) lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
+        try {
+          const password = owner ?? userPassword;
+          const plain = await decrypt(bytes, password);
+          const reloaded = await loadPdfJs(plain);
+          loaded.pdf.destroy();
+          loaded = { ...reloaded, password: loaded.password };
+          bytes = plain;
+          // Saving re-encrypts with the original key, so both passwords keep working.
+          keepEncryption = { password };
+          security = {
+            userPassword,
+            ownerPassword: owner ?? (restricted ? '' : userPassword),
+            permissions: encryption.permissions,
+            algorithm: encryption.algorithm === 'AES-128' ? 'AES-128' : 'AES-256',
+          };
+        } catch (e) {
+          console.warn('Could not decrypt for editing', e);
           editable = false;
-          lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
-        } else {
-          try {
-            const plain = await decrypt(bytes, owner ?? userPassword);
-            const reloaded = await loadPdfJs(plain);
-            loaded.pdf.destroy();
-            loaded = { ...reloaded, password: loaded.password };
-            bytes = plain;
-            security = {
-              userPassword,
-              ownerPassword: owner ?? userPassword,
-              permissions: encryption.permissions,
-              algorithm: encryption.algorithm === 'AES-128' ? 'AES-128' : 'AES-256',
-            };
-          } catch (e) {
-            console.warn('Could not decrypt for editing', e);
-            editable = false;
-          }
         }
       } else {
         try {
@@ -315,12 +332,16 @@ export const useStore = create<Store>()((set, get) => {
         editable,
         encryption,
         security,
+        securityChanged: false,
+        keepEncryption,
+        permissions,
+        ownerAccess,
         lock,
         docVersion: get().docVersion + 1,
         fit: 'width',
         sidebar: get().sidebar,
       });
-      if (!editable && !lock) get().notify('This document is damaged or uses unsupported encryption: it is open read-only.', 'error');
+      if (!editable) get().notify('This document is damaged or uses unsupported encryption: it is open read-only.', 'error');
       verifySignatures(original)
         .then((signatures) => {
           if (get().originalBytes !== original) return;
@@ -337,12 +358,18 @@ export const useStore = create<Store>()((set, get) => {
       // otherwise it must also differ from the open password.
       const differs = s.lock.needsUserPassword ? ownerPassword !== s.lock.userPassword : ownerPassword !== '';
       if (!differs || !(await opensWith(s.originalBytes, ownerPassword))) return false;
-      await get().openDocument(s.originalBytes, s.fileName, { password: s.lock.userPassword, ownerPassword });
+      // Same file key either way, so the decrypted document stays as is: just lift the restrictions.
+      set({
+        lock: null,
+        ownerAccess: true,
+        permissions: ALL_PERMISSIONS,
+        security: s.security ? { ...s.security, ownerPassword } : s.security,
+      });
       return true;
     },
 
     setSecurity(security) {
-      set({ security, dirty: true });
+      set({ security, securityChanged: true, dirty: true });
     },
 
     closeDocument() {

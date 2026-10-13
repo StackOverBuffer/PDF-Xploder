@@ -3,21 +3,13 @@ import * as ops from '../lib/pdfOps';
 import { annotationsByPage, uid, useStore } from './store';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
-import { encrypt } from '../lib/security';
+import { encrypt, reencryptLike } from '../lib/security';
+import { requirePermission } from './permissions';
 import { signPdf, type SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation } from '../lib/types';
 
 const S = () => useStore.getState();
-
-function requireEditable(): boolean {
-  if (!S().bytes) return false;
-  if (!S().editable) {
-    S().notify('This document is read-only.', 'error');
-    return false;
-  }
-  return true;
-}
 
 /** Indices that page commands act on: the thumbnail selection, else the current page. */
 export function targetPages(): number[] {
@@ -67,7 +59,10 @@ export async function buildFileForSave(): Promise<Uint8Array> {
   const s = S();
   if (!s.dirty && s.originalBytes) return s.originalBytes;
   const out = await buildOutput();
-  return s.security ? encrypt(out, s.security) : out;
+  if (s.securityChanged) return s.security ? encrypt(out, s.security) : out;
+  // Untouched security: encrypt exactly like the opened file (works without the owner password).
+  if (s.keepEncryption && s.originalBytes) return reencryptLike(out, s.originalBytes, s.keepEncryption.password);
+  return out;
 }
 
 /** Ask before a save that would invalidate digital signatures. */
@@ -103,7 +98,7 @@ export async function saveAs() {
 }
 
 export async function print() {
-  if (!S().bytes) return;
+  if (!requirePermission('print')) return;
   await S().run('Preparing to print…', async () => {
     const out = await buildOutput();
     const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
@@ -125,12 +120,12 @@ export async function print() {
 // ---------------------------------------------------------------- pages
 
 export async function rotate(delta: number, pages = targetPages()) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   await S().run('Rotating…', async () => S().commitBytes(await ops.rotatePages(S().bytes!, pages, delta)));
 }
 
 export async function deletePages(pages = targetPages()) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   if (pages.length >= S().pageIds.length) return S().notify('A document must keep at least one page.', 'error');
   if (!confirm(`Delete ${pages.length} page(s)?`)) return;
   await S().run('Deleting…', async () => {
@@ -141,7 +136,7 @@ export async function deletePages(pages = targetPages()) {
 }
 
 export async function insertBlank(after = S().currentPage) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   await S().run('Inserting…', async () => {
     const ids = [...S().pageIds];
     ids.splice(after + 1, 0, uid('page'));
@@ -151,7 +146,7 @@ export async function insertBlank(after = S().currentPage) {
 }
 
 export async function duplicate(pages = targetPages()) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   await S().run('Duplicating…', async () => {
     const s = S();
     const ids: string[] = [];
@@ -170,7 +165,7 @@ export async function duplicate(pages = targetPages()) {
 
 /** Move the given pages so they sit before position `to` (in the original numbering). */
 export async function movePages(pages: number[], to: number) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   const n = S().pageIds.length;
   const moving = [...new Set(pages)].sort((a, b) => a - b);
   const rest = Array.from({ length: n }, (_, i) => i).filter((i) => !moving.includes(i));
@@ -186,7 +181,7 @@ export async function movePages(pages: number[], to: number) {
 
 export async function reverseOrder() {
   const n = S().pageIds.length;
-  if (!requireEditable() || n < 2) return;
+  if (!requirePermission('assemble') || n < 2) return;
   await S().run('Reversing…', async () => {
     const order = Array.from({ length: n }, (_, i) => n - 1 - i);
     await S().commitBytes(await ops.reorderPages(S().bytes!, order), order.map((i) => S().pageIds[i]));
@@ -201,7 +196,7 @@ async function insertPdfBytes(other: Uint8Array, at: number) {
 }
 
 export async function insertFromFile(at = S().currentPage + 1) {
-  if (!requireEditable()) return;
+  if (!requirePermission('assemble')) return;
   const files = await pickFile('application/pdf,.pdf', true);
   if (!files.length) return;
   await S().run('Inserting pages…', async () => {
@@ -215,7 +210,7 @@ export async function insertFromFile(at = S().currentPage + 1) {
 }
 
 export async function extract(pages = targetPages()) {
-  if (!S().bytes) return;
+  if (!requirePermission('copy')) return;
   await S().run('Extracting…', async () => {
     const s = S();
     const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
@@ -226,7 +221,7 @@ export async function extract(pages = targetPages()) {
 }
 
 export async function split(every: number) {
-  if (!S().bytes || every < 1) return;
+  if (every < 1 || !requirePermission('copy')) return;
   await S().run('Splitting…', async () => {
     const s = S();
     const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
@@ -236,12 +231,12 @@ export async function split(every: number) {
 }
 
 export async function crop(m: ops.Margins, pages: number[]) {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   await S().run('Cropping…', async () => S().commitBytes(await ops.cropPages(S().bytes!, pages, m)));
 }
 
 export async function exportPageImage(page = S().currentPage, dpi = 150) {
-  if (!S().bytes) return;
+  if (!requirePermission('copy')) return;
   await S().run('Rendering image…', async () => {
     const s = S();
     const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
@@ -259,23 +254,23 @@ export async function exportPageImage(page = S().currentPage, dpi = 150) {
 // ---------------------------------------------------------------- document
 
 export async function watermark(o: ops.WatermarkOptions) {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   await S().run('Adding watermark…', async () => S().commitBytes(await ops.addWatermark(S().bytes!, o)));
 }
 
 export async function headerFooter(o: ops.HeaderFooterOptions) {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   await S().run('Adding header/footer…', async () => S().commitBytes(await ops.addHeaderFooter(S().bytes!, o)));
 }
 
 export async function setMetadata(m: ops.Metadata) {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   await S().run('Updating properties…', async () => S().commitBytes(await ops.setMetadata(S().bytes!, m)));
 }
 
 /** Write the pending form values into the document, optionally flattening the form. */
 export async function fillForm(flatten = false) {
-  if (!requireEditable()) return;
+  if (!requirePermission(flatten ? 'modify' : 'fillForms')) return;
   await S().run(flatten ? 'Flattening form…' : 'Updating form…', async () =>
     S().commitBytes(await ops.setFormValues(S().bytes!, S().formValues, { flatten }), undefined, undefined, {}),
   );
@@ -290,7 +285,7 @@ export function resetFormEdits() {
 
 /** Flatten the current annotations into page content (cannot be edited afterwards, except via undo). */
 export async function flattenAnnotations() {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   const s = S();
   const byPage = annotationsByPage(s).map((l) => l.filter((a) => a.type !== 'redact'));
   if (byPage.every((l) => !l.length)) return s.notify('There are no annotations to flatten.');
@@ -308,7 +303,7 @@ export async function flattenAnnotations() {
  * really removed from the file, not just covered up.
  */
 export async function applyRedactions() {
-  if (!requireEditable()) return;
+  if (!requirePermission('modify')) return;
   const s = S();
   const byPage = annotationsByPage(s);
   const pages = byPage.flatMap((l, i) => (l.some((a) => a.type === 'redact') ? [i] : []));
@@ -352,7 +347,7 @@ export async function normaliseImage(src: string): Promise<{ src: string; width:
 
 /** Place an image centred on the current page, fitted within `maxW` x `maxH` points. */
 export function placeImage(src: string, natW: number, natH: number, opts: { signature?: boolean; maxW?: number; maxH?: number } = {}) {
-  if (!requireEditable()) return;
+  if (!requirePermission('annotate')) return;
   const s = S();
   const index = s.currentPage;
   const g = s.geoms[index];
@@ -375,7 +370,7 @@ function viewSizeOf(index: number) {
 }
 
 export async function insertImageFromFile() {
-  if (!requireEditable()) return;
+  if (!requirePermission('annotate')) return;
   const [f] = await pickFile('image/*');
   if (!f) return;
   await S().run('Loading image…', async () => {
@@ -390,8 +385,9 @@ export async function insertImageFromFile() {
 export async function signDocument(o: SignOptions) {
   const s = S();
   if (!s.bytes) return;
-  if (s.security) return s.notify('Remove password protection before signing (signing encrypted files is not supported yet).', 'error');
-  if (!requireEditable() || !confirmBreakingSignatures()) return;
+  const willEncrypt = s.securityChanged ? !!s.security : !!s.keepEncryption;
+  if (willEncrypt) return s.notify('Remove password protection before signing (signing encrypted files is not supported yet).', 'error');
+  if (!requirePermission('fillForms') || !confirmBreakingSignatures()) return;
   await s.run('Signing…', async () => {
     const base = !s.dirty && s.originalBytes ? s.originalBytes : await buildOutput();
     const signed = await signPdf(base, o);

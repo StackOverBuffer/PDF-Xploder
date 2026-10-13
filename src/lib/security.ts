@@ -1,8 +1,11 @@
 /** Password protection (encryption) helpers, built on @cantoo/pdf-lib. */
-import { PDFDict, PDFDocument, PDFName, PDFNumber } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFSecurity, PDFString } from '@cantoo/pdf-lib';
+import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
 
 export interface Permissions {
   printing: boolean;
+  /** Print at full quality; when false (and printing allowed) only low-resolution printing. */
+  highResPrinting: boolean;
   modifying: boolean;
   copying: boolean;
   annotating: boolean;
@@ -12,7 +15,7 @@ export interface Permissions {
 }
 
 export const ALL_PERMISSIONS: Permissions = {
-  printing: true, modifying: true, copying: true, annotating: true, fillingForms: true, contentAccessibility: true, documentAssembly: true,
+  printing: true, highResPrinting: true, modifying: true, copying: true, annotating: true, fillingForms: true, contentAccessibility: true, documentAssembly: true,
 };
 
 export type Algorithm = 'AES-256' | 'AES-128';
@@ -38,6 +41,8 @@ export function decodePermissions(p: number): Permissions {
   const bit = (n: number) => (p & (1 << (n - 1))) !== 0;
   return {
     printing: bit(3),
+    // Revision 2 handlers have no separate quality bit: printing means full quality.
+    highResPrinting: bit(3) && (bit(12) || (p & 0xf00) === 0),
     modifying: bit(4),
     copying: bit(5),
     annotating: bit(6),
@@ -45,6 +50,10 @@ export function decodePermissions(p: number): Permissions {
     contentAccessibility: bit(10),
     documentAssembly: bit(11),
   };
+}
+
+export function allPermissionsGranted(p: Permissions): boolean {
+  return Object.values(p).every(Boolean);
 }
 
 /** Whether the permissions forbid any of the editing this app does. */
@@ -86,8 +95,19 @@ export async function opensWith(bytes: Uint8Array, password: string): Promise<bo
 }
 
 /** Return an unencrypted copy of the document. */
-export async function decrypt(bytes: Uint8Array, password: string): Promise<Uint8Array> {
+/** Load with a password, working around the fork dropping the trailer's /Info link when decrypting. */
+export async function loadDecrypted(bytes: Uint8Array, password: string): Promise<PDFDocument> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
+  if (!doc.context.trailerInfo.Info) {
+    const raw = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+    const info = raw.context.trailerInfo.Info;
+    if (info instanceof PDFRef && doc.context.lookup(info) instanceof PDFDict) doc.context.trailerInfo.Info = info;
+  }
+  return doc;
+}
+
+export async function decrypt(bytes: Uint8Array, password: string): Promise<Uint8Array> {
+  const doc = await loadDecrypted(bytes, password);
   dropEncryptionRemnants(doc);
   return doc.save({ useObjectStreams: true });
 }
@@ -115,8 +135,37 @@ export async function encrypt(bytes: Uint8Array, s: SecuritySettings): Promise<U
     userPassword: s.userPassword,
     // Without an owner password anyone who can open the file could lift the restrictions.
     ownerPassword: s.ownerPassword || s.userPassword,
-    permissions: { ...s.permissions, printing: s.permissions.printing ? 'highResolution' : false },
+    permissions: { ...s.permissions, printing: s.permissions.printing ? (s.permissions.highResPrinting ? 'highResolution' : 'lowResolution') : false },
     algorithm: s.algorithm,
   });
+  return doc.save({ useObjectStreams: true });
+}
+
+/**
+ * Encrypt `plain` exactly like `original`: same /Encrypt dictionary, file ID
+ * and file key, derived from `password` (the open password suffices). Both
+ * passwords and all permissions of the original keep working, which is how a
+ * restricted document can be saved without knowing its owner password.
+ */
+export async function reencryptLike(plain: Uint8Array, original: Uint8Array, password: string): Promise<Uint8Array> {
+  const src = await PDFDocument.load(original, { ignoreEncryption: true, updateMetadata: false });
+  const enc = src.context.lookup(src.context.trailerInfo.Encrypt);
+  const ids = src.context.lookup(src.context.trailerInfo.ID);
+  if (!(enc instanceof PDFDict) || !(ids instanceof PDFArray)) throw new Error('The original document is not encrypted.');
+  const id0 = ids.get(0);
+  if (!(id0 instanceof PDFHexString || id0 instanceof PDFString)) throw new Error('The original document has no file identifier.');
+  const key = new CipherTransformFactory(enc, id0.asBytes(), password).encryptionKey;
+  const V = (enc.lookup(PDFName.of('V')) as PDFNumber | undefined)?.asNumber() ?? 0;
+  const length = (enc.lookup(PDFName.of('Length')) as PDFNumber | undefined)?.asNumber();
+
+  const doc = await PDFDocument.load(plain, { updateMetadata: false });
+  const ctx = doc.context;
+  ctx.trailerInfo.Encrypt = ctx.register(enc.clone(ctx));
+  ctx.trailerInfo.ID = ctx.obj([ids.get(0), ids.get(1) ?? ids.get(0)]);
+  // A PDFSecurity carrying the existing key instead of a freshly generated one.
+  const security = Object.create(PDFSecurity.prototype) as PDFSecurity;
+  Object.assign(security, { context: ctx, encryption: { V }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40 });
+  ctx.security = security;
+  // Object streams are required: strings are only encrypted as part of them.
   return doc.save({ useObjectStreams: true });
 }

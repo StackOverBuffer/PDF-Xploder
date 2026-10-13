@@ -1,22 +1,13 @@
 import { useState } from 'react';
-import { ShieldCheck, KeyRound, FileKey2 } from 'lucide-react';
+import { ShieldCheck, KeyRound, FileKey2, Check, X as XIcon } from 'lucide-react';
 import { useStore } from '../store/store';
 import { signDocument } from '../store/commands';
-import { ALL_PERMISSIONS, type Algorithm, type Permissions } from '../lib/security';
+import { ACTION_LABELS, allowed, type Action } from '../store/permissions';
+import { ALL_PERMISSIONS, allPermissionsGranted, type Algorithm, type Permissions, type SecuritySettings } from '../lib/security';
 import { createTestCertificate, readP12, type Identity } from '../lib/signature';
 import { downloadBlob, fileBytes } from '../lib/download';
 import type { Rect } from '../lib/types';
-import { Modal } from './Dialogs';
-
-const PERMISSION_LABELS: [keyof Permissions, string][] = [
-  ['printing', 'Printing'],
-  ['copying', 'Copying text and images'],
-  ['modifying', 'Changing the document'],
-  ['annotating', 'Commenting'],
-  ['fillingForms', 'Filling in form fields'],
-  ['documentAssembly', 'Inserting, deleting and rotating pages'],
-  ['contentAccessibility', 'Content extraction for accessibility'],
-];
+import { Modal, useDialog } from './Dialogs';
 
 function UnlockForm({ onDone }: { onDone: () => void }) {
   const [pw, setPw] = useState('');
@@ -28,7 +19,7 @@ function UnlockForm({ onDone }: { onDone: () => void }) {
   };
   return (
     <>
-      <p>This document’s security settings restrict editing. Enter the <b>permissions password</b> (owner password) to edit it.</p>
+      <p>Changing this document’s security requires its <b>permissions password</b> (owner password). Enter it to lift the restrictions for this session.</p>
       <label className="row"><span>Password</span><input type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
       {error && <p className="error-text">{error}</p>}
       <div className="row"><span /><button className="primary" onClick={submit}><KeyRound size={14} /> Unlock</button></div>
@@ -36,37 +27,160 @@ function UnlockForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+const SUMMARY: Action[] = ['print', 'modify', 'assemble', 'annotate', 'fillForms', 'designForms', 'copy', 'security'];
+
+/** What the current session may do, as derived from the document's permissions. */
+function RestrictionsSummary() {
+  const state = useStore();
+  return (
+    <table className="perm-summary">
+      <tbody>
+        {SUMMARY.map((a) => {
+          const ok = allowed(state, a);
+          return (
+            <tr key={a}>
+              <td>{ACTION_LABELS[a]}</td>
+              <td className={ok ? 'ok' : 'bad'}>{ok ? <><Check size={14} /> Allowed</> : <><XIcon size={14} /> Not allowed</>}</td>
+            </tr>
+          );
+        })}
+        {state.permissions.printing && !state.permissions.highResPrinting && <tr><td colSpan={2} className="muted small">Printing is limited to low resolution.</td></tr>}
+      </tbody>
+    </table>
+  );
+}
+
+type PrintLevel = 'none' | 'low' | 'high';
+
+/** Editor for the permission bits; the two-level printing setting maps onto two bits. */
+function PermissionsEditor({ value, onChange }: { value: Permissions; onChange: (p: Permissions) => void }) {
+  const print: PrintLevel = !value.printing ? 'none' : value.highResPrinting ? 'high' : 'low';
+  const box = (k: keyof Permissions, label: string, hint?: string) => (
+    <label className="perm-row">
+      <input type="checkbox" checked={value[k]} onChange={(e) => onChange({ ...value, [k]: e.target.checked })} />
+      <span>{label}{hint && <span className="muted small"> — {hint}</span>}</span>
+    </label>
+  );
+  return (
+    <div className="perm-editor">
+      <label className="row"><span>Printing</span>
+        <select value={print} onChange={(e) => {
+          const v = e.target.value as PrintLevel;
+          onChange({ ...value, printing: v !== 'none', highResPrinting: v === 'high' });
+        }}>
+          <option value="none">Not allowed</option>
+          <option value="low">Low resolution (150 dpi)</option>
+          <option value="high">High resolution</option>
+        </select>
+      </label>
+      {box('modifying', 'Changing the document', 'content, page marks, form design')}
+      {box('documentAssembly', 'Inserting, deleting and rotating pages')}
+      {box('annotating', 'Commenting', 'also allows filling in forms')}
+      {box('fillingForms', 'Filling in form fields and signing')}
+      {box('copying', 'Copying text and images, extracting pages')}
+      {box('contentAccessibility', 'Text access for screen readers')}
+      <div className="row"><span />
+        <div className="chips">
+          <button onClick={() => onChange(ALL_PERMISSIONS)}>Allow all</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, fillingForms: false, copying: false })}>Read &amp; print only</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false })}>Comments &amp; forms only</button>
+          <button onClick={() => onChange({ ...ALL_PERMISSIONS, modifying: false, documentAssembly: false, annotating: false, copying: false })}>Forms only</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function currentSettings(): SecuritySettings {
+  return useStore.getState().security ?? { userPassword: '', ownerPassword: '', permissions: ALL_PERMISSIONS, algorithm: 'AES-256' };
+}
+
+function apply(next: SecuritySettings | null, close: () => void) {
+  const s = useStore.getState();
+  s.setSecurity(next);
+  s.notify(next ? 'Security settings will be applied when you save.' : 'Security will be removed when you save.');
+  close();
+}
+
+export function PermissionsDialog({ close }: { close: () => void }) {
+  const ownerAccess = useStore((s) => s.ownerAccess && s.editable);
+  const signed = useStore((s) => s.signatures.length > 0);
+  const initial = currentSettings();
+  const [perms, setPerms] = useState<Permissions>(initial.permissions);
+  const [ownerPw, setOwnerPw] = useState(initial.ownerPassword && initial.ownerPassword !== initial.userPassword ? initial.ownerPassword : '');
+  const [error, setError] = useState('');
+  const restricting = !allPermissionsGranted(perms);
+
+  const submit = () => {
+    if (!restricting) {
+      // Nothing restricted: keep only an open password, if there is one.
+      return apply(initial.userPassword ? { ...initial, ownerPassword: initial.userPassword, permissions: ALL_PERMISSIONS } : null, close);
+    }
+    if (!ownerPw) return setError('Set a permissions password: it is needed to change these settings later.');
+    if (ownerPw === initial.userPassword) return setError('The permissions password must differ from the open password.');
+    apply({ ...initial, ownerPassword: ownerPw, permissions: perms }, close);
+  };
+
+  return (
+    <Modal
+      title="Document permissions"
+      wide
+      onClose={close}
+      footer={ownerAccess ? <><button onClick={close}>Cancel</button><button className="primary" onClick={submit}><ShieldCheck size={14} /> Apply</button></> : undefined}
+    >
+      <h3 className="section">Restrictions in effect</h3>
+      <RestrictionsSummary />
+      {!ownerAccess ? (
+        <UnlockForm onDone={close} />
+      ) : (
+        <>
+          <h3 className="section">Allow others to</h3>
+          <PermissionsEditor value={perms} onChange={setPerms} />
+          {restricting && (
+            <label className="row"><span>Permissions password</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder="needed to change permissions later" /></label>
+          )}
+          {error && <p className="error-text">{error}</p>}
+          {signed && <p className="warn-text small">This document is signed. Changing its security rewrites the file and invalidates the signatures.</p>}
+          <p className="muted small">
+            Permissions are enforced by PDF software (this app included) for anyone without the permissions password. PDF has no permission that
+            prevents saving a copy: to stop others from saving changes, disallow changing, commenting and form filling. Permissions are applied when you save.
+          </p>
+        </>
+      )}
+    </Modal>
+  );
+}
+
 export function SecurityDialog({ close }: { close: () => void }) {
-  const lock = useStore((s) => s.lock);
+  const ownerAccess = useStore((s) => s.ownerAccess && s.editable);
   const encryption = useStore((s) => s.encryption);
   const current = useStore((s) => s.security);
+  const securityChanged = useStore((s) => s.securityChanged);
   const signed = useStore((s) => s.signatures.length > 0);
-  const [requireOpen, setRequireOpen] = useState(!!current?.userPassword);
-  const [userPw, setUserPw] = useState(current?.userPassword ?? '');
-  const [restrict, setRestrict] = useState(!!current && Object.values(current.permissions).some((v) => !v));
-  const [ownerPw, setOwnerPw] = useState(current?.ownerPassword && current.ownerPassword !== current.userPassword ? current.ownerPassword : '');
-  const [perms, setPerms] = useState<Permissions>(current?.permissions ?? ALL_PERMISSIONS);
-  const [algorithm, setAlgorithm] = useState<Algorithm>(current?.algorithm ?? 'AES-256');
+  const initial = currentSettings();
+  const [requireOpen, setRequireOpen] = useState(!!initial.userPassword);
+  const [userPw, setUserPw] = useState(initial.userPassword);
+  const [ownerPw, setOwnerPw] = useState(initial.ownerPassword && initial.ownerPassword !== initial.userPassword ? initial.ownerPassword : '');
+  const [algorithm, setAlgorithm] = useState<Algorithm>(initial.algorithm);
   const [error, setError] = useState('');
+  const restricted = !allPermissionsGranted(initial.permissions);
 
-  if (lock) {
-    return <Modal title="Document security" onClose={close}><UnlockForm onDone={close} /></Modal>;
+  if (!ownerAccess) {
+    return <Modal title="Password security" onClose={close}><UnlockForm onDone={close} /></Modal>;
   }
 
-  const apply = () => {
-    if (!requireOpen && !restrict) return setError('Choose at least one kind of protection, or use “Remove security”.');
+  const submit = () => {
     if (requireOpen && !userPw) return setError('Enter the password needed to open the document.');
-    if (restrict && !ownerPw) return setError('Enter the permissions password.');
-    if (requireOpen && restrict && userPw === ownerPw) return setError('The two passwords must differ, or anyone who can open the file could lift the restrictions.');
-    useStore.getState().setSecurity({
-      userPassword: requireOpen ? userPw : '',
-      ownerPassword: restrict ? ownerPw : userPw,
-      permissions: restrict ? perms : ALL_PERMISSIONS,
-      algorithm,
-    });
-    useStore.getState().notify('Security settings will be applied when you save.');
-    close();
+    if (restricted && !ownerPw) return setError('This document restricts permissions: keep a permissions password.');
+    if (requireOpen && ownerPw && userPw === ownerPw) return setError('The two passwords must differ, or anyone who can open the file could lift the restrictions.');
+    const open = requireOpen ? userPw : '';
+    if (!open && !restricted) return apply(null, close);
+    apply({ userPassword: open, ownerPassword: ownerPw || open, permissions: initial.permissions, algorithm }, close);
   };
+
+  const status = securityChanged
+    ? current ? `On save: encrypted with ${current.algorithm}.` : 'On save: no encryption.'
+    : encryption?.encrypted ? `On save: unchanged (${encryption.algorithm}).` : 'On save: no encryption.';
 
   return (
     <Modal
@@ -74,32 +188,22 @@ export function SecurityDialog({ close }: { close: () => void }) {
       onClose={close}
       footer={
         <>
-          {current && <button className="danger" onClick={() => { useStore.getState().setSecurity(null); useStore.getState().notify('Security will be removed when you save.'); close(); }}>Remove security</button>}
+          {(current || encryption?.encrypted) && <button className="danger" onClick={() => apply(null, close)}>Remove security</button>}
           <span className="spacer" />
           <button onClick={close}>Cancel</button>
-          <button className="primary" onClick={apply}><ShieldCheck size={14} /> Apply</button>
+          <button className="primary" onClick={submit}><ShieldCheck size={14} /> Apply</button>
         </>
       }
     >
-      <p className="muted small">
-        {encryption?.encrypted ? `Opened file: encrypted (${encryption.algorithm}).` : 'Opened file: not encrypted.'}{' '}
-        {current ? `On save: encrypted with ${current.algorithm}.` : 'On save: no encryption.'}
-      </p>
+      <p className="muted small">{encryption?.encrypted ? `Opened file: encrypted (${encryption.algorithm}).` : 'Opened file: not encrypted.'} {status}</p>
       {signed && <p className="warn-text small">This document is signed. Changing its security rewrites the file and invalidates the signatures.</p>}
       <label className="row inline"><input type="checkbox" checked={requireOpen} onChange={(e) => setRequireOpen(e.target.checked)} /> Require a password to open the document</label>
       {requireOpen && <label className="row"><span>Open password</span><input type="password" value={userPw} onChange={(e) => setUserPw(e.target.value)} autoComplete="new-password" /></label>}
-      <label className="row inline"><input type="checkbox" checked={restrict} onChange={(e) => setRestrict(e.target.checked)} /> Restrict what others can do</label>
-      {restrict && (
-        <>
-          <label className="row"><span>Permissions password</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" /></label>
-          <div className="perm-list">
-            <span className="muted small">Allow:</span>
-            {PERMISSION_LABELS.map(([k, label]) => (
-              <label key={k} className="inline small"><input type="checkbox" checked={perms[k]} onChange={(e) => setPerms({ ...perms, [k]: e.target.checked })} /> {label}</label>
-            ))}
-          </div>
-        </>
-      )}
+      <label className="row"><span>Permissions password</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder={restricted ? 'required' : 'optional'} /></label>
+      <div className="row"><span>Permissions</span>
+        <span className="small">{restricted ? 'Some actions are restricted.' : 'Everything is allowed.'}</span>
+        <button onClick={() => { close(); useDialog.getState().show('permissions'); }}>Edit permissions…</button>
+      </div>
       <label className="row"><span>Encryption</span>
         <select value={algorithm} onChange={(e) => setAlgorithm(e.target.value as Algorithm)}>
           <option value="AES-256">AES-256 (Acrobat X and later)</option>
@@ -107,7 +211,6 @@ export function SecurityDialog({ close }: { close: () => void }) {
         </select>
       </label>
       {error && <p className="error-text">{error}</p>}
-      <p className="muted small">Restrictions are honoured by well-behaved PDF software; they are not a substitute for an open password.</p>
     </Modal>
   );
 }

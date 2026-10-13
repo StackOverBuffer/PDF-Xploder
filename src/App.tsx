@@ -1,3 +1,4 @@
+import { can } from './store/permissions';
 import { useEffect, useState } from 'react';
 import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature } from 'lucide-react';
 import { useStore, type SidebarTab } from './store/store';
@@ -77,7 +78,7 @@ function useShortcuts() {
         s.goToPage(s.currentPage - 1);
       } else if (!e.altKey && TOOL_KEYS[e.key]) {
         const tool = TOOL_KEYS[e.key];
-        if (tool === 'select' || tool === 'hand' || s.editable) s.setTool(tool);
+        if (tool === 'select' || tool === 'hand' || can('annotate')) s.setTool(tool);
       }
     };
     window.addEventListener('keydown', onKey);

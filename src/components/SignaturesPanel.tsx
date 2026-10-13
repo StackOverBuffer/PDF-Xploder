@@ -1,7 +1,9 @@
 import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion } from 'lucide-react';
 import { useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import type { SigStatus } from '../lib/signature';
 import { useDialog } from './Dialogs';
+import { ACTION_LABELS, allowed, type Action } from '../store/permissions';
 
 export const STATUS: Record<SigStatus, { label: string; icon: typeof ShieldCheck; cls: string }> = {
   valid: { label: 'Valid', icon: ShieldCheck, cls: 'ok' },
@@ -12,7 +14,7 @@ export const STATUS: Record<SigStatus, { label: string; icon: typeof ShieldCheck
 
 export function SignaturesPanel() {
   const signatures = useStore((s) => s.signatures);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('fillForms');
   return (
     <div className="panel">
       <div className="panel-title">
@@ -58,11 +60,13 @@ export function DocBanner() {
   const signatures = useStore((s) => s.signatures);
   const dirty = useStore((s) => s.dirty);
   const show = useDialog((d) => d.show);
+  const state = useStore();
   if (lock) {
+    const denied = (['print', 'modify', 'assemble', 'annotate', 'fillForms', 'copy'] as Action[]).filter((a) => !allowed(state, a));
     return (
       <div className="doc-banner warn">
-        <ShieldAlert size={16} /> This document’s security settings restrict editing. It is open read-only.
-        <button onClick={() => show('security')}>Unlock…</button>
+        <ShieldAlert size={16} /> Restricted by the document’s security: {denied.map((a) => ACTION_LABELS[a].toLowerCase()).join(', ')} {denied.length === 1 ? 'is' : 'are'} not allowed.
+        <button onClick={() => show('permissions')}>Permissions…</button>
       </div>
     );
   }

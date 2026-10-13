@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Highlighter } from 'lucide-react';
 import { styleFor, uid, useStore, type SearchHit } from '../store/store';
+import { useCan } from '../store/permissions';
 import { pageTextRuns, type TextRun } from '../lib/pdfjs';
 
 let cache: { version: number; runs: TextRun[][] } | null = null;
@@ -42,7 +43,7 @@ export async function runSearch(query: string, matchCase: boolean): Promise<Sear
 export function SearchPanel() {
   const search = useStore((s) => s.search);
   const docVersion = useStore((s) => s.docVersion);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('annotate');
   const [query, setQuery] = useState(search.query);
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

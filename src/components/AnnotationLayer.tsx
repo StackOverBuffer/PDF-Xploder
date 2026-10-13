@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { styleFor, uid, useStore } from '../store/store';
+import { useCan } from '../store/permissions';
 import { frameGeom, frameMatrix, pdfRectToView, pdfToView, rectFromPoints, viewRectToPdf, viewToPdf, type VRect } from '../lib/geometry';
 import { hasRect, resizePatch, translatePatch, viewBounds } from '../lib/annotGeom';
 import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
@@ -34,7 +35,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const tool = useStore((s) => s.tool);
   const selected = useStore((s) => (s.selected?.pageId === pageId ? s.selected.id : null));
   const editing = useStore((s) => s.editing);
-  const editable = useStore((s) => s.editable);
+  const editable = useCan('annotate');
   const hits = useStore((s) => s.search.hits);
   const hitIndex = useStore((s) => s.search.index);
   const svgRef = useRef<SVGSVGElement>(null);
