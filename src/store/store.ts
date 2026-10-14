@@ -104,6 +104,8 @@ interface State {
   ownerAccess: boolean;
   /** Set while a restricted document is open without its owner password. */
   lock: { userPassword: string; needsUserPassword: boolean } | null;
+  /** The author's restrictions were lifted for this session without the permissions password. */
+  restrictionsLifted: boolean;
   signatures: SignatureInfo[];
   past: Snapshot[];
   future: Snapshot[];
@@ -134,6 +136,13 @@ interface Actions {
   openDocument(bytes: Uint8Array, name: string, opts?: { password?: string; ownerPassword?: string }): Promise<void>;
   /** Lift permission restrictions with the owner password; resolves false if it is wrong. */
   unlock(ownerPassword: string): Promise<boolean>;
+  /**
+   * Lift the restrictions for this session without the permissions password, for
+   * documents the user is entitled to edit (confirmed in the dialog). PDF permissions
+   * are not encryption: the file key is already known from opening the file. Saving
+   * keeps the original encryption and restrictions unless security is changed.
+   */
+  liftRestrictions(): void;
   setSecurity(s: SecuritySettings | null): void;
   closeDocument(): void;
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
@@ -169,6 +178,7 @@ interface Actions {
 export type Store = State & Actions;
 
 const initialDoc = {
+  restrictionsLifted: false,
   fileName: '',
   bytes: null,
   pdf: null,
@@ -403,6 +413,11 @@ export const useStore = create<Store>()((set, get) => {
         security: s.security ? { ...s.security, ownerPassword } : s.security,
       });
       return true;
+    },
+
+    liftRestrictions() {
+      if (!get().lock) return;
+      set({ lock: null, ownerAccess: true, permissions: ALL_PERMISSIONS, restrictionsLifted: true });
     },
 
     setSecurity(security) {

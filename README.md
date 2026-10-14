@@ -151,7 +151,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 - **Fonts.** Noto Sans, Noto Sans Symbols 2 (bundled in `public/fonts`) and Noto Sans SC/KR (fetched from jsDelivr only when text needs them) are licensed under the SIL Open Font License; see `public/fonts/OFL.txt`. Offline, CJK characters fall back to `?`.
 - **node-forge.** `npm audit` flags node-forge for GHSA-86w9-cpqp-85rv, a flaw in its RSA signature *verification*. The app uses forge only to read .p12 files and create signatures; all verification goes through Web Crypto.
-- **Permissions.** PDF permissions are honoured by well-behaved software, not enforced cryptographically, and PDF has no permission that prevents saving a copy. To re-encrypt a restricted file without its owner password, the app derives the file key through an internal module of `@cantoo/pdf-lib` (aliased as `pdf-lib-internal/crypto` in `vite.config.ts`).
+- **Permissions.** PDF permissions are honoured by well-behaved software, not enforced cryptographically, and PDF has no permission that prevents saving a copy. To re-encrypt a restricted file without its owner password, the app derives the file key through an internal module of `@cantoo/pdf-lib` (aliased as `pdf-lib-internal/crypto` in `vite.config.ts`). For documents you are entitled to edit, *Protect → Unlock → Lift restrictions without the password…* lifts them for the session after you confirm that; saving keeps the original encryption and restrictions unless you change the security.
 - **Saving signed documents.** Edits to a signed document are saved by rewriting the file, which invalidates existing signatures (the app asks first). Sign again after editing.
 
 ## Keyboard shortcuts

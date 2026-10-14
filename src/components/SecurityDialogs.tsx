@@ -25,7 +25,40 @@ function UnlockForm({ onDone }: { onDone: () => void }) {
       <label className="row"><span>{t('Password')}</span><input type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
       {error && <p className="error-text">{error}</p>}
       <div className="row"><span /><button className="primary" onClick={submit}><KeyRound size={14} /> {t('Unlock')}</button></div>
+      <LiftWithoutPassword onDone={onDone} />
     </>
+  );
+}
+
+/** Lift the restrictions without the permissions password, once the user confirms they are entitled to. */
+function LiftWithoutPassword({ onDone }: { onDone: () => void }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [entitled, setEntitled] = useState(false);
+  if (!open) {
+    return <p className="muted small"><button className="link" onClick={() => setOpen(true)}>{t('Lift restrictions without the password…')}</button></p>;
+  }
+  return (
+    <div className="lift-box">
+      <p className="small">{t('PDF permissions are not encryption: the restrictions are a request by the author that PDF software honours. PDF-Xploder can lift them for this session without the permissions password.')}</p>
+      <p className="small">{t('The author set these restrictions on purpose. Circumventing protection of copyrighted works can be unlawful (in Germany § 95a UrhG). Only continue for your own documents or with the rights holder’s permission.')}</p>
+      <label className="row"><input type="checkbox" checked={entitled} onChange={(e) => setEntitled(e.target.checked)} /> <span>{t('I am entitled to edit this document (e.g. it is my own, or the rights holder agreed).')}</span></label>
+      <p className="muted small">{t('Saving keeps the original encryption and restrictions unless you change the security under Protect → Password.')}</p>
+      <div className="row">
+        <span />
+        <button
+          className="primary"
+          disabled={!entitled}
+          onClick={() => {
+            useStore.getState().liftRestrictions();
+            useStore.getState().notify('Restrictions lifted for this session.');
+            onDone();
+          }}
+        >
+          <KeyRound size={14} /> {t('Lift restrictions')}
+        </button>
+      </div>
+    </div>
   );
 }
 

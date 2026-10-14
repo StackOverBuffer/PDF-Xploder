@@ -310,6 +310,13 @@ const DE: Record<string, string> = {
   'Use + to add one for the current view.': 'Mit + fügen Sie eines für die aktuelle Ansicht hinzu.',
   'Delete “{title}” and its {count} sub-bookmark(s)?': '„{title}“ und {count} untergeordnete(s) Lesezeichen löschen?',
   'Updating bookmarks…': 'Lesezeichen werden aktualisiert…',
+  // Lifting restrictions without the permissions password
+  'Lift restrictions without the password…': 'Einschränkungen ohne Kennwort aufheben…',
+  'PDF permissions are not encryption: the restrictions are a request by the author that PDF software honours. PDF-Xploder can lift them for this session without the permissions password.': 'PDF-Berechtigungen sind keine Verschlüsselung: Die Einschränkungen sind eine Vorgabe des Autors, an die sich PDF-Programme halten. PDF-Xploder kann sie für diese Sitzung ohne Berechtigungskennwort aufheben.',
+  'The author set these restrictions on purpose. Circumventing protection of copyrighted works can be unlawful (in Germany § 95a UrhG). Only continue for your own documents or with the rights holder’s permission.': 'Der Autor hat diese Einschränkungen bewusst gesetzt. Das Umgehen von Schutzmaßnahmen an urheberrechtlich geschützten Werken kann rechtswidrig sein (§ 95a UrhG). Fahren Sie nur bei eigenen Dokumenten oder mit Zustimmung des Rechteinhabers fort.',
+  'I am entitled to edit this document (e.g. it is my own, or the rights holder agreed).': 'Ich bin berechtigt, dieses Dokument zu bearbeiten (z. B. eigenes Dokument oder Zustimmung des Rechteinhabers).',
+  'Saving keeps the original encryption and restrictions unless you change the security under Protect → Password.': 'Beim Speichern bleiben die ursprüngliche Verschlüsselung und die Einschränkungen erhalten, sofern Sie die Sicherheit nicht unter Schützen → Kennwort ändern.',
+  'Lift restrictions': 'Einschränkungen aufheben', 'Restrictions lifted for this session.': 'Einschränkungen für diese Sitzung aufgehoben.',
 };
 
 export default DE;
