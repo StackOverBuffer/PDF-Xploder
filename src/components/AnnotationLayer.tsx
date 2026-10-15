@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, type PointerEvent as RPointerEvent }
 import { styleFor, uid, useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import { frameGeom, frameMatrix, pdfRectToView, pdfToView, rectFromPoints, viewRectToPdf, viewToPdf, type VRect } from '../lib/geometry';
-import { hasRect, resizePatch, translatePatch, viewBounds } from '../lib/annotGeom';
+import { hasRect, resizePatch, translatePatch, viewBounds, cloudEdges } from '../lib/annotGeom';
 import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
@@ -26,11 +26,12 @@ interface Props {
 const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
   fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
 };
-const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
+const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'polyline', 'cloud', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
 
 type Draft =
   | { kind: 'ink'; points: Pt[] }
+  | { kind: 'path'; points: Pt[] }
   | { kind: 'box'; start: Pt; end: Pt }
   | null;
 
@@ -68,6 +69,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   };
 
   // ------------------------------------------------------------ drawing
+  /** Where the previous click of a polygon/polyline/cloud landed, to detect the closing double click. */
+  const lastClick = useRef<Pt | null>(null);
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
     if (!drawing || e.button !== 0) return;
     e.preventDefault();
@@ -79,6 +82,18 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       return;
     }
     if (tool === 'ink') setDraft({ kind: 'ink', points: [p] });
+    else if (tool === 'polygon' || tool === 'polyline' || tool === 'cloud') {
+      // A click near the previous one (a double click) closes the shape.
+      const prev = lastClick.current;
+      lastClick.current = p;
+      if (prev && draft?.kind === 'path' && Math.hypot(p.x - prev.x, p.y - prev.y) < 4) {
+        commitDraft(draft);
+        setDraft(null);
+        lastClick.current = null;
+        return;
+      }
+      setDraft({ kind: 'path', points: [...(draft?.kind === 'path' ? draft.points : []), p] });
+    }
     else if (tool === 'note') createNote(p);
     else setDraft({ kind: 'box', start: p, end: p });
   };
@@ -89,6 +104,10 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     if (!draft) return;
     const p = viewPt(e);
     if (draft.kind === 'ink') setDraft({ kind: 'ink', points: [...draft.points, p] });
+    else if (draft.kind === 'path') {
+      // The rubber band follows the pointer: only the trailing point moves.
+      setDraft({ ...draft, points: [...draft.points.slice(0, -1), p] });
+    }
     else setDraft({ ...draft, end: e.shiftKey ? constrain(draft.start, p, tool) : p });
   };
 
@@ -98,6 +117,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       return;
     }
     if (!draft) return;
+    if (draft.kind === 'path') return; // Vertices are added on pointer down; keep collecting.
     commitDraft(draft);
     setDraft(null);
   };
@@ -134,6 +154,16 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     if (d.kind === 'ink') {
       if (d.points.length < 2) return;
       store.addAnnotation(index, { ...base('ink'), type: 'ink', width: st.width, paths: [simplify(d.points).map((p) => viewToPdf(geom, p))] });
+      return;
+    }
+    if (d.kind === 'path') {
+      // At least an edge; every point is a clicked vertex (no trailing cursor at commit time).
+      if (d.points.length < 2) return;
+      const vertices = simplify(d.points).map((p) => viewToPdf(geom, p));
+      if (vertices.length < 2) return;
+      store.addAnnotation(index, { ...base(tool), type: tool as 'polygon' | 'polyline' | 'cloud', width: st.width, fill: st.fill, vertices });
+      lastClick.current = null;
+      if (tool !== 'polyline') store.setTool('select');
       return;
     }
     const dx = Math.abs(d.end.x - d.start.x);
@@ -256,8 +286,25 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       }
     };
     page.addEventListener('pointerdown', onDown);
-    return () => page.removeEventListener('pointerdown', onDown);
+    // Escape abandons a partly drawn polygon/polyline/cloud.
+    const onCancel = () => {
+      setDraft(null);
+      lastClick.current = null;
+    };
+    window.addEventListener('awesome-pdf:cancel-draft', onCancel);
+    return () => {
+      page.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('awesome-pdf:cancel-draft', onCancel);
+    };
   }, [pageId]);
+
+  // Starting another tool or leaving the page abandons a partly drawn shape.
+  useEffect(() => {
+    if (draft?.kind === 'path' && !['polygon', 'polyline', 'cloud'].includes(tool)) {
+      setDraft(null);
+      lastClick.current = null;
+    }
+  }, [tool, draft?.kind]);
 
   const pageHits = hits.map((h, i) => ({ h, i })).filter(({ h }) => h.page === index);
   const S = scale;
@@ -352,10 +399,36 @@ function arrowHead(x1: number, y1: number, x2: number, y2: number, len: number):
   return `M${pts[0]} L${x2},${y2} L${pts[1]}`;
 }
 
+/** SVG path of the scalloped preview for the cloud tool (same geometry as the PDF appearance). */
+function cloudPreviewPath(points: Pt[], S: number, width: number): string {
+  const scaled = points.map((p) => ({ x: p.x * S, y: p.y * S }));
+  const segs = cloudEdges(scaled, Math.max(4, width * 2.5) * S, true);
+  if (!segs.length) return '';
+  let d = `M${segs[0].a.x},${segs[0].a.y}`;
+  for (const s of segs) d += ` Q${s.c.x},${s.c.y} ${s.b.x},${s.b.y}`;
+  return `${d} Z`;
+}
+
 function DraftShape({ draft, tool, scale: S }: { draft: NonNullable<Draft>; tool: Tool; scale: number }) {
   const st = styleFor(tool);
   if (draft.kind === 'ink') {
     return <polyline className="draft" points={draft.points.map((p) => `${p.x * S},${p.y * S}`).join(' ')} fill="none" stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" strokeLinejoin="round" opacity={st.opacity} />;
+  }
+  if (draft.kind === 'path') {
+    const pts = draft.points.map((p) => `${p.x * S},${p.y * S}`);
+    const closed = tool !== 'polyline';
+    const d = closed
+      ? `M${pts[0]} L${pts.slice(1).join(' L')} Z`
+      : `M${pts[0]} L${pts.slice(1).join(' L')}`;
+    const preview = tool === 'cloud' ? cloudPreviewPath(draft.points, S, st.width) : null;
+    return (
+      <g className="draft" opacity={st.opacity}>
+        <path d={preview ?? d} fill={st.fill ?? 'none'} stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" strokeLinejoin="round" />
+        {draft.points.map((p, i) => (
+          <circle key={i} cx={p.x * S} cy={p.y * S} r={2.5} fill={st.color} />
+        ))}
+      </g>
+    );
   }
   const { start, end } = draft;
   if (tool === 'line' || tool === 'arrow') {
@@ -454,6 +527,28 @@ function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pag
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} />
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
           {a.type === 'arrow' && <path d={arrowHead(p1.x, p1.y, p2.x, p2.y, Math.max(8, a.width * 4) * S)} />}
+        </g>
+      );
+    }
+    case 'polygon':
+    case 'polyline': {
+      const pts = a.vertices.map(view);
+      const points = pts.map((v) => `${v.x},${v.y}`).join(' ');
+      return (
+        <g opacity={a.opacity}>
+          <polygon points={points} fill={a.fill ?? 'none'} stroke={a.color} strokeWidth={a.width * S} strokeLinecap="round" strokeLinejoin="round" />
+          <polygon points={points} fill="none" stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
+        </g>
+      );
+    }
+    case 'cloud': {
+      const segs = cloudEdges(a.vertices.map(view), Math.max(4, a.width * 2.5) * S, true);
+      let d = segs.length ? `M${segs[0].a.x},${segs[0].a.y}` : '';
+      for (const s of segs) d += ` Q${s.c.x},${s.c.y} ${s.b.x},${s.b.y}`;
+      return (
+        <g opacity={a.opacity}>
+          <path d={`${d} Z`} fill={a.fill ?? 'none'} stroke={a.color} strokeWidth={a.width * S} strokeLinecap="round" strokeLinejoin="round" />
+          <path d={`${d} Z`} fill="none" stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
         </g>
       );
     }

@@ -311,7 +311,7 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+O', 'Open'], ['Ctrl+S', 'Save'], ['Ctrl+P', 'Print'], ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'], ['Ctrl+F', 'Find'], ['Ctrl+G', 'Go to page'],
   ['Ctrl + / Ctrl −', 'Zoom in / out'], ['Ctrl+0', 'Fit width'], ['Delete', 'Delete selected annotation'], ['Esc', 'Select tool / deselect'],
   ['V', 'Edit comments'], ['X', 'Select text'], ['G', 'Snapshot'], ['H', 'Hand'], ['Shift+H', 'Highlight'], ['U', 'Underline'], ['K', 'Strikeout'], ['P', 'Pencil'], ['R', 'Rectangle'], ['O', 'Ellipse'],
-  ['L', 'Line'], ['A', 'Arrow'], ['T', 'Text box'], ['N', 'Sticky note'], ['S', 'Stamp'], ['PageUp / PageDown', 'Previous / next page'],
+  ['L', 'Line'], ['A', 'Arrow'], ['Y', 'Polygon'], ['J', 'Polyline'], ['W', 'Cloud'], ['T', 'Text box'], ['N', 'Sticky note'], ['S', 'Stamp'], ['PageUp / PageDown', 'Previous / next page'],
 ];
 
 /** German keyboards label the keys differently. */

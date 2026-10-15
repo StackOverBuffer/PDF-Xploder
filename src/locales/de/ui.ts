@@ -92,10 +92,11 @@ const DE: Record<string, string> = {
   'Author name': 'Name des Autors',
   // annotation types (src/lib/annotGeom.ts)
   Highlight: 'Hervorheben', Underline: 'Unterstreichen', Strikeout: 'Durchstreichen', Pencil: 'Stift', Rectangle: 'Rechteck', Ellipse: 'Ellipse', Line: 'Linie',
-  Arrow: 'Pfeil', 'Text box': 'Textfeld', 'Sticky note': 'Notiz', Image: 'Bild', Stamp: 'Stempel', 'Redaction mark': 'Schwärzungsmarkierung', Signature: 'Unterschrift',
+  Arrow: 'Pfeil', Polygon: 'Vieleck', Polyline: 'Linienzug', Cloud: 'Wolke', 'Text box': 'Textfeld', 'Sticky note': 'Notiz', Image: 'Bild', Stamp: 'Stempel', 'Redaction mark': 'Schwärzungsmarkierung', Signature: 'Unterschrift',
   // tools
   'Highlight tool': 'Werkzeug Hervorheben', 'Underline tool': 'Werkzeug Unterstreichen', 'Strikeout tool': 'Werkzeug Durchstreichen', 'Pencil tool': 'Werkzeug Stift',
-  'Rectangle tool': 'Werkzeug Rechteck', 'Ellipse tool': 'Werkzeug Ellipse', 'Line tool': 'Werkzeug Linie', 'Arrow tool': 'Werkzeug Pfeil', 'Text box tool': 'Werkzeug Textfeld',
+  'Rectangle tool': 'Werkzeug Rechteck', 'Ellipse tool': 'Werkzeug Ellipse', 'Line tool': 'Werkzeug Linie', 'Arrow tool': 'Werkzeug Pfeil',
+  'Polygon tool': 'Werkzeug Vieleck', 'Polyline tool': 'Werkzeug Linienzug', 'Cloud tool': 'Werkzeug Wolke', 'Text box tool': 'Werkzeug Textfeld',
   'Sticky note tool': 'Werkzeug Notiz', 'Stamp tool': 'Werkzeug Stempel', 'Redact tool': 'Werkzeug Schwärzen', 'Signature tool': 'Werkzeug Unterschrift',
   'Text field tool': 'Werkzeug Textfeld (Formular)', 'Check box tool': 'Werkzeug Kontrollkästchen', 'Dropdown tool': 'Werkzeug Kombinationsfeld', 'List box tool': 'Werkzeug Listenfeld',
   'Radio button tool': 'Werkzeug Optionsfeld',
@@ -106,6 +107,12 @@ const DE: Record<string, string> = {
   'Drag to draw. Hold Shift for a square.': 'Zum Zeichnen ziehen. Umschalttaste halten für ein Quadrat.',
   'Drag to draw. Hold Shift for a circle.': 'Zum Zeichnen ziehen. Umschalttaste halten für einen Kreis.',
   'Drag to draw. Hold Shift to snap to 45°.': 'Zum Zeichnen ziehen. Umschalttaste halten zum Einrasten in 45°-Schritten.',
+  'Click the corners; double-click the last one to close the polygon. Escape cancels.':
+    'Klicken Sie die Ecken an; schließen Sie das Vieleck mit einem Doppelklick auf die letzte. Escape bricht ab.',
+  'Click the points; double-click the last one to finish the line. Escape cancels.':
+    'Klicken Sie die Punkte an; beenden Sie den Linienzug mit einem Doppelklick auf den letzten. Escape bricht ab.',
+  'Click the corners; double-click the last one to close the cloud. Escape cancels.':
+    'Klicken Sie die Ecken an; schließen Sie die Wolke mit einem Doppelklick auf die letzte. Escape bricht ab.',
   'Click or drag to place a text box, then type.': 'Klicken oder ziehen Sie, um ein Textfeld zu platzieren, und tippen Sie dann.',
   'Click to place a sticky note.': 'Klicken Sie, um eine Notiz zu platzieren.', 'Click or drag to place the stamp.': 'Klicken oder ziehen Sie, um den Stempel zu platzieren.',
   'Drag a box for the new text field.': 'Ziehen Sie einen Rahmen für das neue Textfeld auf.', 'Click or drag to place a check box.': 'Klicken oder ziehen Sie, um ein Kontrollkästchen zu platzieren.',

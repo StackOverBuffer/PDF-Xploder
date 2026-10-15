@@ -115,6 +115,9 @@ describe('export', () => {
     { ...base, id: '4', type: 'rect', rect: { x: 50, y: 50, w: 30, h: 30 }, width: 2, fill: '#00ff00' },
     { ...base, id: '5', type: 'ellipse', rect: { x: 50, y: 50, w: 30, h: 20 }, width: 2, fill: null },
     { ...base, id: '6', type: 'arrow', p1: { x: 0, y: 0 }, p2: { x: 100, y: 100 }, width: 2 },
+    { ...base, id: '61', type: 'polygon', vertices: [{ x: 10, y: 150 }, { x: 60, y: 180 }, { x: 90, y: 150 }, { x: 50, y: 130 }], width: 2, fill: '#00aaff' },
+    { ...base, id: '62', type: 'polyline', vertices: [{ x: 110, y: 150 }, { x: 140, y: 190 }, { x: 170, y: 140 }, { x: 190, y: 170 }], width: 1.5, fill: null },
+    { ...base, id: '63', type: 'cloud', vertices: [{ x: 120, y: 220 }, { x: 180, y: 240 }, { x: 160, y: 260 }, { x: 110, y: 250 }], width: 2, fill: null },
     { ...base, id: '7', type: 'text', rect: { x: 20, y: 100, w: 120, h: 60 }, text: 'Hello wrapped world – ünïcode 你好', fontSize: 12, border: true },
     { ...base, id: '8', type: 'note', at: { x: 150, y: 280 }, text: 'A note' },
     { ...base, id: '9', type: 'stamp', rect: { x: 20, y: 200, w: 100, h: 40 }, label: 'Approved' },
@@ -145,7 +148,7 @@ describe('export', () => {
       const bytes = await ops.rotatePages(await makeDoc(1), [0], rotation);
       const out = await ops.exportWithAnnotations(bytes, [withImage]);
       expect(await subtypes(out)).toEqual([
-        '/Highlight', '/Underline', '/Ink', '/Square', '/Circle', '/Line', '/FreeText', '/Text', '/Stamp', '/Redact', '/Stamp',
+        '/Highlight', '/Underline', '/Ink', '/Square', '/Circle', '/Line', '/Polygon', '/PolyLine', '/Polygon', '/FreeText', '/Text', '/Stamp', '/Redact', '/Stamp',
       ]);
       const back = await ops.importForEditing(out, () => 'new');
       expect(back.count).toBe(withImage.length);
@@ -176,14 +179,20 @@ describe('export', () => {
     add({ Subtype: 'Square', Rect: [50, 50, 80, 80], BS: { W: 2 }, C: [1, 0, 0], IC: [0, 1, 0] });
     add({ Subtype: 'Ink', Rect: [0, 0, 10, 10], InkList: [[1, 1, 5, 5, 9, 1]], C: [0, 0, 0] });
     add({ Subtype: 'Text', Rect: [150, 270, 170, 290], Contents: PDFHexString.fromText('note'), C: [1, 0.8, 0] });
+    add({ Subtype: 'Polygon', Rect: [0, 200, 100, 260], Vertices: [10, 210, 80, 220, 50, 250], BS: { W: 2 }, C: [1, 0, 0], IC: [0, 0.5, 1] });
+    add({ Subtype: 'PolyLine', Rect: [0, 100, 100, 160], Vertices: [10, 110, 50, 150, 90, 120], BS: { W: 3 }, C: [0, 1, 0] });
+    add({ Subtype: 'Polygon', Rect: [100, 200, 200, 260], Vertices: [110, 210, 190, 220, 150, 250], BS: { W: 2 }, BE: { S: 'Cloudy', I: 1 }, C: [0.5, 0.5, 0.5] });
     add({ Subtype: 'Link', Rect: [0, 0, 10, 10] });
     const back = await ops.importForEditing(await doc.save(), () => 'gen');
-    expect(back.count).toBe(6);
-    expect(back.annotations[0].map((a) => a.type)).toEqual(['highlight', 'text', 'arrow', 'rect', 'ink', 'note']);
+    expect(back.count).toBe(9);
+    expect(back.annotations[0].map((a) => a.type)).toEqual(['highlight', 'text', 'arrow', 'rect', 'ink', 'note', 'polygon', 'polyline', 'cloud']);
     expect(back.annotations[0][0]).toMatchObject({ color: '#ffff00', author: 'Ann', comment: 'Look', createdAt: Date.UTC(2024, 0, 2, 3, 4, 5), rects: [{ x: 10, y: 10, w: 50, h: 12 }] });
     expect(back.annotations[0][1]).toMatchObject({ text: 'Typewriter', fontSize: 10, color: '#0000ff', rect: { x: 20, y: 100, w: 130, h: 40 } });
     expect(back.annotations[0][3]).toMatchObject({ rect: { x: 51, y: 51, w: 28, h: 28 }, width: 2, fill: '#00ff00' });
     expect(back.annotations[0][5]).toMatchObject({ at: { x: 150, y: 290 }, text: 'note' });
+    expect(back.annotations[0][6]).toMatchObject({ type: 'polygon', vertices: [{ x: 10, y: 210 }, { x: 80, y: 220 }, { x: 50, y: 250 }], width: 2, fill: '#0080ff' });
+    expect(back.annotations[0][7]).toMatchObject({ type: 'polyline', vertices: [{ x: 10, y: 110 }, { x: 50, y: 150 }, { x: 90, y: 120 }], width: 3, fill: null });
+    expect(back.annotations[0][8]).toMatchObject({ type: 'cloud', width: 2 });
     // The link is not editable and stays in the document.
     expect(await subtypes(back.bytes)).toEqual(['/Link']);
   });

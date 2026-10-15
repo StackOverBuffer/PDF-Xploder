@@ -245,6 +245,7 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .annot-layer.drawing { pointer-events: all; cursor: crosshair; }
 .annot-layer.drawing.tool-text { cursor: text; }
 .annot-layer.drawing.tool-note { cursor: copy; }
+.annot-layer.drawing.tool-polygon, .annot-layer.drawing.tool-polyline, .annot-layer.drawing.tool-cloud { cursor: copy; }
 .annot-layer .annot { pointer-events: none; }
 .annot-layer.tool-select .annot { pointer-events: visiblePainted; cursor: move; }
 .annot-layer.tool-select .annot-text, .annot-layer.tool-select .annot-image, .annot-layer.tool-select .annot-stamp,

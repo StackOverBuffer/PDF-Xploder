@@ -12,6 +12,7 @@ import {
   PDFName,
   PDFOperator,
   PDFRef,
+  appendBezierCurve,
   closePath,
   degrees,
   drawEllipse,
@@ -19,6 +20,7 @@ import {
   drawRectangle,
   drawText,
   fill,
+  fillAndStroke,
   lineTo,
   moveTo,
   popGraphicsState,
@@ -34,6 +36,7 @@ import {
 } from '@cantoo/pdf-lib';
 import { hexToRgb } from './color';
 import { frameGeom, pdfRectToView, pdfToView, viewToPdf } from './geometry';
+import { cloudEdges } from './annotGeom';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { NOTE_SIZE } from './types';
 
@@ -147,6 +150,45 @@ export class Canvas {
     this.ops.push(closePath(), fill(), popGraphicsState());
   }
 
+  /** Fill and stroke a polygon (open: a polyline). */
+  polygon(points: Pt[], o: { color: string; width: number; opacity: number; fill: string | null; close: boolean }) {
+    if (points.length < 2) {
+      this.polyline(points, { color: o.color, width: o.width, opacity: o.opacity });
+      return;
+    }
+    const gs = this.gs(o.opacity);
+    const path: PDFOperator[] = [moveTo(points[0].x, points[0].y), ...points.slice(1).map((p) => lineTo(p.x, p.y))];
+    if (o.close) path.push(closePath());
+    this.ops.push(pushGraphicsState());
+    if (gs) this.ops.push(setGraphicsState(gs));
+    if (o.fill) {
+      this.ops.push(...path, setFillingColor(hexToRgb(o.fill)), fill());
+      this.ops.push(...path, setStrokingColor(hexToRgb(o.color)), setLineWidth(o.width), setLineCap(LineCapStyle.Round), setLineJoin(LineJoinStyle.Round), stroke());
+    } else {
+      this.ops.push(setStrokingColor(hexToRgb(o.color)), setLineWidth(o.width), setLineCap(LineCapStyle.Round), setLineJoin(LineJoinStyle.Round), ...path, stroke());
+    }
+    this.ops.push(popGraphicsState());
+  }
+
+    /** A "cloudy" border: outward scallops along the outline (see cloudEdges). */
+  cloudy(points: Pt[], o: { color: string; width: number; opacity: number; fill: string | null; close: boolean }) {
+    const segs = cloudEdges(points, Math.max(4, o.width * 2.5), o.close);
+    if (!segs.length) return;
+    const gs = this.gs(o.opacity);
+    this.ops.push(pushGraphicsState());
+    if (gs) this.ops.push(setGraphicsState(gs));
+    const path: PDFOperator[] = [moveTo(segs[0].a.x, segs[0].a.y)];
+    for (const s of segs) {
+      // A quadratic Bézier a–c–b as a cubic one (control points on the tangents).
+      path.push(appendBezierCurve((2 * s.a.x + s.c.x) / 3, (2 * s.a.y + s.c.y) / 3, (s.a.x + 2 * s.c.x) / 3, (s.a.y + 2 * s.c.y) / 3, s.b.x, s.b.y));
+    }
+    if (o.close) path.push(closePath());
+    this.ops.push(setStrokingColor(hexToRgb(o.color)), setLineWidth(o.width), setLineCap(LineCapStyle.Round), setLineJoin(LineJoinStyle.Round), ...path);
+    if (o.fill) this.ops.push(setFillingColor(hexToRgb(o.fill)), fillAndStroke());
+    else this.ops.push(stroke());
+    this.ops.push(popGraphicsState());
+  }
+
   /** Draw one line of text starting at `at` (baseline origin, user space), rotated `angle` degrees CCW. */
   text(engine: TextEngine, line: string, at: Pt, o: { size: number; color: string; opacity: number; angle: number }) {
     const a = (o.angle * Math.PI) / 180;
@@ -238,6 +280,14 @@ export function annotationRect(a: Annotation, g: PageGeom): Rect {
       return pad(boundsOf([a.p1, a.p2]), a.width / 2 + 1);
     case 'arrow':
       return pad(boundsOf([a.p1, a.p2, ...arrowHeadPoints(a.p1, a.p2, a.width)]), a.width / 2 + 1);
+    case 'polygon':
+    case 'polyline':
+      return pad(boundsOf(a.vertices), a.width / 2 + 1);
+    case 'cloud': {
+      const segs = cloudEdges(a.vertices, Math.max(4, a.width * 2.5), true);
+      const pts = segs.flatMap((s) => [s.a, s.b, s.c]);
+      return pad(boundsOf(pts), a.width / 2 + 1);
+    }
     case 'rect':
     case 'ellipse':
       return pad(a.rect, a.width / 2);
@@ -329,6 +379,13 @@ export async function buildAppearance(
         const [h1, h2] = arrowHeadPoints(a.p1, a.p2, a.width);
         c.polyline([h1, a.p2, h2], { color: a.color, width: a.width, opacity: op });
       }
+      break;
+    case 'polygon':
+    case 'polyline':
+      c.polygon(a.vertices, { color: a.color, width: a.width, opacity: op, fill: a.fill, close: a.type === 'polygon' });
+      break;
+    case 'cloud':
+      c.cloudy(a.vertices, { color: a.color, width: a.width, opacity: op, fill: a.fill, close: true });
       break;
     case 'text': {
       const fg = frameGeom(g, a.rot);

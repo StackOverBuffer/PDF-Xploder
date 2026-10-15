@@ -430,6 +430,7 @@ export function transformAnnotation(a: Annotation, t: PageTransform): Annotation
   if ('rect' in a) (out as { rect: Rect }).rect = mapRect(t.m, a.rect);
   if ('rects' in a) (out as { rects: Rect[] }).rects = a.rects.map((r) => mapRect(t.m, r));
   if ('paths' in a) (out as { paths: Pt[][] }).paths = a.paths.map((p) => p.map(pt));
+  if ('vertices' in a) (out as { vertices: Pt[] }).vertices = a.vertices.map(pt);
   if ('p1' in a) Object.assign(out, { p1: pt(a.p1), p2: pt(a.p2) });
   if ('at' in a) (out as { at: Pt }).at = pt(a.at);
   if ('width' in a) (out as { width: number }).width = a.width * k;

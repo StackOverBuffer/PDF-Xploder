@@ -70,6 +70,14 @@ export interface LineAnnot extends AnnotBase {
   width: number;
 }
 
+/** Polygon (closed), polyline (open) and cloud (closed, scalloped border). */
+export interface PolygonAnnot extends AnnotBase {
+  type: 'polygon' | 'polyline' | 'cloud';
+  vertices: Pt[];
+  width: number;
+  fill: string | null;
+}
+
 export interface TextBoxAnnot extends AnnotBase, Oriented {
   type: 'text';
   rect: Rect;
@@ -110,6 +118,7 @@ export type Annotation =
   | InkAnnot
   | ShapeAnnot
   | LineAnnot
+  | PolygonAnnot
   | TextBoxAnnot
   | NoteAnnot
   | ImageAnnot
@@ -136,6 +145,9 @@ export type Tool =
   | 'ellipse'
   | 'line'
   | 'arrow'
+  | 'polygon'
+  | 'polyline'
+  | 'cloud'
   | 'text'
   | 'note'
   | 'stamp'

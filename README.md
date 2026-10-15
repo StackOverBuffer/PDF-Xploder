@@ -69,6 +69,7 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 ### Comment & markup
 - ✅ Highlight, underline, strikeout from a text selection
 - ✅ Pencil (freehand), rectangle, ellipse, line, arrow (Shift to constrain)
+- ✅ Polygon, polyline and cloud (click the vertices, double-click to finish)
 - ✅ Text box (typewriter) with inline editing, sticky notes
 - ✅ Stamps (Approved, Draft, Confidential, … or custom text)
 - ✅ Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete

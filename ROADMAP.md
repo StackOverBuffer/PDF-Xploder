@@ -35,14 +35,14 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Audio File Annotations | ⬜ |
 | Callout Annotations | ⬜ |
 | Caret Annotations | ⬜ |
-| Cloud Annotations | ⬜ |
+| Cloud Annotations | ✅ scalloped border, fills like the polygon tool |
 | File Attachment Annotations | 🟡 document-level attachments (pane); no attachment icon on the page yet |
 | Freehand Annotations | ✅ Pencil |
 | Highlight, Underline and Strikeout Annotations | ✅ from text selection, search hits or the Select Text rectangle |
 | Line and Arrow Annotations | ✅ |
 | Link Annotations | ✅ to pages and web addresses, from objects or selected text |
 | Oval and Rectangle Annotations | ✅ |
-| Polygon and Polyline Annotations | ⬜ |
+| Polygon and Polyline Annotations | ✅ click vertices, double-click to finish; also exported as standard /Polygon and /PolyLine |
 | Stamps | ✅ standard stamps and custom image stamps that hang on the pointer |
 | Sticky Note Annotations | ✅ |
 | Text Box Annotations | ✅ |

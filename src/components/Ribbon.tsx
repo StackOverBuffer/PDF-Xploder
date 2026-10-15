@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import {
   FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
-  MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw, 
-  ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck,
+  MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
+  ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
@@ -255,6 +255,11 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Stack>
                 <ToolBtn size="small" tool="line" icon={<Minus size={I} />} label="Line" />
                 <ToolBtn size="small" tool="arrow" icon={<MoveUpRight size={I} />} label="Arrow" />
+              </Stack>
+              <Stack>
+                <ToolBtn size="small" tool="polygon" icon={<Pentagon size={I} />} label="Polygon" />
+                <ToolBtn size="small" tool="polyline" icon={<Spline size={I} />} label="Polyline" />
+                <ToolBtn size="small" tool="cloud" icon={<Cloud size={I} />} label="Cloud" />
               </Stack>
             </Group>
             <Group label="Text">

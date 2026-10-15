@@ -110,7 +110,8 @@ function dataUrlToBytes(src: string): { bytes: Uint8Array; mime: string } {
 
 const SUBTYPE: Record<Annotation['type'], string> = {
   highlight: 'Highlight', underline: 'Underline', strikeout: 'StrikeOut', ink: 'Ink', rect: 'Square',
-  ellipse: 'Circle', line: 'Line', arrow: 'Line', text: 'FreeText', note: 'Text', image: 'Stamp', stamp: 'Stamp', redact: 'Redact',
+  ellipse: 'Circle', line: 'Line', arrow: 'Line', polygon: 'Polygon', polyline: 'PolyLine', cloud: 'Polygon',
+  text: 'FreeText', note: 'Text', image: 'Stamp', stamp: 'Stamp', redact: 'Redact',
 };
 
 /** Add `a` to the page as a native annotation with an appearance stream. */
@@ -156,6 +157,18 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('L', [a.p1.x, a.p1.y, a.p2.x, a.p2.y]);
       set('BS', { W: a.width, S: 'S' });
       if (a.type === 'arrow') set('LE', ['None', 'OpenArrow']);
+      break;
+    case 'polygon':
+    case 'polyline':
+      set('Vertices', a.vertices.flatMap((p) => [p.x, p.y]));
+      set('BS', { W: a.width, S: 'S' });
+      if (a.fill) set('IC', hexToRgbTuple(a.fill));
+      break;
+    case 'cloud':
+      set('Vertices', a.vertices.flatMap((p) => [p.x, p.y]));
+      set('BS', { W: a.width, S: 'S' });
+      set('BE', { S: 'Cloudy', I: 1 });
+      if (a.fill) set('IC', hexToRgbTuple(a.fill));
       break;
     case 'text':
       set('DA', PDFString.of(`/Helv ${a.fontSize} Tf ${color.map((v) => v.toFixed(3)).join(' ')} rg`));
@@ -246,6 +259,7 @@ function translate(a: Annotation, dx: number, dy: number): Partial<Annotation> {
     case 'highlight': case 'underline': case 'strikeout': return { rects: a.rects.map(mr) };
     case 'ink': return { paths: a.paths.map((p) => p.map(mv)) };
     case 'line': case 'arrow': return { p1: mv(a.p1), p2: mv(a.p2) };
+    case 'polygon': case 'polyline': case 'cloud': return { vertices: a.vertices.map(mv) };
     case 'note': return { at: mv(a.at) };
     default: return { rect: mr(a.rect) };
   }
@@ -307,6 +321,16 @@ function fromStandard(dict: PDFDict, env: ParseEnv): Annotation | null {
       const arrowAtEnd = /Arrow/.test(ends[1] ?? '');
       const [p1, p2] = arrowAtStart && !arrowAtEnd ? [{ x: l[2], y: l[3] }, { x: l[0], y: l[1] }] : [{ x: l[0], y: l[1] }, { x: l[2], y: l[3] }];
       return { ...b, type: arrowAtStart || arrowAtEnd ? 'arrow' : 'line', p1, p2, width: borderWidth(dict) };
+    }
+    case 'Polygon':
+    case 'PolyLine': {
+      const v = numbers(dict.lookup(PDFName.of('Vertices')));
+      const vertices: Pt[] = [];
+      for (let i = 0; i + 1 < v.length; i += 2) vertices.push({ x: v[i], y: v[i + 1] });
+      if (vertices.length < 2) return null;
+      const cloudy = (dict.lookup(PDFName.of('BE')) as PDFDict | undefined)?.lookup(PDFName.of('S'))?.toString() === '/Cloudy';
+      const type: 'cloud' | 'polygon' | 'polyline' = cloudy ? 'cloud' : subtype === 'Polygon' ? 'polygon' : 'polyline';
+      return { ...b, type, vertices, width: borderWidth(dict), fill: toHex(numbers(dict.lookup(PDFName.of('IC')))) ?? null };
     }
     case 'FreeText': {
       const da = parseDA(text(dict.lookup(PDFName.of('DA'))));

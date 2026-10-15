@@ -36,7 +36,7 @@ const DE: Record<string, string> = {
   'Page to PNG': 'Seite als PNG', Info: 'Info', Properties: 'Eigenschaften',
   // Comment
   'Text markup': 'Textmarkierung', Highlight: 'Hervorheben', Underline: 'Unterstreichen', Strikeout: 'Durchstreichen',
-  Drawing: 'Zeichnen', Pencil: 'Stift', Arrow: 'Pfeil', 'Text box': 'Textfeld', Note: 'Notiz', Stamp: 'Stempel',
+  Drawing: 'Zeichnen', Pencil: 'Stift', Arrow: 'Pfeil', Polygon: 'Vieleck', Polyline: 'Linienzug', Cloud: 'Wolke', 'Text box': 'Textfeld', Note: 'Notiz', Stamp: 'Stempel',
   Manage: 'Verwalten', Flatten: 'Reduzieren',
   // Organize
   Pages: 'Seiten', 'Rotate left': 'Links drehen', 'Rotate right': 'Rechts drehen', Rotate: 'Drehen', Insert: 'Einfügen',

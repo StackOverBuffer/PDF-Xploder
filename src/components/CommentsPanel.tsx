@@ -39,7 +39,7 @@ export function CommentsPanel() {
                       const s = useStore.getState();
                       s.setTool('select');
                       s.select({ pageId: pid, id: a.id });
-                      const anchor = 'rect' in a ? { x: a.rect.x, y: a.rect.y + a.rect.h } : 'rects' in a ? { x: a.rects[0].x, y: a.rects[0].y + a.rects[0].h } : 'at' in a ? a.at : 'p1' in a ? a.p1 : a.paths[0]?.[0];
+                      const anchor = 'rect' in a ? { x: a.rect.x, y: a.rect.y + a.rect.h } : 'rects' in a ? { x: a.rects[0].x, y: a.rects[0].y + a.rects[0].h } : 'at' in a ? a.at : 'p1' in a ? a.p1 : 'vertices' in a ? a.vertices[0] : a.paths[0]?.[0];
                       // goToPage takes a user-space y; for rotated pages fall back to the page top.
                       s.goToPage(i, anchor && geoms[i].rotation === 0 ? anchor.y : undefined);
                     }}

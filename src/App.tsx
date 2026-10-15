@@ -35,7 +35,7 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: 'select', x: 'selectText', g: 'snapshot', z: 'zoom', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
-  l: 'line', a: 'arrow', t: 'text', n: 'note', s: 'stamp',
+  l: 'line', a: 'arrow', y: 'polygon', j: 'polyline', w: 'cloud', t: 'text', n: 'note', s: 'stamp',
 };
 
 async function openSample() {
@@ -83,6 +83,8 @@ function useShortcuts() {
       } else if (e.key === 'Escape' && useTextBox.getState().sel) {
         useTextBox.setState({ sel: null });
       } else if (e.key === 'Escape') {
+        // Cancel a partly drawn polygon/polyline/cloud before switching back to select.
+        window.dispatchEvent(new Event('awesome-pdf:cancel-draft'));
         if (s.selectedField) useStore.setState({ selectedField: null });
         s.select(null);
         s.setTool('select');

@@ -17,6 +17,10 @@ export function translatePatch(a: Annotation, dx: number, dy: number): Partial<A
     case 'line':
     case 'arrow':
       return { p1: movePt(a.p1, dx, dy), p2: movePt(a.p2, dx, dy) };
+    case 'polygon':
+    case 'polyline':
+    case 'cloud':
+      return { vertices: a.vertices.map((p) => movePt(p, dx, dy)) };
     case 'note':
       return { at: movePt(a.at, dx, dy) };
     default:
@@ -61,6 +65,16 @@ export function viewBounds(a: Annotation, g: PageGeom): VRect {
       const r = rectFromPoints(pdfToView(g, a.p1), pdfToView(g, a.p2));
       return { left: r.x - 4, top: r.y - 4, width: r.w + 8, height: r.h + 8 };
     }
+    case 'polygon':
+    case 'polyline':
+    case 'cloud': {
+      const pts = a.vertices.map((p) => pdfToView(g, p));
+      const xs = pts.map((p) => p.x);
+      const ys = pts.map((p) => p.y);
+      const l = Math.min(...xs);
+      const t = Math.min(...ys);
+      return { left: l, top: t, width: Math.max(...xs) - l, height: Math.max(...ys) - t };
+    }
     case 'note': {
       const v = pdfToView(g, a.at);
       return { left: v.x, top: v.y, width: NOTE_SIZE, height: NOTE_SIZE };
@@ -84,6 +98,9 @@ export const ANNOT_LABELS: Record<Annotation['type'], string> = {
   ellipse: 'Ellipse',
   line: 'Line',
   arrow: 'Arrow',
+  polygon: 'Polygon',
+  polyline: 'Polyline',
+  cloud: 'Cloud',
   text: 'Text box',
   note: 'Sticky note',
   image: 'Image',
@@ -107,4 +124,52 @@ export function annotSummary(a: Annotation): string {
     default:
       return '';
   }
+}
+
+/**
+ * A "cloudy" outline: scallops (arcs bulging outwards) along the edges, as
+ * PDF-XChange and Acrobat draw /BE S /Cloudy. The shared geometry for the
+ * on-screen SVG and the PDF appearance stream: each edge a→b is replaced by
+ * a quadratic Bézier with the control point `bulge` above the midpoint,
+ * outwards (the winding of a closed outline is detected so the bumps always
+ * point away from the interior; open paths bulge to the left of travel).
+ */
+export function cloudEdges(points: Pt[], bulge: number, close: boolean): { a: Pt; c: Pt; b: Pt }[] {
+  if (points.length < 2) return points.map((p) => ({ a: p, c: p, b: p }));
+  const n = points.length;
+  // Twice the signed area (shoelace): > 0 means counter-clockwise in y-up space.
+  let area2 = 0;
+  for (let i = 0; i < n; i++) {
+    const p = points[i];
+    const q = points[(i + 1) % n];
+    area2 += p.x * q.y - q.x * p.y;
+  }
+  const flip = close && area2 > 0 ? -1 : 1;
+  const segs: { a: Pt; c: Pt; b: Pt }[] = [];
+  for (let i = 0; i < (close ? n : n - 1); i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!len) continue;
+    // Rotating the direction (dx, dy) by ±90° gives the outward normal.
+    const nx = (-(b.y - a.y) / len) * bulge * flip;
+    const ny = ((b.x - a.x) / len) * bulge * flip;
+    const c = { x: (a.x + b.x) / 2 + nx, y: (a.y + b.y) / 2 + ny };
+    segs.push({ a, c, b });
+  }
+  return segs;
+}
+
+/** Points of a quadratic Bézier a–c–b, for on-screen drawing. */
+export function quadraticPoints(s: { a: Pt; c: Pt; b: Pt }, steps = 8): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+    out.push({
+      x: u * u * s.a.x + 2 * u * t * s.c.x + t * t * s.b.x,
+      y: u * u * s.a.y + 2 * u * t * s.c.y + t * t * s.b.y,
+    });
+  }
+  return out;
 }

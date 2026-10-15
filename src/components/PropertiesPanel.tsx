@@ -113,6 +113,10 @@ function fieldsFor(type: string): Fields {
     case 'line':
     case 'arrow':
       return { color: true, width: true, opacity: true };
+    case 'polygon':
+    case 'polyline':
+    case 'cloud':
+      return { color: true, fill: true, width: true, opacity: true };
     case 'rect':
     case 'ellipse':
       return { color: true, fill: true, width: true, opacity: true };
@@ -202,7 +206,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
 
 const TOOL_NAMES: Record<string, string> = {
   highlight: 'Highlight', underline: 'Underline', strikeout: 'Strikeout', ink: 'Pencil', rect: 'Rectangle', ellipse: 'Ellipse',
-  line: 'Line', arrow: 'Arrow', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature', fieldText: 'Text field', fieldCheckbox: 'Check box', fieldDropdown: 'Dropdown', fieldList: 'List box', fieldRadio: 'Radio button',
+  line: 'Line', arrow: 'Arrow', polygon: 'Polygon', polyline: 'Polyline', cloud: 'Cloud', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature', fieldText: 'Text field', fieldCheckbox: 'Check box', fieldDropdown: 'Dropdown', fieldList: 'List box', fieldRadio: 'Radio button',
 };
 
 const TOOL_HINTS: Record<string, string> = {
@@ -214,6 +218,9 @@ const TOOL_HINTS: Record<string, string> = {
   ellipse: 'Drag to draw. Hold Shift for a circle.',
   line: 'Drag to draw. Hold Shift to snap to 45°.',
   arrow: 'Drag to draw. Hold Shift to snap to 45°.',
+  polygon: 'Click the corners; double-click the last one to close the polygon. Escape cancels.',
+  polyline: 'Click the points; double-click the last one to finish the line. Escape cancels.',
+  cloud: 'Click the corners; double-click the last one to close the cloud. Escape cancels.',
   text: 'Click or drag to place a text box, then type.',
   note: 'Click to place a sticky note.',
   stamp: 'Click or drag to place the stamp.',
