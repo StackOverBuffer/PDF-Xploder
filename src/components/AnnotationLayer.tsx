@@ -417,13 +417,13 @@ function DraftShape({ draft, tool, scale: S }: { draft: NonNullable<Draft>; tool
   if (draft.kind === 'path') {
     const pts = draft.points.map((p) => `${p.x * S},${p.y * S}`);
     const closed = tool !== 'polyline';
-    const d = closed
+    const d = pts.length < 2 ? '' : closed
       ? `M${pts[0]} L${pts.slice(1).join(' L')} Z`
       : `M${pts[0]} L${pts.slice(1).join(' L')}`;
-    const preview = tool === 'cloud' ? cloudPreviewPath(draft.points, S, st.width) : null;
+    const preview = tool === 'cloud' && pts.length > 1 ? cloudPreviewPath(draft.points, S, st.width) : null;
     return (
       <g className="draft" opacity={st.opacity}>
-        <path d={preview ?? d} fill={st.fill ?? 'none'} stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" strokeLinejoin="round" />
+        {d && <path d={preview ?? d} fill={st.fill ?? 'none'} stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" strokeLinejoin="round" />}
         {draft.points.map((p, i) => (
           <circle key={i} cx={p.x * S} cy={p.y * S} r={2.5} fill={st.color} />
         ))}
@@ -543,7 +543,8 @@ function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pag
     }
     case 'cloud': {
       const segs = cloudEdges(a.vertices.map(view), Math.max(4, a.width * 2.5) * S, true);
-      let d = segs.length ? `M${segs[0].a.x},${segs[0].a.y}` : '';
+      if (!segs.length) return null;
+      let d = `M${segs[0].a.x},${segs[0].a.y}`;
       for (const s of segs) d += ` Q${s.c.x},${s.c.y} ${s.b.x},${s.b.y}`;
       return (
         <g opacity={a.opacity}>
