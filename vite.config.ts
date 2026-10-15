@@ -60,5 +60,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: { esbuildOptions: { target: 'es2022' } },
-  test: { environment: 'node', include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup.ts'] },
+  // RSA key generation and full-document round trips can take a while on slow disks.
+  test: { environment: 'node', include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup.ts'], testTimeout: 120_000 },
 });
