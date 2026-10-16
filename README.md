@@ -64,7 +64,8 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ✅ Rotate view (without changing the file); new comments follow the orientation on screen
 - ⬜ Single-page / two-page / facing layouts
 - ✅ Clickable links (internal destinations, named actions, web links with confirmation)
-- ⬜ Multiple documents in tabs, split view, full-screen / presentation mode
+- ✅ Several documents in tabs: each opened file gets its own tab with its own undo history, zoom and position; reorder by dragging, close with ×, middle click or the context menu (others / to the right / all); unsaved tabs are marked and confirmed before closing
+- ⬜ Split view, full-screen / presentation mode
 
 ### Comment & markup
 - ✅ Highlight, underline, strikeout from a text selection
@@ -135,7 +136,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - ✅ OCR for scanned documents (see below)
 - ✅ Share the PDF via the system share sheet (where the browser supports it)
 - ✅ Accessibility: quick check (tags, language, title, text, field tooltips, permissions) with one-click fixes; read aloud; inverted page colours
-- ⬜ Multiple documents in tabs, autosave (e.g. IndexedDB)
+- ⬜ Autosave (e.g. IndexedDB)
 
 ### OCR
 - ✅ **OCR Pages** dialog like PDF-XChange's Enhanced OCR plugin: all / current / a range of pages; German, English, French, Italian, Spanish, Dutch and Polish (any combination); 150–400 dpi; pages that already contain text are skipped unless asked
@@ -157,7 +158,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 ## Keyboard shortcuts
 
-`Ctrl+O` open · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
+`Ctrl+O` open · `Ctrl+Alt+PgDn`/`Ctrl+Alt+PgUp` next/previous tab · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
 `Alt+PgDn`/`Alt+PgUp` next/previous bookmark · `V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp

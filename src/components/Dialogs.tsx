@@ -23,6 +23,11 @@ export const useDialog = create<{ open: DialogName | null; payload: unknown; sho
   close: () => set({ open: null, payload: undefined }),
 }));
 
+// Dialogs work on the active document: close them when another tab becomes active.
+useStore.subscribe((s, prev) => {
+  if (s.activeTab !== prev.activeTab && useDialog.getState().open) useDialog.getState().close();
+});
+
 export function Modal({ title, children, onClose, footer, wide }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean }) {
   const t = useT();
   useEffect(() => {

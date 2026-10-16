@@ -139,7 +139,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Dark Page Mode | 🟡 inverted page colours |
 | Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |
 | Right-to-Left Page Layout | ⬜ |
-| Tabbed Interface and Multiple Tab Groups | ⬜ |
+| Tabbed Interface and Multiple Tab Groups | 🟡 document tabs (open several files, switch, reorder, close others/right/all, unsaved marker, per-tab undo, zoom and position); ⬜ multiple tab groups |
 | Autosave/Autorecovery | ⬜ (IndexedDB) |
 | Save Current Session | ⬜ |
 | Customize Layout of Panes, Custom Toolbars/Ribbons, Quick Tools | ⬜ |
@@ -196,7 +196,8 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Edit PDF Portfolios | ⬜ |
 | Export Content to MS Office Formats | ⬜ |
 | Macros | ⬜ |
-| Multiple Document Windows, Edit in Third-Party Applications | 🚫 single-document web app (tabs are planned in section 8) |
+| Multiple Document Windows | 🟡 several documents in tabs (one window) |
+| Edit in Third-Party Applications | 🚫 desktop-only |
 
 ## 10. Enhance documents
 

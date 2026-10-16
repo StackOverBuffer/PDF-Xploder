@@ -135,7 +135,7 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
               <Btn icon={<FolderOpen size={L} />} label="Open" onClick={cmd.openFromDialog} />
               <Btn icon={<Save size={L} />} label="Save" disabled={noDoc} onClick={cmd.save} />
               <Btn icon={<SaveAll size={L} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
-              <Btn icon={<X size={L} />} label="Close" disabled={noDoc} onClick={() => (!S().dirty || confirm('Discard unsaved changes?')) && S().closeDocument()} />
+              <Btn icon={<X size={L} />} label="Close" disabled={noDoc} onClick={() => S().closeTab(S().activeTab)} />
             </Group>
             <Group label="Output">
               <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />

@@ -133,6 +133,19 @@ interface State {
   sidebar: SidebarTab | null;
 
   search: { query: string; hits: SearchHit[]; index: number; matchCase: boolean };
+
+  /** Open document tabs, in display order. The active tab's document is the top-level state. */
+  tabs: TabInfo[];
+  activeTab: string;
+  /** Scroll position to restore once the viewer shows a tab again. */
+  restoreScroll: { top: number; left: number } | null;
+}
+
+export interface TabInfo {
+  id: string;
+  /** Name and unsaved state of inactive tabs (the active tab's are fileName/dirty). */
+  fileName: string;
+  dirty: boolean;
 }
 
 interface Actions {
@@ -147,7 +160,16 @@ interface Actions {
    */
   liftRestrictions(): void;
   setSecurity(s: SecuritySettings | null): void;
+  /** Close the active tab's document (and the tab, if there are others). */
   closeDocument(): void;
+  /** Open a document in a new tab (or in the active tab if it is empty). */
+  openInNewTab(bytes: Uint8Array, name: string, opts?: { password?: string; ownerPassword?: string }): Promise<void>;
+  /** Add an empty tab and activate it; returns its id. */
+  newTab(): string;
+  switchTab(id: string): void;
+  /** Close a tab, asking first if it has unsaved changes; resolves false if the user cancelled. */
+  closeTab(id: string, opts?: { force?: boolean }): boolean;
+  moveTab(id: string, toIndex: number): void;
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
   commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>, formValues?: Record<string, FieldValue>): Promise<void>;
   addAnnotation(pageIndex: number, a: Annotation): void;
@@ -179,6 +201,18 @@ interface Actions {
 }
 
 export type Store = State & Actions;
+
+let tabCounter = 1;
+const newTabId = () => `tab-${tabCounter++}`;
+
+/** Inactive tabs' documents: their document fields and scroll position. */
+type Parked = Partial<State> & { scroll?: { top: number; left: number } };
+const parked = new Map<string, Parked>();
+
+/** Whether any open tab has unsaved changes. */
+export function anyTabDirty(): boolean {
+  return useStore.getState().dirty || [...parked.values()].some((p) => p.dirty);
+}
 
 const initialDoc = {
   restrictionsLifted: false,
@@ -375,6 +409,68 @@ export const useStore = create<Store>()((set, get) => {
       .catch((e) => console.warn('Signature check failed', e));
   }
 
+  /** Fields that belong to one document; everything else (tools, styles, panes…) is shared. */
+  const DOC_KEYS = [...Object.keys(initialDoc), 'scale', 'fit', 'formDesign'] as (keyof State)[];
+
+  function park() {
+    const s = get();
+    const p: Parked = {};
+    for (const k of DOC_KEYS) (p as Record<string, unknown>)[k] = s[k];
+    const viewer = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.viewer') : null;
+    if (viewer) p.scroll = { top: viewer.scrollTop, left: viewer.scrollLeft };
+    parked.set(s.activeTab, p);
+    set({ tabs: s.tabs.map((t) => (t.id === s.activeTab ? { ...t, fileName: s.fileName, dirty: s.dirty } : t)) });
+  }
+
+  function activate(id: string) {
+    const p = parked.get(id);
+    parked.delete(id);
+    const { scroll, ...fields }: Parked = p ?? { ...initialDoc };
+    set({
+      ...initialDoc,
+      ...fields,
+      activeTab: id,
+      restoreScroll: scroll ?? null,
+      opening: false,
+      // Views remount for the other document; caches see a new version.
+      docSession: get().docSession + 1,
+      docVersion: get().docVersion + 1,
+    });
+  }
+
+  function addEmptyTab(): string {
+    park();
+    const id = newTabId();
+    set({ tabs: [...get().tabs, { id, fileName: '', dirty: false }] });
+    activate(id);
+    // A new document starts fitted to the window.
+    set({ fit: 'width', formDesign: false });
+    return id;
+  }
+
+  function removeTab(id: string) {
+    const s = get();
+    const i = s.tabs.findIndex((t) => t.id === id);
+    if (i < 0) return;
+    if (id === s.activeTab) {
+      s.pdf?.destroy();
+      const rest = s.tabs.filter((t) => t.id !== id);
+      if (!rest.length) {
+        // Closing the last tab leaves one empty tab.
+        const fresh = newTabId();
+        set({ tabs: [{ id: fresh, fileName: '', dirty: false }] });
+        activate(fresh);
+        return;
+      }
+      set({ tabs: rest });
+      activate(rest[Math.min(i, rest.length - 1)].id);
+    } else {
+      parked.get(id)?.pdf?.destroy();
+      parked.delete(id);
+      set({ tabs: s.tabs.filter((t) => t.id !== id) });
+    }
+  }
+
   return {
     ...initialDoc,
     docVersion: 0,
@@ -391,6 +487,9 @@ export const useStore = create<Store>()((set, get) => {
     formDesign: false,
     contentFilter: 'all',
     sidebar: 'pages',
+    tabs: [{ id: 'tab-0', fileName: '', dirty: false }],
+    activeTab: 'tab-0',
+    restoreScroll: null,
 
     async openDocument(bytes, name, opts = {}) {
       set({ opening: true });
@@ -428,8 +527,56 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     closeDocument() {
-      get().pdf?.destroy();
-      set({ ...initialDoc, docVersion: get().docVersion + 1, docSession: get().docSession + 1 });
+      removeTab(get().activeTab);
+    },
+
+    async openInNewTab(bytes, name, opts) {
+      if (!get().pdf) return get().openDocument(bytes, name, opts);
+      const previous = get().activeTab;
+      const id = addEmptyTab();
+      try {
+        await get().openDocument(bytes, name, opts);
+      } finally {
+        // Cancelled (password) or failed: drop the empty tab and go back.
+        if (get().activeTab === id && !get().pdf) {
+          removeTab(id);
+          if (get().tabs.some((t) => t.id === previous)) {
+            park();
+            activate(previous);
+          }
+        }
+      }
+    },
+
+    newTab() {
+      return addEmptyTab();
+    },
+
+    switchTab(id) {
+      const s = get();
+      // Never switch while a command runs: it would finish on the wrong document.
+      if (id === s.activeTab || s.busy || !s.tabs.some((t) => t.id === id)) return;
+      park();
+      activate(id);
+    },
+
+    closeTab(id, opts = {}) {
+      const s = get();
+      if (s.busy) return false;
+      const dirty = id === s.activeTab ? s.dirty : !!parked.get(id)?.dirty;
+      const name = id === s.activeTab ? s.fileName : s.tabs.find((t) => t.id === id)?.fileName;
+      if (dirty && !opts.force && !confirm(tr('“{name}” has unsaved changes. Close it anyway?').replace('{name}', name || tr('Untitled')))) return false;
+      removeTab(id);
+      return true;
+    },
+
+    moveTab(id, toIndex) {
+      const tabs = [...get().tabs];
+      const from = tabs.findIndex((t) => t.id === id);
+      if (from < 0) return;
+      const [t] = tabs.splice(from, 1);
+      tabs.splice(Math.max(0, Math.min(toIndex, tabs.length)), 0, t);
+      set({ tabs });
     },
 
     async commitBytes(bytes, pageIds, annotations, formValues) {

@@ -19,16 +19,13 @@ export function targetPages(): number[] {
   return s.selectedPages.length ? [...s.selectedPages].sort((a, b) => a - b) : [s.currentPage];
 }
 
+/** Open PDF files, each in its own tab (like PDF-XChange). */
 export async function openFiles(files: File[]) {
   const pdfs = files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) return S().notify('Please choose a PDF file.', 'error');
-  if (S().dirty && !confirm(tr('Discard unsaved changes?'))) return;
-  await S().run('Opening…', async () => {
-    const [first, ...rest] = pdfs;
-    await S().openDocument(await fileBytes(first), first.name);
-    // Additional files are merged onto the end, like "combine files".
-    for (const f of rest) await insertPdfBytes(await fileBytes(f), S().pageIds.length);
-  });
+  for (const f of pdfs) {
+    await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name));
+  }
 }
 
 export async function openFromDialog() {
@@ -37,8 +34,7 @@ export async function openFromDialog() {
 }
 
 export async function newDocument() {
-  if (S().dirty && !confirm(tr('Discard unsaved changes?'))) return;
-  await S().run('Creating…', async () => S().openDocument(await ops.createBlankDocument(), 'Untitled.pdf'));
+  await S().run('Creating…', async () => S().openInNewTab(await ops.createBlankDocument(), tr('Untitled') + '.pdf'));
 }
 
 /** The document bytes with pending form edits applied (annotations not included). */

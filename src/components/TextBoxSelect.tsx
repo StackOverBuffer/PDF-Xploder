@@ -21,6 +21,11 @@ export interface TextBoxSelection {
 
 export const useTextBox = create<{ sel: TextBoxSelection | null }>()(() => ({ sel: null }));
 
+// A selection belongs to one document: drop it when another tab becomes active.
+useStore.subscribe((s, prev) => {
+  if (s.activeTab !== prev.activeTab && useTextBox.getState().sel) useTextBox.setState({ sel: null });
+});
+
 interface Seg {
   r: VRect;
   text: string;

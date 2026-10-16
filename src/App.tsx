@@ -1,9 +1,10 @@
 import { can } from './store/permissions';
 import { useEffect, useState } from 'react';
 import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
-import { useStore, type SidebarTab } from './store/store';
+import { anyTabDirty, useStore, type SidebarTab } from './store/store';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
+import { TabBar } from './components/TabBar';
 import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
 import { addBookmarkAt } from './store/contentActions';
 import { goToBookmark } from './store/bookmarkCommands';
@@ -40,7 +41,7 @@ const TOOL_KEYS: Record<string, Tool> = {
 
 async function openSample() {
   const s = useStore.getState();
-  await s.run('Creating sample…', async () => s.openDocument(await createSampleDocument(), 'sample.pdf'));
+  await s.run('Creating sample…', async () => s.openInNewTab(await createSampleDocument(), 'sample.pdf'));
 }
 
 function useShortcuts() {
@@ -56,6 +57,14 @@ function useShortcuts() {
         const k = e.key.toLowerCase();
         const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
         if (k === 'o') return run(cmd.openFromDialog);
+        // Next/previous tab (Ctrl+Tab belongs to the browser).
+        if (e.altKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
+          return run(() => {
+            const i = s.tabs.findIndex((x) => x.id === s.activeTab);
+            const next = s.tabs[(i + (e.key === 'PageDown' ? 1 : -1) + s.tabs.length) % s.tabs.length];
+            if (next) s.switchTab(next.id);
+          });
+        }
         if (!s.pdf) return;
         if (k === 's') return run(e.shiftKey ? cmd.saveAs : cmd.save);
         if (k === 'p') return run(cmd.print);
@@ -157,6 +166,8 @@ export function App() {
   const toast = useStore((s) => s.toast);
   const busy = useStore((s) => s.busy);
   const dirty = useStore((s) => s.dirty);
+  const fileName = useStore((s) => s.fileName);
+  const showTabs = useStore((s) => s.tabs.length > 1 || !!s.pdf);
   const [showProps, setShowProps] = useState(true);
   useEffect(() => {
     const show = () => setShowProps(true);
@@ -168,20 +179,20 @@ export function App() {
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (useStore.getState().dirty) e.preventDefault();
+      if (anyTabDirty()) e.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
   useEffect(() => {
-    const name = useStore.getState().fileName;
-    document.title = name ? `${dirty ? '• ' : ''}${name} — PDF-Xploder` : 'PDF-Xploder';
-  }, [dirty, hasDoc]);
+    document.title = fileName ? `${dirty ? '• ' : ''}${fileName} — PDF-Xploder` : 'PDF-Xploder';
+  }, [dirty, hasDoc, fileName]);
 
   return (
     <div className="app">
       <Ribbon showProps={showProps} toggleProps={() => setShowProps(!showProps)} />
+      {showTabs && <TabBar />}
       <div className="workspace">
         {hasDoc && (
           <nav className="sidebar-rail">

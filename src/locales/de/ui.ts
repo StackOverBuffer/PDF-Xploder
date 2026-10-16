@@ -324,6 +324,10 @@ const DE: Record<string, string> = {
   'I am entitled to edit this document (e.g. it is my own, or the rights holder agreed).': 'Ich bin berechtigt, dieses Dokument zu bearbeiten (z. B. eigenes Dokument oder Zustimmung des Rechteinhabers).',
   'Saving keeps the original encryption and restrictions unless you change the security under Protect → Password.': 'Beim Speichern bleiben die ursprüngliche Verschlüsselung und die Einschränkungen erhalten, sofern Sie die Sicherheit nicht unter Schützen → Kennwort ändern.',
   'Lift restrictions': 'Einschränkungen aufheben', 'Restrictions lifted for this session.': 'Einschränkungen für diese Sitzung aufgehoben.',
+  // Document tabs
+  Documents: 'Dokumente', 'Close others': 'Andere schließen', 'Close tabs to the right': 'Rechte Tabs schließen', 'Close all': 'Alle schließen',
+  'Middle click': 'Mittelklick', 'Unsaved changes': 'Ungespeicherte Änderungen', 'Open…': 'Öffnen…',
+  '“{name}” has unsaved changes. Close it anyway?': '„{name}“ hat ungespeicherte Änderungen. Trotzdem schließen?',
 };
 
 export default DE;

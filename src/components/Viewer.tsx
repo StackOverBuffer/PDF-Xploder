@@ -113,6 +113,19 @@ export function Viewer() {
     return () => ro.disconnect();
   }, [applyFit, updateVisible]);
 
+  // Coming back to a tab: restore where it was scrolled to.
+  useLayoutEffect(() => {
+    const r = useStore.getState().restoreScroll;
+    const el = ref.current;
+    if (!r || !el) return;
+    useStore.setState({ restoreScroll: null });
+    requestAnimationFrame(() => {
+      el.scrollTop = r.top;
+      el.scrollLeft = r.left;
+      updateVisible();
+    });
+  }, [docSession, updateVisible]);
+
   // Keep the same document position when zooming.
   const prevScale = useRef(scale);
   useLayoutEffect(() => {
