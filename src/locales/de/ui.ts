@@ -328,6 +328,8 @@ const DE: Record<string, string> = {
   Documents: 'Dokumente', 'Close others': 'Andere schließen', 'Close tabs to the right': 'Rechte Tabs schließen', 'Close all': 'Alle schließen',
   'Middle click': 'Mittelklick', 'Unsaved changes': 'Ungespeicherte Änderungen', 'Open…': 'Öffnen…',
   '“{name}” has unsaved changes. Close it anyway?': '„{name}“ hat ungespeicherte Änderungen. Trotzdem schließen?',
+  'Saved to {name}': 'Gespeichert in {name}',
+  'Could not write to the file, so a copy was downloaded instead.': 'Die Datei konnte nicht geschrieben werden, daher wurde stattdessen eine Kopie heruntergeladen.',
 };
 
 export default DE;

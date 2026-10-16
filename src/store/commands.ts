@@ -7,6 +7,7 @@ import { viewRectToPdf, viewSize } from '../lib/geometry';
 import { encrypt, reencryptLike } from '../lib/security';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
+import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import { signPdf, type SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation, Rect } from '../lib/types';
@@ -20,15 +21,26 @@ export function targetPages(): number[] {
 }
 
 /** Open PDF files, each in its own tab (like PDF-XChange). */
-export async function openFiles(files: File[]) {
-  const pdfs = files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+export async function openFiles(files: File[], handles: (FileSystemFileHandle | null)[] = []) {
+  const pdfs = files.map((file, i) => ({ file, handle: handles[i] ?? null })).filter(({ file: f }) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) return S().notify('Please choose a PDF file.', 'error');
-  for (const f of pdfs) {
-    await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name));
+  for (const { file: f, handle } of pdfs) {
+    await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name, { handle }));
   }
 }
 
+/** Open dropped files, keeping their file handles where the browser provides them. Call from the drop event itself. */
+export function openDropped(dt: DataTransfer) {
+  const files = Array.from(dt.files);
+  void droppedHandles(dt).then((handles) => openFiles(files, handles.length === files.length ? handles : []));
+}
+
 export async function openFromDialog() {
+  const picked = await pickPdfHandles();
+  if (picked) {
+    if (picked.length) await openFiles(picked.map((p) => p.file), picked.map((p) => p.handle));
+    return;
+  }
   const files = await pickFile('application/pdf,.pdf', true);
   if (files.length) await openFiles(files);
 }
@@ -55,7 +67,7 @@ export async function buildOutput(flatten = false): Promise<Uint8Array> {
  */
 export async function buildFileForSave(): Promise<Uint8Array> {
   const s = S();
-  if (!s.dirty && s.originalBytes) return s.originalBytes;
+  if (unchangedSinceOpen()) return s.originalBytes!;
   const out = await buildOutput();
   if (s.securityChanged) return s.security ? encrypt(out, s.security) : out;
   // Untouched security: encrypt exactly like the opened file (works without the owner password).
@@ -70,13 +82,41 @@ function confirmBreakingSignatures(): boolean {
   return confirm(tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'));
 }
 
-export async function save() {
-  if (!S().bytes || !confirmBreakingSignatures()) return;
+/** The opened bytes are still exactly the document (nothing edited or saved since). */
+function unchangedSinceOpen(): boolean {
+  const s = S();
+  return !s.dirty && !s.savedOnce && !!s.originalBytes;
+}
+
+/** Build the file and write it to `handle`, or download it as `name` when there is none or writing fails. */
+async function writeOut(handle: FileSystemFileHandle | null, name: string) {
   await S().run('Saving…', async () => {
     const out = await buildFileForSave();
-    downloadBlob(out, S().fileName || 'document.pdf');
+    if (handle) {
+      try {
+        await writeToHandle(handle, out);
+        useStore.setState({ fileHandle: handle, fileName: handle.name });
+        S().markSaved();
+        S().notify(tf('Saved to {name}', { name: handle.name }));
+        return;
+      } catch (e) {
+        console.warn('Writing to the file failed', e);
+        S().notify('Could not write to the file, so a copy was downloaded instead.', 'error');
+      }
+    }
+    useStore.setState({ fileName: name });
+    downloadBlob(out, name);
     S().markSaved();
   });
+}
+
+/** Save: write back to the opened file where the browser allows it (Chrome, Edge), else download. */
+export async function save() {
+  const s = S();
+  if (!s.bytes || !confirmBreakingSignatures()) return;
+  // Ask for write access first, while the key press or click still counts as a user gesture.
+  const handle = s.fileHandle && (await ensureWritable(s.fileHandle)) ? s.fileHandle : null;
+  await writeOut(handle, S().fileName || 'document.pdf');
 }
 
 /** Save a copy with all comments burnt into the pages (keeps the editing session as is). */
@@ -87,12 +127,22 @@ export async function saveFlattenedCopy() {
   });
 }
 
+/** Save As: a save dialog where available (later saves go to the new file), else ask for a name and download. */
 export async function saveAs() {
   if (!S().bytes) return;
-  const name = prompt(tr('File name'), S().fileName || 'document.pdf');
+  const suggested = S().fileName || 'document.pdf';
+  const handle = await pickSaveHandle(suggested);
+  if (handle === undefined) return;
+  if (handle) {
+    if (!confirmBreakingSignatures()) return;
+    return writeOut(handle, handle.name);
+  }
+  const name = prompt(tr('File name'), suggested);
   if (!name) return;
-  useStore.setState({ fileName: /\.pdf$/i.test(name) ? name : `${name}.pdf` });
-  await save();
+  if (!confirmBreakingSignatures()) return;
+  // A downloaded copy: later saves must not overwrite the file opened before.
+  useStore.setState({ fileHandle: null });
+  await writeOut(null, /\.pdf$/i.test(name) ? name : `${name}.pdf`);
 }
 
 export async function print() {
@@ -387,7 +437,7 @@ export async function signDocument(o: SignOptions) {
   if (willEncrypt) return s.notify('Remove password protection before signing (signing encrypted files is not supported yet).', 'error');
   if (!requirePermission('fillForms') || !confirmBreakingSignatures()) return;
   await s.run('Signing…', async () => {
-    const base = !s.dirty && s.originalBytes ? s.originalBytes : await buildOutput();
+    const base = unchangedSinceOpen() ? s.originalBytes! : await buildOutput();
     const signed = await signPdf(base, o);
     const name = /-signed\.pdf$/i.test(s.fileName) ? s.fileName : `${baseName(s.fileName || 'document')}-signed.pdf`;
     downloadBlob(signed, name);

@@ -3,7 +3,7 @@ import { styleFor, uid, useStore } from '../store/store';
 import { can } from '../store/permissions';
 import { pdfToView, viewRectToPdf, viewSize, type VRect } from '../lib/geometry';
 import { PageView } from './PageView';
-import { openFiles } from '../store/commands';
+import { openDropped } from '../store/commands';
 import type { TextMarkupKind } from '../lib/types';
 
 const GAP = 16;
@@ -247,7 +247,7 @@ export function Viewer() {
         if (!e.dataTransfer.files.length) return;
         e.preventDefault();
         setDragOver(false);
-        openFiles(Array.from(e.dataTransfer.files));
+        openDropped(e.dataTransfer);
       }}
     >
       {/* A different document gets fresh page views, so nothing of the previous one can linger. */}

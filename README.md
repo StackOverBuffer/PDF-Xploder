@@ -129,6 +129,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 
 ### Document & output
 - ✅ New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
+- ✅ Save writes back to the opened file in Chrome and Edge (File System Access API; the browser asks once for write access), Save As shows a save dialog there; other browsers download the file
 - ✅ Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
 - ✅ Document properties (title, author, subject, keywords, creator, producer)
 - ✅ Export the current page as PNG

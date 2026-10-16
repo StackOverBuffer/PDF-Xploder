@@ -33,6 +33,13 @@ export interface SearchHit {
   context: string;
 }
 
+export interface OpenOptions {
+  password?: string;
+  ownerPassword?: string;
+  /** The file it was opened from, when the browser gives one (Save writes back to it). */
+  handle?: FileSystemFileHandle | null;
+}
+
 export type SidebarTab = 'pages' | 'outline' | 'comments' | 'attachments' | 'forms' | 'search' | 'signatures';
 
 export interface ScrollRequest {
@@ -109,6 +116,10 @@ interface State {
   lock: { userPassword: string; needsUserPassword: boolean } | null;
   /** The author's restrictions were lifted for this session without the permissions password. */
   restrictionsLifted: boolean;
+  /** Where the document came from (File System Access API), so Save can write back to it. */
+  fileHandle: FileSystemFileHandle | null;
+  /** Saved at least once: the opened bytes no longer match what the user has on disk. */
+  savedOnce: boolean;
   signatures: SignatureInfo[];
   past: Snapshot[];
   future: Snapshot[];
@@ -149,7 +160,7 @@ export interface TabInfo {
 }
 
 interface Actions {
-  openDocument(bytes: Uint8Array, name: string, opts?: { password?: string; ownerPassword?: string }): Promise<void>;
+  openDocument(bytes: Uint8Array, name: string, opts?: OpenOptions): Promise<void>;
   /** Lift permission restrictions with the owner password; resolves false if it is wrong. */
   unlock(ownerPassword: string): Promise<boolean>;
   /**
@@ -163,7 +174,7 @@ interface Actions {
   /** Close the active tab's document (and the tab, if there are others). */
   closeDocument(): void;
   /** Open a document in a new tab (or in the active tab if it is empty). */
-  openInNewTab(bytes: Uint8Array, name: string, opts?: { password?: string; ownerPassword?: string }): Promise<void>;
+  openInNewTab(bytes: Uint8Array, name: string, opts?: OpenOptions): Promise<void>;
   /** Add an empty tab and activate it; returns its id. */
   newTab(): string;
   switchTab(id: string): void;
@@ -216,6 +227,8 @@ export function anyTabDirty(): boolean {
 
 const initialDoc = {
   restrictionsLifted: false,
+  fileHandle: null as FileSystemFileHandle | null,
+  savedOnce: false,
   fileName: '',
   bytes: null,
   pdf: null,
@@ -303,7 +316,7 @@ export const useStore = create<Store>()((set, get) => {
     set({ currentPage: Math.min(get().currentPage, snap.pageIds.length - 1) });
   }
 
-  async function openDocumentImpl(bytes: Uint8Array, name: string, opts: { password?: string; ownerPassword?: string } = {}) {
+  async function openDocumentImpl(bytes: Uint8Array, name: string, opts: OpenOptions = {}) {
     const original = bytes;
     let loaded;
     try {
@@ -382,6 +395,7 @@ export const useStore = create<Store>()((set, get) => {
       bytes,
       originalBytes: original,
       fileName: name,
+      fileHandle: opts.handle ?? null,
       pdf: loaded.pdf,
       geoms: loaded.geoms,
       pageIds,
@@ -658,7 +672,7 @@ export const useStore = create<Store>()((set, get) => {
       await restore(next);
     },
 
-    markSaved: () => set({ dirty: false }),
+    markSaved: () => set({ dirty: false, savedOnce: true }),
 
     setTool: (tool) =>
       set({

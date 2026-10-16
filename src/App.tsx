@@ -124,7 +124,7 @@ function Welcome() {
       className={`welcome ${over ? 'drag-over' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); cmd.openFiles(Array.from(e.dataTransfer.files)); }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); cmd.openDropped(e.dataTransfer); }}
     >
       <div className="welcome-card">
         <h1>PDF-Xploder</h1>

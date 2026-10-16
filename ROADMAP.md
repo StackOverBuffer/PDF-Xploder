@@ -10,7 +10,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 |---|---|
 | Add Placeholder Tool | ⬜ |
 | Enhanced 3D Plugin | ⬜ (3D/PRC rendering is a large separate project) |
-| Enhanced Open/Save File Dialog Boxes | 🟡 browser file dialogs; drag & drop to open |
+| Enhanced Open/Save File Dialog Boxes | 🟡 system open/save dialogs; Save writes back to the opened file in Chrome/Edge (download elsewhere); drag & drop to open |
 | FreeSign Tool | 🟡 signature images (drawn, typed or uploaded) as comments |
 | Optimize Document Enhancements | ⬜ |
 | Search Feature for Files in Cloud Storage | 🚫 needs cloud accounts (see section 11) |
