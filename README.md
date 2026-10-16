@@ -14,6 +14,14 @@ npm run build      # production build in dist/
 
 Click **Try a sample** on the start screen for a document with text, a form and bookmarks.
 
+### Offline and installation
+
+The production build includes a service worker (`pwa/sw.js`, filled in by the `pwa` plugin in
+`vite.config.ts`) that caches every built file on the first visit, plus fonts and OCR data from
+jsDelivr once they are used. A new version installs in the background and takes over once every
+PDF-Xploder window has been closed. `public/manifest.webmanifest` makes the app installable and
+registers it as a handler for PDF files. The service worker is not used by `npm run dev`.
+
 ### Publishing to GitHub Pages
 
 `.github/workflows/pages.yml` builds the app and deploys it to GitHub Pages whenever the
@@ -130,6 +138,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 ### Document & output
 - ✅ New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
 - ✅ Save writes back to the opened file in Chrome and Edge (File System Access API; the browser asks once for write access), Save As shows a save dialog there; other browsers download the file
+- ✅ Install as an app (File → Install app, in Chrome and Edge): own window, works fully offline, and appears under "Open with…" for PDF files; files opened that way arrive as tabs in the running window
 - ✅ Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
 - ✅ Document properties (title, author, subject, keywords, creator, producer)
 - ✅ Export the current page as PNG
@@ -152,7 +161,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 ## Notes
 
-- **Fonts.** Noto Sans, Noto Sans Symbols 2 (bundled in `public/fonts`) and Noto Sans SC/KR (fetched from jsDelivr only when text needs them) are licensed under the SIL Open Font License; see `public/fonts/OFL.txt`. Offline, CJK characters fall back to `?`.
+- **Fonts.** Noto Sans, Noto Sans Symbols 2 (bundled in `public/fonts`) and Noto Sans SC/KR (fetched from jsDelivr only when text needs them) are licensed under the SIL Open Font License; see `public/fonts/OFL.txt`. Once loaded they are cached for offline use; offline before the first use, CJK characters fall back to `?`.
 - **node-forge.** `npm audit` flags node-forge for GHSA-86w9-cpqp-85rv, a flaw in its RSA signature *verification*. The app uses forge only to read .p12 files and create signatures; all verification goes through Web Crypto.
 - **Permissions.** PDF permissions are honoured by well-behaved software, not enforced cryptographically, and PDF has no permission that prevents saving a copy. To re-encrypt a restricted file without its owner password, the app derives the file key through an internal module of `@cantoo/pdf-lib` (aliased as `pdf-lib-internal/crypto` in `vite.config.ts`). For documents you are entitled to edit, *Protect → Unlock → Lift restrictions without the password…* lifts them for the session after you confirm that; saving keeps the original encryption and restrictions unless you change the security.
 - **Saving signed documents.** Edits to a signed document are saved by rewriting the file, which invalidates existing signatures (the app asks first). Sign again after editing.

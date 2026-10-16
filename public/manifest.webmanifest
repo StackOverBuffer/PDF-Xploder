@@ -1,0 +1,21 @@
+{
+  "name": "PDF-Xploder",
+  "short_name": "PDF-Xploder",
+  "description": "View, annotate, organise, fill and sign PDFs. Files never leave your device.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e9ecf1",
+  "theme_color": "#1a5fb4",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "file_handlers": [
+    { "action": "./", "accept": { "application/pdf": [".pdf"] }, "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }], "launch_type": "single-client" }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}

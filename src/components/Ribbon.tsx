@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
+  MonitorDown, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
   ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
@@ -21,6 +21,7 @@ import { OrganizeTab } from './OrganizeTab';
 import { BookmarksTab } from './BookmarksTab';
 import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } from '../store/contentActions';
 import { tr, useLang, useT } from '../lib/i18n';
+import { installApp, usePwa } from '../lib/pwa';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
 type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
@@ -74,6 +75,8 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   const reading = extra.useExtras((x) => x.reading);
   const invert = extra.useExtras((x) => x.invert);
   const noDoc = !hasDoc;
+  const installPrompt = usePwa((p) => !!p.prompt);
+  const installed = usePwa((p) => p.installed);
   const canModify = useCan('modify');
   const canCopy = useCan('copy');
   const canPrint = useCan('print');
@@ -144,6 +147,17 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
             <Group label="Info">
               <Btn icon={<Info size={L} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
             </Group>
+            {!installed && (
+              <Group label="App">
+                <Btn
+                  icon={<MonitorDown size={L} />}
+                  label="Install app"
+                  disabled={!installPrompt}
+                  title={installPrompt ? 'Own window, works offline and opens PDFs from your computer' : 'Your browser does not offer installation here (Chrome and Edge do; on other browsers use “Add to Home Screen” or similar)'}
+                  onClick={() => installApp()}
+                />
+              </Group>
+            )}
           </>
         )}
         {tab === 'Home' && (

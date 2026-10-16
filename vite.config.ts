@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
-import { readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import type { Plugin } from 'vite';
 
 /**
@@ -35,10 +37,35 @@ function pdfjsAssets(): Plugin {
   };
 }
 
+/** Write the offline service worker (pwa/sw.js) into the build with the list of every built file. */
+function pwa(): Plugin {
+  let outDir = 'dist';
+  const list = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(join(dir, e.name)) : [join(dir, e.name)]));
+  return {
+    name: 'pwa-service-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const files = list(outDir)
+        .map((f) => relative(outDir, f).split(sep).join('/'))
+        .filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)(LICENSE|OFL)[^/]*$/.test(f))
+        .sort();
+      const hash = createHash('sha256');
+      for (const f of files) hash.update(f).update(readFileSync(join(outDir, f)));
+      const sw = readFileSync(fileURLToPath(new URL('./pwa/sw.js', import.meta.url)), 'utf8')
+        .replace('self.__FILES__', JSON.stringify(files.map((f) => (f === 'index.html' ? './' : f)).concat('index.html')))
+        .replace('self.__VERSION__', JSON.stringify(hash.digest('hex').slice(0, 12)));
+      writeFileSync(join(outDir, 'sw.js'), sw);
+    },
+  };
+}
+
 export default defineConfig({
   // Served from a sub-path on GitHub Pages (e.g. /PDF-Xploder/); see .github/workflows/pages.yml.
   base: process.env.BASE_PATH || '/',
-  plugins: [react(), pdfjsAssets()],
+  plugins: [react(), pdfjsAssets(), pwa()],
   resolve: {
     alias: {
       // Internal module of @cantoo/pdf-lib (not in its package exports) used to

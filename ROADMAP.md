@@ -140,6 +140,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |
 | Right-to-Left Page Layout | ⬜ |
 | Tabbed Interface and Multiple Tab Groups | 🟡 document tabs (open several files, switch, reorder, close others/right/all, unsaved marker, per-tab undo, zoom and position); ⬜ multiple tab groups |
+| Desktop application, shell integration ("Open with", default PDF app) | ✅ installable app (own window, works offline, registered for PDFs; files opened from the system arrive as tabs in the running window) |
 | Autosave/Autorecovery | ⬜ (IndexedDB) |
 | Save Current Session | ⬜ |
 | Customize Layout of Panes, Custom Toolbars/Ribbons, Quick Tools | ⬜ |
