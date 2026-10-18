@@ -419,9 +419,11 @@ export async function exportWithAnnotations(
 }
 
 /** Open a document for editing: supported annotations move into the model. */
+let importSeq = 0;
 export async function importForEditing(
   bytes: Uint8Array,
-  newId: () => string,
+  // Without one (in the worker), ids are numbered; the caller gives them its own.
+  newId: () => string = () => `imported-${++importSeq}`,
 ): Promise<{ bytes: Uint8Array; annotations: Annotation[][]; count: number }> {
   const doc = await load(bytes);
   const geoms = doc.getPages().map(geomOf);

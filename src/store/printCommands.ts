@@ -1,5 +1,5 @@
 /** Printing with options (page range, paper, scaling, pages per sheet), via the browser's print dialog. */
-import * as ops from '../lib/pdfOps';
+import { ops } from '../lib/worker';
 import { buildPrintPdf, isPlain, planSheets, type PrintOptions, type Sheet } from '../lib/printLayout';
 import { useStore } from './store';
 import { buildOutput, currentBytes } from './commands';

@@ -1,6 +1,8 @@
 /** Commands of the Organize tab: glue between its dialogs, the store and the organize library. */
-import * as ops from '../lib/pdfOps';
-import * as org from '../lib/organize';
+import type * as OpsT from '../lib/pdfOps';
+import type * as OrgT from '../lib/organize';
+import { ops } from '../lib/worker';
+import { org } from '../lib/worker';
 import { annotationsByPage, uid, useStore } from './store';
 import { requirePermission } from './permissions';
 import { currentBytes, deletePages, normaliseImage } from './commands';
@@ -40,7 +42,7 @@ const cloneAnnots = (list: Annotation[] = []) => list.map((a) => ({ ...a, id: ui
  * its id and comments, repeats get fresh ids with copies of the comments, pages
  * from other files get new ids.
  */
-async function commitLayout(bytes: Uint8Array, layout: org.PageSource[]) {
+async function commitLayout(bytes: Uint8Array, layout: OrgT.PageSource[]) {
   const s = S();
   const seen = new Set<number>();
   const annotations = { ...s.annotations };
@@ -58,7 +60,7 @@ async function commitLayout(bytes: Uint8Array, layout: org.PageSource[]) {
 }
 
 /** Commit bytes whose page content moved; comments move with it. */
-async function commitTransformed(res: org.TransformResult) {
+async function commitTransformed(res: OrgT.TransformResult) {
   const s = S();
   const annotations = { ...s.annotations };
   res.transforms.forEach((t, i) => {
@@ -82,7 +84,7 @@ async function outputBytes(): Promise<Uint8Array> {
   return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()));
 }
 
-function dataUrlImage(src: string): org.PageImage {
+function dataUrlImage(src: string): OrgT.PageImage {
   const [head, data] = src.split(',');
   const bin = atob(data);
   const bytes = new Uint8Array(bin.length);
@@ -91,7 +93,7 @@ function dataUrlImage(src: string): org.PageImage {
 }
 
 /** Any browser-decodable image as PNG or JPEG bytes. */
-export async function imageFromBlob(b: Blob): Promise<org.PageImage> {
+export async function imageFromBlob(b: Blob): Promise<OrgT.PageImage> {
   return dataUrlImage((await normaliseImage(await readAsDataUrl(b))).src);
 }
 
@@ -106,7 +108,7 @@ export async function insertBlankPages(at: number, count: number, size?: [number
   await run('Inserting…', async () => commitInserted(await org.insertBlankPages(S().bytes!, at, count, size), at, count));
 }
 
-export async function insertImagePages(files: Blob[], at: number, o: org.ImagePageOptions) {
+export async function insertImagePages(files: Blob[], at: number, o: OrgT.ImagePageOptions) {
   if (!files.length || !requirePermission('assemble')) return;
   await run('Inserting pages…', async () => {
     const images = await Promise.all(files.map(imageFromBlob));
@@ -153,7 +155,7 @@ export async function insertPagesFromFile(other: Uint8Array, pages: number[], at
   if (!pages.length) return S().notify(tr('No pages match.'), 'error');
   if (!requirePermission('assemble')) return;
   const n = S().pageIds.length;
-  const layout: org.PageSource[] = Array.from({ length: n }, (_, i) => i);
+  const layout: OrgT.PageSource[] = Array.from({ length: n }, (_, i) => i);
   layout.splice(at, 0, ...pages.map((page) => ({ file: 0, page })));
   await arrange('Inserting pages…', layout, [other]);
   S().setSelectedPages(pages.map((_, k) => at + k));
@@ -232,11 +234,11 @@ export async function splitDocument(m: SplitMethod) {
 
 // ---------------------------------------------------------------- arranging
 
-export async function arrange(label: string, layout: org.PageSource[], others: Uint8Array[] = []) {
+export async function arrange(label: string, layout: OrgT.PageSource[], others: Uint8Array[] = []) {
   await run(label, async () => commitLayout(await org.assemblePages(S().bytes!, layout, others), layout));
 }
 
-export async function duplicatePageList(pages: number[], copies: number, where: org.DuplicateWhere, collate: boolean) {
+export async function duplicatePageList(pages: number[], copies: number, where: OrgT.DuplicateWhere, collate: boolean) {
   if (!pages.length || copies < 1 || !requirePermission('assemble')) return;
   await arrange('Duplicating…', org.duplicateLayout(S().pageIds.length, pages, Math.round(copies), where, collate));
 }
@@ -305,23 +307,23 @@ export async function deleteDuplicates(groups: number[][]) {
 
 // ---------------------------------------------------------------- page shape
 
-export async function overlayFromFile(other: Uint8Array, o: org.OverlayOptions) {
+export async function overlayFromFile(other: Uint8Array, o: OrgT.OverlayOptions) {
   if (!o.pages.length) return S().notify(tr('No pages match.'), 'error');
   if (!requirePermission('modify')) return;
   await run('Overlaying pages…', async () => S().commitBytes(await org.overlayPages(S().bytes!, other, o)));
 }
 
-export async function normalize(pages: number[], o: org.NormalizeOptions) {
+export async function normalize(pages: number[], o: OrgT.NormalizeOptions) {
   if (!pages.length || !requirePermission('modify')) return;
   await run('Normalizing pages…', async () => commitTransformed(await org.normalizePages(S().bytes!, pages, o)));
 }
 
-export async function resize(pages: number[], o: org.ResizeOptions) {
+export async function resize(pages: number[], o: OrgT.ResizeOptions) {
   if (!pages.length || !requirePermission('modify')) return;
   await run('Resizing pages…', async () => commitTransformed(await org.resizePages(S().bytes!, pages, o)));
 }
 
-export async function addMargins(pages: number[], m: ops.Margins) {
+export async function addMargins(pages: number[], m: OpsT.Margins) {
   if (!pages.length || !requirePermission('modify')) return;
   await run('Adding margins…', async () => S().commitBytes(await org.addMargins(S().bytes!, pages, m)));
 }
@@ -357,11 +359,11 @@ export async function autoCrop(pages: number[], padding = 6) {
 
 // ---------------------------------------------------------------- page marks
 
-const MARK_NAMES: Record<org.MarkKind, string> = {
+const MARK_NAMES: Record<OrgT.MarkKind, string> = {
   Watermark: 'watermarks', Background: 'backgrounds', Header: 'headers and footers', Footer: 'headers and footers', BatesN: 'Bates numbers',
 };
 
-export async function removeMarks(kinds: org.MarkKind[]) {
+export async function removeMarks(kinds: OrgT.MarkKind[]) {
   if (!requirePermission('modify')) return;
   const what = tr(MARK_NAMES[kinds[0]]);
   await run('Removing…', async () => {
@@ -372,12 +374,12 @@ export async function removeMarks(kinds: org.MarkKind[]) {
   });
 }
 
-export async function addWatermark(o: ops.WatermarkOptions & { under?: boolean }) {
+export async function addWatermark(o: OpsT.WatermarkOptions & { under?: boolean }) {
   if (!requirePermission('modify')) return;
   await run('Adding watermark…', async () => S().commitBytes(await org.addWatermarkMark(S().bytes!, o)));
 }
 
-export async function addBackground(o: Omit<org.BackgroundOptions, 'image'> & { imageFile?: Blob | null }) {
+export async function addBackground(o: Omit<OrgT.BackgroundOptions, 'image'> & { imageFile?: Blob | null }) {
   if (!o.pages.length || !requirePermission('modify')) return;
   await run('Adding background…', async () => {
     const image = o.imageFile ? await imageFromBlob(o.imageFile) : null;
@@ -385,22 +387,22 @@ export async function addBackground(o: Omit<org.BackgroundOptions, 'image'> & { 
   });
 }
 
-export async function addHeadersFooters(o: org.HeaderFooterSet) {
+export async function addHeadersFooters(o: OrgT.HeaderFooterSet) {
   if (!requirePermission('modify')) return;
   if (!Object.values(o.texts).some((t) => t?.trim())) return S().notify(tr('Enter the text for at least one position.'), 'error');
   await run('Adding header/footer…', async () => S().commitBytes(await org.addHeadersFooters(S().bytes!, o)));
 }
 
-export async function addBates(o: org.BatesOptions) {
+export async function addBates(o: OrgT.BatesOptions) {
   if (!o.pages.length || !requirePermission('modify')) return;
   await run('Adding Bates numbers…', async () => S().commitBytes(await org.addBates(S().bytes!, o)));
 }
 
-export async function readPageLabels(): Promise<org.PageLabelRange[]> {
+export async function readPageLabels(): Promise<OrgT.PageLabelRange[]> {
   return org.getPageLabels(S().bytes!);
 }
 
-export async function setPageLabels(ranges: org.PageLabelRange[]) {
+export async function setPageLabels(ranges: OrgT.PageLabelRange[]) {
   if (!requirePermission('modify')) return;
   await run('Numbering pages…', async () => S().commitBytes(await org.setPageLabels(S().bytes!, ranges)));
 }

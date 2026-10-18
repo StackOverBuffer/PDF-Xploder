@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { PRIORITY, renderSlot } from '../lib/renderQueue';
+import { docKey, keepCanvas, takeCanvas } from '../lib/pageCache';
 import { RotateCcw, RotateCw, Trash2, FilePlus2, Copy, FileOutput } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -48,12 +49,30 @@ const Thumb = memo(function Thumb({ index, root }: { index: number; root: HTMLEl
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const inView = useInView(root, host);
   const done = useRef('');
+  /** The canvas shown and its key in the page cache (kept there when unmounted, e.g. on a tab switch). */
+  const shown = useRef<{ canvas: HTMLCanvasElement; key: string } | null>(null);
   const { width, height } = viewSize(geom);
   const scale = THUMB_W / width;
 
   useEffect(() => {
+    if (shown.current) takeCanvas(shown.current.key);
+    return () => {
+      if (shown.current) keepCanvas(shown.current.key, shown.current.canvas);
+    };
+  }, []);
+
+  useEffect(() => {
     const key = `${docVersion}:${scale}:${geom.rotation}`;
     if (!inView || !pdf || opening || done.current === key) return;
+    const cacheKey = `thumb:${docKey(pdf)}:${index}:${scale}:${geom.rotation}:${window.devicePixelRatio}`;
+    const swap = (canvas: HTMLCanvasElement) => {
+      hostRef.current?.replaceChildren(canvas);
+      if (shown.current) keepCanvas(shown.current.key, shown.current.canvas);
+      shown.current = { canvas, key: cacheKey };
+      done.current = key;
+    };
+    const kept = takeCanvas(cacheKey);
+    if (kept) return swap(kept);
     let cancelled = false;
     let task: { cancel(): void } | null = null;
     // The pages in the main view come first.
@@ -72,8 +91,7 @@ const Thumb = memo(function Thumb({ index, root }: { index: number; root: HTMLEl
         task = t;
         await t.promise;
         if (cancelled) return;
-        hostRef.current?.replaceChildren(canvas);
-        done.current = key;
+        swap(canvas);
       } catch {
         /* cancelled */
       } finally {

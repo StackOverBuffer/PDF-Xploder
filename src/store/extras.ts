@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { annotationsByPage, useStore } from './store';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
-import * as ops from '../lib/pdfOps';
+import { ops } from '../lib/worker';
 import { buildFileForSave, currentBytes, normaliseImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';

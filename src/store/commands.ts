@@ -1,11 +1,11 @@
 /** User-level commands: glue between UI, the store and pdf operations. */
-import * as ops from '../lib/pdfOps';
+import type * as OpsT from '../lib/pdfOps';
 import * as forms from '../lib/forms';
 import { annotationsByPage, uid, useStore, whenIdle } from './store';
 import { rememberRecent, type RecentFile } from './session';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
-import { encrypt, reencryptLike } from '../lib/security';
+import { ops, sec } from '../lib/worker';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
@@ -88,9 +88,9 @@ export async function buildFileForSave(): Promise<Uint8Array> {
   const s = S();
   if (unchangedSinceOpen()) return s.originalBytes!;
   const out = await buildOutput();
-  if (s.securityChanged) return s.security ? encrypt(out, s.security) : out;
+  if (s.securityChanged) return s.security ? sec.encrypt(out, s.security) : out;
   // Untouched security: encrypt exactly like the opened file (works without the owner password).
-  if (s.keepEncryption && s.originalBytes) return reencryptLike(out, s.originalBytes, s.keepEncryption.password);
+  if (s.keepEncryption && s.originalBytes) return sec.reencryptLike(out, s.originalBytes, s.keepEncryption.password);
   return out;
 }
 
@@ -285,7 +285,7 @@ export async function split(every: number) {
   });
 }
 
-export async function crop(m: ops.Margins, pages: number[]) {
+export async function crop(m: OpsT.Margins, pages: number[]) {
   if (!requirePermission('modify')) return;
   await S().run('Cropping…', async () => S().commitBytes(await ops.cropPages(S().bytes!, pages, m)));
 }
@@ -308,17 +308,17 @@ export async function exportPageImage(page = S().currentPage, dpi = 150) {
 
 // ---------------------------------------------------------------- document
 
-export async function watermark(o: ops.WatermarkOptions) {
+export async function watermark(o: OpsT.WatermarkOptions) {
   if (!requirePermission('modify')) return;
   await S().run('Adding watermark…', async () => S().commitBytes(await ops.addWatermark(S().bytes!, o)));
 }
 
-export async function headerFooter(o: ops.HeaderFooterOptions) {
+export async function headerFooter(o: OpsT.HeaderFooterOptions) {
   if (!requirePermission('modify')) return;
   await S().run('Adding header/footer…', async () => S().commitBytes(await ops.addHeaderFooter(S().bytes!, o)));
 }
 
-export async function setMetadata(m: ops.Metadata) {
+export async function setMetadata(m: OpsT.Metadata) {
   if (!requirePermission('modify')) return;
   await S().run('Updating properties…', async () => S().commitBytes(await ops.setMetadata(S().bytes!, m)));
 }
@@ -460,7 +460,7 @@ export async function signDocument(o: SignOptions) {
 // ---------------------------------------------------------------- form design
 
 /** Pending (unsaved) form values follow renamed fields and are dropped for deleted ones. */
-function moveFormValue(from: string, to: string | null): Record<string, ops.FieldValue> {
+function moveFormValue(from: string, to: string | null): Record<string, OpsT.FieldValue> {
   const values = { ...S().formValues };
   if (from in values) {
     if (to) values[to] = values[from];

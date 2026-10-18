@@ -86,6 +86,8 @@ export default defineConfig({
       },
     },
   },
+  // The PDF worker loads fonts and other parts on demand: it has to be a module.
+  worker: { format: 'es' },
   optimizeDeps: { esbuildOptions: { target: 'es2022' } },
   // RSA key generation and full-document round trips can take a while on slow disks.
   test: { environment: 'node', include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup.ts'], testTimeout: 120_000 },

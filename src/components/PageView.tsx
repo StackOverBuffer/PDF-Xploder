@@ -7,6 +7,7 @@ import { WidgetLayer } from './WidgetLayer';
 import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
 import { PRIORITY, renderSlot } from '../lib/renderQueue';
+import { docKey, keepCanvas, takeCanvas } from '../lib/pageCache';
 import { TextBoxLayer } from './TextBoxSelect';
 import { useContextMenu } from './Menu';
 import { pageMenu } from './contextMenus';
@@ -66,6 +67,8 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   /** What the canvas and the text layer currently show (tracked apart: either can be cancelled). */
   const renderedCanvas = useRef('');
   const renderedText = useRef('');
+  /** The canvas shown, and its key in the page cache (the host's ref is gone when unmounting). */
+  const shown = useRef<{ canvas: HTMLCanvasElement; key: string } | null>(null);
   const textLayer = useRef<{ layer: TextLayer; scale: number } | null>(null);
   const dpr = useDevicePixelRatio();
   const pageRef = useRef<HTMLDivElement>(null);
@@ -73,15 +76,16 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
 
   useEffect(() => registerTextLayer(textRef.current!), []);
 
-  // Free the canvas memory right away when the page is unmounted (scrolled far away).
-  useEffect(
-    () => () => {
-      const c = canvasHost.current?.firstChild;
-      if (c instanceof HTMLCanvasElement) c.width = c.height = 0;
+  // An unmounted page (scrolled far away, another tab shown) keeps its canvas in the
+  // page cache, which frees it when room is needed.
+  useEffect(() => {
+    // Mounted again with the DOM kept (React's StrictMode): the canvas is ours again.
+    if (shown.current) takeCanvas(shown.current.key);
+    return () => {
+      if (shown.current) keepCanvas(shown.current.key, shown.current.canvas);
       textLayer.current?.layer.cancel();
-    },
-    [],
-  );
+    };
+  }, []);
 
   const { width, height } = viewSize(geom);
   const w = Math.floor(width * scale);
@@ -100,6 +104,18 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
     const needText = renderedText.current !== textKey;
     const needRescale = !needText && textLayer.current?.scale !== scale;
     if (!needCanvas && !needText && !needRescale) return;
+    // Not by docVersion, which also changes on a tab switch: every content change loads a new pdf.
+    const cacheKey = `${docKey(pdf)}:${index}:${scale}:${geom.rotation}:${dpr}`;
+    // Show it, kept from earlier: a page drawn at this zoom.
+    const swap = (canvas: HTMLCanvasElement) => {
+      canvasHost.current?.replaceChildren(canvas);
+      if (shown.current) keepCanvas(shown.current.key, shown.current.canvas);
+      shown.current = { canvas, key: cacheKey };
+      renderedCanvas.current = canvasKey;
+    };
+    const kept = needCanvas ? takeCanvas(cacheKey) : null;
+    if (kept) swap(kept);
+    const drawCanvas = needCanvas && !kept;
     let cancelled = false;
     let renderTask: { cancel(): void } | null = null;
     let building: TextLayer | null = null;
@@ -108,13 +124,13 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
       try {
         // Re-rendering an already drawn page (zoom, edits): wait until the zoom settles;
         // the old canvas is stretched meanwhile.
-        if (renderedCanvas.current && needCanvas) {
+        if (renderedCanvas.current && drawCanvas) {
           await new Promise((r) => setTimeout(r, 120));
           if (cancelled) return;
         }
         const page = await pdf.getPage(index + 1);
         if (cancelled) return;
-        if (needCanvas) {
+        if (drawCanvas) {
           const slot = renderSlot(PRIORITY.page);
           endMain = slot.done;
           await slot.ready;
@@ -133,11 +149,11 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
           const task = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
           renderTask = task;
           await task.promise;
-          if (cancelled) return;
-          const old = canvasHost.current?.firstChild;
-          canvasHost.current?.replaceChildren(canvas);
-          if (old instanceof HTMLCanvasElement) old.width = old.height = 0;
-          renderedCanvas.current = canvasKey;
+          if (cancelled) {
+            canvas.width = canvas.height = 0;
+            return;
+          }
+          swap(canvas);
           endMain();
         }
         const textDiv = textRef.current;

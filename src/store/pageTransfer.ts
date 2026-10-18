@@ -4,7 +4,7 @@
  * tab itself; drop them on "+" to open them as a new document. Pages are
  * copied, comments included (they stay editable).
  */
-import * as ops from '../lib/pdfOps';
+import { ops } from '../lib/worker';
 import { rangeText } from '../lib/organize';
 import { baseName } from '../lib/download';
 import { tf } from '../lib/i18n';

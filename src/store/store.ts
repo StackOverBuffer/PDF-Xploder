@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
-import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
-import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
+import { load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
+import { ops as opsW, sec as secW } from '../lib/worker';
+import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
 import { DEFAULT_SCALE, type MeasureScale } from '../lib/measure';
@@ -445,7 +446,7 @@ export const useStore = create<Store>()((set, get) => {
     }
     let encryption: EncryptionInfo = { encrypted: false, permissions: ALL_PERMISSIONS };
     try {
-      encryption = await inspectEncryption(bytes);
+      encryption = await secW.inspectEncryption(bytes);
     } catch {
       /* damaged: handled below */
     }
@@ -465,7 +466,7 @@ export const useStore = create<Store>()((set, get) => {
       if (!ownerAccess) lock = { userPassword, needsUserPassword: loaded.password !== undefined && userPassword !== '' };
       try {
         const password = owner ?? userPassword;
-        const plain = await decrypt(bytes, password);
+        const plain = await secW.decrypt(bytes, password);
         const reloaded = await loadPdfJs(plain);
         loaded.pdf.destroy();
         loaded = { ...reloaded, password: loaded.password };
@@ -492,7 +493,11 @@ export const useStore = create<Store>()((set, get) => {
         // Big files: parsing them with pdf-lib takes seconds on the main thread. Skip it
         // when the viewer finds no comments that would become editable.
         const imp = (await hasImportableAnnotations(loaded.pdf))
-          ? await importForEditing(bytes, () => uid('annot'))
+          ? await opsW.importForEditing(bytes).then((r) => {
+              // Ids are given here (unique across all open documents).
+              for (const list of r.annotations) for (const a of list) a.id = uid('annot');
+              return r;
+            })
           : { count: 0, bytes, annotations: [] as Annotation[][] };
         if (imp.count) {
           const reloaded = await loadPdfJs(imp.bytes, undefined, 0);

@@ -22,7 +22,8 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
 import { createSampleDocument } from './lib/sample';
-import { getFormFields, type FieldInfo } from './lib/pdfOps';
+import type { FieldInfo } from './lib/pdfOps';
+import { ops as opsW } from './lib/worker';
 import type { Tool } from './lib/types';
 import { useT } from './lib/i18n';
 
@@ -191,7 +192,7 @@ function useFormFields() {
     // pdf.js already has the file: without any form field there, skip the (slow, for big files) pdf-lib parse.
     const anyFields = useStore.getState().bytes === bytes ? pdf.getFieldObjects().then((o) => !!o && Object.keys(o).length > 0).catch(() => true) : Promise.resolve(true);
     anyFields
-      .then((has) => (has ? getFormFields(bytes) : []))
+      .then((has) => (has ? opsW.getFormFields(bytes) : []))
       .then((fields) => {
         fieldCache.set(bytes, fields);
         apply(fields);

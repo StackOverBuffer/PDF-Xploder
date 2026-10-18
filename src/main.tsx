@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
 import { loadLanguage, useLang } from './lib/i18n';
+import { warmUpWorker } from './lib/worker';
 import { setupPwa } from './lib/pwa';
 import { openFiles } from './store/commands';
 import { useStore } from './store/store';
@@ -20,7 +21,10 @@ loadLanguage(useLang.getState().lang).finally(() =>
 // The command search matches German names too: fetch them when the browser is idle,
 // so the first search does not wait for them.
 const idle = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000));
-idle(() => void loadLanguage('de'), { timeout: 10000 });
+idle(() => {
+  void loadLanguage('de');
+  warmUpWorker();
+}, { timeout: 10000 });
 
 // Reopen the last session's tabs (files handed over by the system open after them).
 loadRecent();
