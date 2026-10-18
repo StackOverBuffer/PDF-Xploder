@@ -74,6 +74,7 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ⬜ Single-page / two-page / facing layouts
 - ✅ Clickable links (internal destinations, named actions, web links with confirmation)
 - ✅ Several documents in tabs: each opened file gets its own tab with its own undo history, zoom and position; reorder by dragging, close with ×, middle click or the context menu (others / to the right / all); unsaved tabs are marked and confirmed before closing
+- ✅ Drag pages between documents: drag thumbnails onto another tab (hovering switches to it) and drop them into its page list or onto the tab to append them; drop them on "+" to open them as a new document. Pages are copied with their comments, which stay editable
 - ⬜ Split view, full-screen / presentation mode
 
 ### Comment & markup

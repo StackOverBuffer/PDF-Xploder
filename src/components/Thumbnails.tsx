@@ -3,6 +3,7 @@ import { RotateCcw, RotateCw, Trash2, FilePlus2, Copy, FileOutput } from 'lucide
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
+import { PAGE_DRAG_TYPE, draggingFromOtherTab, dropPages, endPageDrag, startPageDrag } from '../store/pageTransfer';
 import { viewSize } from '../lib/geometry';
 import { tf, useT } from '../lib/i18n';
 
@@ -85,24 +86,30 @@ export function Thumbnails() {
   const onDragStart = (e: React.DragEvent, i: number) => {
     const s = useStore.getState();
     if (!selected.includes(i)) s.setSelectedPages([i]);
-    e.dataTransfer.setData('application/x-awesome-pages', JSON.stringify(selected.includes(i) ? selected : [i]));
-    e.dataTransfer.effectAllowed = 'move';
+    const pages = selected.includes(i) ? selected : [i];
+    e.dataTransfer.setData(PAGE_DRAG_TYPE, JSON.stringify(pages));
+    // Move within the document; copy into another tab.
+    e.dataTransfer.effectAllowed = 'copyMove';
+    startPageDrag(pages);
   };
 
   const onDragOver = (e: React.DragEvent, i: number) => {
-    if (!e.dataTransfer.types.includes('application/x-awesome-pages')) return;
+    if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = draggingFromOtherTab() ? 'copy' : 'move';
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
   };
 
   const onDrop = (e: React.DragEvent) => {
-    const data = e.dataTransfer.getData('application/x-awesome-pages');
     const to = dropAt;
     setDropAt(null);
-    if (!data || to === null) return;
+    if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
     e.preventDefault();
-    cmd.movePages(JSON.parse(data), to);
+    // Pages from another tab: copy them in (below the last page when dropped on empty space).
+    if (draggingFromOtherTab()) return void dropPages(to ?? undefined);
+    const data = e.dataTransfer.getData(PAGE_DRAG_TYPE);
+    if (data && to !== null) cmd.movePages(JSON.parse(data), to);
   };
 
   const n = selected.length || 1;
@@ -117,7 +124,18 @@ export function Thumbnails() {
         <button title={t('Delete')} disabled={!canAssemble} onClick={() => cmd.deletePages()}><Trash2 size={16} /></button>
         <span className="muted small">{tf('{n} sel.', { n })}</span>
       </div>
-      <div className="thumbs" key={docSession} onDragLeave={() => setDropAt(null)} onDrop={onDrop}>
+      <div
+        className="thumbs"
+        key={docSession}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(PAGE_DRAG_TYPE) && draggingFromOtherTab()) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDragLeave={() => setDropAt(null)}
+        onDrop={onDrop}
+      >
         {Array.from({ length: count }, (_, i) => (
           <div
             key={i}
@@ -125,6 +143,7 @@ export function Thumbnails() {
             draggable={canAssemble}
             onDragStart={(e) => onDragStart(e, i)}
             onDragOver={(e) => onDragOver(e, i)}
+            onDragEnd={endPageDrag}
             onClick={(e) => onClick(e, i)}
           >
             <div className="thumb-frame">

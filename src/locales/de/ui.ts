@@ -371,6 +371,8 @@ const DE: Record<string, string> = {
   'Shrink oversized pages': 'Übergroße Seiten verkleinern',
   'Custom scale': 'Benutzerdefiniert',
   'Scale (%)': 'Skalierung (%)',
+  'Copied {n} page(s) from {name}.': '{n} Seite(n) aus {name} kopiert.',
+  'The document the pages come from does not allow copying.': 'Das Dokument, aus dem die Seiten stammen, erlaubt kein Kopieren.',
   'Saved to {name}': 'Gespeichert in {name}',
   'Could not write to the file, so a copy was downloaded instead.': 'Die Datei konnte nicht geschrieben werden, daher wurde stattdessen eine Kopie heruntergeladen.',
 };

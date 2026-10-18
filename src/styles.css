@@ -461,3 +461,7 @@ select.widget { padding: 0; }
 .print-nav { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
 .print-hint { margin-right: auto; }
 @media (max-width: 720px) { .print-layout { flex-direction: column-reverse; align-items: stretch; } .print-preview { width: auto; position: static; } .print-sheet { width: 100%; } }
+
+/* Pages dragged onto a document tab or "+" */
+.doctab.page-drop { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.doctab-new.page-drop { outline: 2px dashed var(--accent); background: var(--accent-soft); }
