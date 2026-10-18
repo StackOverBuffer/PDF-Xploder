@@ -2,6 +2,7 @@
 import { PDFBool, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { load } from './pdfOps';
 import { tf, tr } from './i18n';
+import { saveDoc } from './pdfSave';
 
 export type CheckStatus = 'pass' | 'fail' | 'warn';
 export type FixId = 'title' | 'lang' | 'displayTitle';
@@ -70,5 +71,5 @@ export async function applyAccessibilityFix(bytes: Uint8Array, fix: FixId, value
   if (fix === 'lang') doc.catalog.set(PDFName.of('Lang'), PDFString.of(value));
   if (fix === 'title') doc.setTitle(value, { showInWindowTitleBar: true });
   if (fix === 'displayTitle') doc.catalog.getOrCreateViewerPreferences().setDisplayDocTitle(true);
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }

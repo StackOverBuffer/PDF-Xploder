@@ -5,6 +5,7 @@
  */
 import { PDFArray, PDFDict, PDFHexString, PDFName, PDFNull, PDFNumber, PDFRef, PDFString, type PDFDocument, type PDFObject } from '@cantoo/pdf-lib';
 import { load } from './pdfOps';
+import { saveDoc } from './pdfSave';
 
 export interface OutlineNode {
   /** Reference of the existing item ("12 0 R"), or a temporary id for new ones. */
@@ -213,7 +214,7 @@ export function setOutline(doc: PDFDocument, nodes: OutlineNode[]) {
 export async function writeOutline(bytes: Uint8Array, nodes: OutlineNode[]): Promise<Uint8Array> {
   const doc = await load(bytes);
   setOutline(doc, nodes);
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 // ---------------------------------------------------------------- tree helpers

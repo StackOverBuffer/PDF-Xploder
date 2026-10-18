@@ -70,6 +70,24 @@ function snapshot(pageEl: HTMLElement | null, box: VRect, zoom: number): string 
   return out.toDataURL();
 }
 
+/**
+ * Arrow-key nudges are merged: holding a key would otherwise rewrite the document
+ * for every repeat. The sum is applied once the keys rest for a moment.
+ */
+let nudge: { page: number; ids: number[]; dx: number; dy: number; geom: PageGeom } | null = null;
+let nudgeTimer = 0;
+function queueNudge(page: number, ids: number[], [dx, dy]: [number, number], geom: PageGeom) {
+  if (nudge && (nudge.page !== page || nudge.ids.join() !== ids.join())) flushNudge();
+  nudge = nudge ? { ...nudge, dx: nudge.dx + dx, dy: nudge.dy + dy } : { page, ids, dx, dy, geom };
+  clearTimeout(nudgeTimer);
+  nudgeTimer = window.setTimeout(flushNudge, 180);
+}
+function flushNudge() {
+  const n = nudge;
+  nudge = null;
+  if (n && (n.dx || n.dy)) applyContentEdits(n.page, [{ type: 'transform', ids: n.ids, m: toUser(n.geom, translate(n.dx, n.dy)) }]);
+}
+
 export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, width, height }: Props) {
   const tool = useStore((s) => s.tool);
   const filter = useStore((s) => s.contentFilter);
@@ -123,7 +141,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
     if (!objects) return;
     const handle = (e.target as Element).getAttribute('data-handle') as Handle | null;
     if (handle && selBox && canEdit) {
-      setDrag({ mode: handle === 'rot' ? 'rotate' : 'scale', start: p, box: selBox, handle, t: IDENTITY, moved: false, ghost: snapshot(ref.current!.parentElement, selBox, S) });
+      setDrag({ mode: handle === 'rot' ? 'rotate' : 'scale', start: p, box: selBox, handle, t: IDENTITY, moved: false });
       return;
     }
     const hit = [...visible].reverse().find((o) => contains(vbox(o), p));
@@ -133,7 +151,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       else if (!ids.includes(hit.id)) ids = [hit.id];
       select(ids);
       const box = unionV((objects ?? []).filter((o) => ids.includes(o.id)).map(vbox));
-      if (canEdit && ids.includes(hit.id)) setDrag({ mode: 'move', start: p, box, t: IDENTITY, moved: false, ghost: snapshot(ref.current!.parentElement, box, S) });
+      if (canEdit && ids.includes(hit.id)) setDrag({ mode: 'move', start: p, box, t: IDENTITY, moved: false });
       return;
     }
     if (!(e.shiftKey || e.ctrlKey)) select([]);
@@ -174,7 +192,11 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       if (Math.abs(sy) < 0.02) sy = 0.02 * Math.sign(sy || 1);
       t = about(scaleM(sx, sy), a.x, a.y);
     }
-    setDrag({ ...td, t, moved: td.moved || Math.abs(p.x - start.x) + Math.abs(p.y - start.y) > 1 });
+    const moved = td.moved || Math.abs(p.x - start.x) + Math.abs(p.y - start.y) > 1;
+    // The picture of the objects that follows the pointer is made once the drag really starts
+    // (encoding it on every click would make selecting slow).
+    const ghost = td.ghost ?? (moved ? snapshot(ref.current!.parentElement, box, S) : undefined);
+    setDrag({ ...td, t, moved, ghost });
   };
 
   const onPointerUp = () => {
@@ -266,7 +288,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       const nudge: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
       if (nudge[e.key]) {
         e.preventDefault();
-        applyContentEdits(index, [{ type: 'transform', ids: sel.ids, m: toUser(geom, translate(...nudge[e.key])) }]);
+        queueNudge(index, sel.ids, nudge[e.key], geom);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         e.stopImmediatePropagation();

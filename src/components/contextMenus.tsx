@@ -76,7 +76,11 @@ export function objectMenu(page: number, geom: PageGeom, chosen: ObjectInfo[], l
     const v = pdfRectToView(geom, box!);
     return toUser(geom, about(rotate(deg), v.left + v.width / 2, v.top + v.height / 2));
   };
-  const flip = (sx: number, sy: number) => about(scaleM(sx, sy), box!.x + box!.w / 2, box!.y + box!.h / 2);
+  // Flips, like rotations, act as seen on screen (the page may be rotated).
+  const flip = (sx: number, sy: number) => {
+    const v = pdfRectToView(geom, box!);
+    return toUser(geom, about(scaleM(sx, sy), v.left + v.width / 2, v.top + v.height / 2));
+  };
   const userAt = viewToPdf(geom, at);
   const text = chosen.filter((o) => o.kind === 'text').map((o) => o.text).join(' ');
   const layerRefs = new Set(chosen.map((o) => o.layer ?? ''));

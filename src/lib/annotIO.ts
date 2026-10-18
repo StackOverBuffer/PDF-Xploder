@@ -7,6 +7,7 @@
  * round trips; standard keys still win where another editor changed them.
  */
 import {
+  decodePDFRawStream,
   PDFArray,
   PDFDict,
   PDFDocument,
@@ -247,7 +248,14 @@ function fromPrivate(dict: PDFDict): Annotation | null {
   if (a.type === 'image') {
     const src = dict.lookup(PRIVATE_SRC);
     if (!(src instanceof PDFRawStream)) return null;
-    a.src = bytesToDataUrl(src.getContents(), (a.src as string) || 'image/png');
+    // Another tool may have compressed the stream: decode its filters.
+    let data = src.getContents();
+    try {
+      if (src.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(src).decode();
+    } catch {
+      /* keep the raw bytes */
+    }
+    a.src = bytesToDataUrl(data, (a.src as string) || 'image/png');
   }
   return a;
 }

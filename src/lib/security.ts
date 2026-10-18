@@ -1,6 +1,7 @@
 /** Password protection (encryption) helpers, built on @cantoo/pdf-lib. */
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFSecurity, PDFString } from '@cantoo/pdf-lib';
 import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
+import { saveDoc } from './pdfSave';
 
 export interface Permissions {
   printing: boolean;
@@ -87,7 +88,7 @@ export async function inspectEncryption(bytes: Uint8Array): Promise<EncryptionIn
   return { encrypted: true, algorithm: cipherName(enc), permissions: decodePermissions(p) };
 }
 
-function containsAscii(bytes: Uint8Array, word: string): boolean {
+export function containsAscii(bytes: Uint8Array, word: string): boolean {
   const codes = [...word].map((c) => c.charCodeAt(0));
   const first = codes[0];
   for (let i = bytes.indexOf(first); i >= 0 && i <= bytes.length - codes.length; i = bytes.indexOf(first, i + 1)) {
@@ -123,7 +124,7 @@ export async function loadDecrypted(bytes: Uint8Array, password: string): Promis
 export async function decrypt(bytes: Uint8Array, password: string): Promise<Uint8Array> {
   const doc = await loadDecrypted(bytes, password);
   dropEncryptionRemnants(doc);
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 /**
@@ -152,7 +153,7 @@ export async function encrypt(bytes: Uint8Array, s: SecuritySettings): Promise<U
     permissions: { ...s.permissions, printing: s.permissions.printing ? (s.permissions.highResPrinting ? 'highResolution' : 'lowResolution') : false },
     algorithm: s.algorithm,
   });
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 /**
@@ -181,5 +182,5 @@ export async function reencryptLike(plain: Uint8Array, original: Uint8Array, pas
   Object.assign(security, { context: ctx, encryption: { V }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40 });
   ctx.security = security;
   // Object streams are required: strings are only encrypted as part of them.
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }

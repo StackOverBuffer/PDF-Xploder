@@ -11,6 +11,7 @@ import { tr } from '../lib/i18n';
 import type { Raster } from '../lib/ocr/raster';
 import type { M } from '../lib/ocr/mapping';
 import type { OutputMode, EncodedImage } from '../lib/ocr/writer';
+import { saveDoc } from '../lib/pdfSave';
 
 const S = () => useStore.getState();
 
@@ -218,7 +219,7 @@ export async function runOcr(o: OcrOptions, onProgress: ProgressHandler, signal:
       );
       if (!summary.done) return null;
       if (replaced) removeUnreferenced(doc);
-      const out = await doc.save({ useObjectStreams: true });
+      const out = await saveDoc(doc);
       if (S().bytes !== startBytes) throw new Error(tr('The document changed during OCR; the result was discarded.'));
       await S().commitBytes(out);
       return summary;

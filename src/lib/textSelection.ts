@@ -11,6 +11,9 @@ let listening = false;
 
 function reset(layer: HTMLElement) {
   const end = endOf(layer);
+  // Nothing to undo on layers that were not part of a selection (the common case: keeps
+  // selection changes elsewhere, e.g. typing in a form field, from touching every page).
+  if (!layer.classList.contains('selecting') && (!end || (!end.nextSibling && end.parentElement === layer))) return;
   layer.classList.remove('selecting');
   if (!end) return;
   layer.append(end);

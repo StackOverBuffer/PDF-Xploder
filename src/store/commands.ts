@@ -1,14 +1,14 @@
 /** User-level commands: glue between UI, the store and pdf operations. */
 import * as ops from '../lib/pdfOps';
 import * as forms from '../lib/forms';
-import { annotationsByPage, uid, useStore } from './store';
+import { annotationsByPage, uid, useStore, whenIdle } from './store';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
 import { encrypt, reencryptLike } from '../lib/security';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
-import { signPdf, type SignOptions } from '../lib/signature';
+import type { SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation, Rect } from '../lib/types';
 
@@ -25,6 +25,8 @@ export async function openFiles(files: File[], handles: (FileSystemFileHandle | 
   const pdfs = files.map((file, i) => ({ file, handle: handles[i] ?? null })).filter(({ file: f }) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) return S().notify('Please choose a PDF file.', 'error');
   for (const { file: f, handle } of pdfs) {
+    // Files can arrive while a command runs (dropped, or opened from the system): wait for it.
+    await whenIdle();
     await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name, { handle }));
   }
 }
@@ -357,10 +359,12 @@ export async function applyRedactions() {
     } finally {
       pdf.destroy();
     }
-    const out = await ops.replacePagesWithImages(s.bytes!, images);
+    const { bytes: out, removedFields } = await ops.replacePagesWithImages(s.bytes!, images);
     const annotations = { ...s.annotations };
     for (const i of pages) delete annotations[s.pageIds[i]];
-    await S().commitBytes(out, undefined, annotations);
+    // Pending values of removed fields must not be written back on save.
+    const formValues = Object.fromEntries(Object.entries(S().formValues).filter(([k]) => !removedFields.includes(k)));
+    await S().commitBytes(out, undefined, annotations, formValues);
     s.notify(tf('Redacted {n} page(s).', { n: pages.length }));
   });
 }
@@ -425,6 +429,7 @@ export async function signDocument(o: SignOptions) {
   if (!requirePermission('fillForms') || !confirmBreakingSignatures()) return;
   await s.run('Signing…', async () => {
     const base = unchangedSinceOpen() ? s.originalBytes! : await buildOutput();
+    const { signPdf } = await import('../lib/signature');
     const signed = await signPdf(base, o);
     const name = /-signed\.pdf$/i.test(s.fileName) ? s.fileName : `${baseName(s.fileName || 'document')}-signed.pdf`;
     downloadBlob(signed, name);

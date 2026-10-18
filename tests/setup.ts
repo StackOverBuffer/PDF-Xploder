@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { setFontSource } from '../src/lib/fonts';
 import { setSubsetWasmLoader } from '../src/lib/subset';
+import { loadLanguage } from '../src/lib/i18n';
+
+await loadLanguage('de');
 
 // Read bundled fonts from disk. The on-demand CJK fonts are "offline" in tests
 // unless CJK_FONT / KR_FONT point to local copies of Noto Sans SC / KR.

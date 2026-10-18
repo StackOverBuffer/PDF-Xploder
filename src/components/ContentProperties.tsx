@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, BringToFront, SendToBack, ArrowUp, ArrowDown,
@@ -36,7 +36,8 @@ function NumberField({ label, value, onCommit, step = 1, disabled, suffix }: { l
   return (
     <label className="prop num-prop">
       <span className="prop-label">{label}{suffix && <span className="muted"> {suffix}</span>}</span>
-      <input type="number" step={step} value={v} disabled={disabled} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
+      {/* Enter commits by leaving the field, so the change is applied once (not again on blur). */}
+      <input type="number" step={step} value={v} disabled={disabled} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
     </label>
   );
 }
@@ -51,10 +52,29 @@ function ColorField({ label, value, onChange, allowNone, disabled }: { label: st
         {['#000000', '#ffffff', '#e53935', '#1e88e5', '#43a047', '#fdd835', '#8e24aa', '#757575'].map((c) => (
           <button key={c} disabled={disabled} className={`swatch-btn ${value === c ? 'active' : ''}`} style={{ background: c }} onClick={() => onChange(c)} />
         ))}
-        <input type="color" disabled={disabled} value={value ?? '#000000'} onChange={(e) => onChange(e.target.value)} />
+        <PickedColor disabled={disabled} value={value ?? '#000000'} onPick={onChange} />
       </div>
     </div>
   );
+}
+
+/**
+ * Colour input that applies the colour once it is chosen (the native change event),
+ * not for every step while the picker is dragged: each change rewrites the page.
+ */
+function PickedColor({ value, onPick, disabled }: { value: string; onPick: (c: string) => void; disabled?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const pick = useRef(onPick);
+  pick.current = onPick;
+  useEffect(() => {
+    const el = ref.current!;
+    const onChange = () => pick.current(el.value);
+    el.addEventListener('change', onChange);
+    return () => el.removeEventListener('change', onChange);
+  }, []);
+  return <input ref={ref} type="color" disabled={disabled} value={v} onChange={(e) => setV(e.target.value)} />;
 }
 
 const union = (rs: Rect[]): Rect => {
@@ -90,8 +110,6 @@ export function ContentProperties() {
   const one = chosen.length === 1 ? chosen[0] : undefined;
   const texts = chosen.filter((o) => o.kind === 'text');
   const paths = chosen.filter((o) => o.kind === 'path');
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
   // Rotation and flips act as seen on screen, about the selection's centre.
   const viewTransform = (m: M) => {
     const v = pdfRectToView(g, box);
@@ -157,8 +175,8 @@ export function ContentProperties() {
       <div className="icon-row">
         <button title={t('Rotate left')} onClick={() => edit({ type: 'transform', ids, m: viewTransform(rotate(-90)) })}><RotateCcw size={15} /></button>
         <button title={t('Rotate right')} onClick={() => edit({ type: 'transform', ids, m: viewTransform(rotate(90)) })}><RotateCw size={15} /></button>
-        <button title={t('Flip horizontally')} onClick={() => edit({ type: 'transform', ids, m: about(scaleM(-1, 1), cx, cy) })}><FlipHorizontal2 size={15} /></button>
-        <button title={t('Flip vertically')} onClick={() => edit({ type: 'transform', ids, m: about(scaleM(1, -1), cx, cy) })}><FlipVertical2 size={15} /></button>
+        <button title={t('Flip horizontally')} onClick={() => edit({ type: 'transform', ids, m: viewTransform(scaleM(-1, 1)) })}><FlipHorizontal2 size={15} /></button>
+        <button title={t('Flip vertically')} onClick={() => edit({ type: 'transform', ids, m: viewTransform(scaleM(1, -1)) })}><FlipVertical2 size={15} /></button>
         <span className="spacer" />
         <button title={t('Bring to front')} onClick={() => edit({ type: 'arrange', ids, to: 'front' })}><BringToFront size={15} /></button>
         <button title={t('Bring forward')} onClick={() => edit({ type: 'arrange', ids, to: 'forward' })}><ArrowUp size={15} /></button>
@@ -242,7 +260,7 @@ function TextValue({ value, onCommit }: { value: string; onCommit: (v: string) =
   return (
     <label className="prop">
       <span className="prop-label">{t('Content')}</span>
-      <input value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} onKeyDown={(e) => e.key === 'Enter' && v !== value && onCommit(v)} />
+      <input value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
     </label>
   );
 }

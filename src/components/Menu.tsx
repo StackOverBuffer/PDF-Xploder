@@ -71,8 +71,13 @@ export function Menu({ anchor, items, onClose, side, root = true }: Props) {
     }
   }, [anchor, side]);
 
+  // The latest onClose, so re-renders of the owner do not re-register the listeners
+  // (which would also re-arm the deferred outside-click listener).
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!root) return;
+    const onClose = () => closeRef.current();
     const onDown = (e: PointerEvent) => !(e.target as Element).closest?.('.rmenu') && onClose();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -92,7 +97,7 @@ export function Menu({ anchor, items, onClose, side, root = true }: Props) {
       window.removeEventListener('resize', onClose);
       window.removeEventListener('blur', onClose);
     };
-  }, [onClose, root]);
+  }, [root]);
 
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });

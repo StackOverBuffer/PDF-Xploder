@@ -2,6 +2,7 @@
 import { PDFArray, PDFDict, PDFName, PDFNull, PDFNumber, PDFRef, PDFString } from '@cantoo/pdf-lib';
 import { load } from './pdfOps';
 import type { Rect } from './types';
+import { saveDoc } from './pdfSave';
 
 export type LinkTarget = { page: number; y?: number } | { url: string };
 
@@ -41,7 +42,7 @@ export async function addBookmark(bytes: Uint8Array, title: string, page: number
   const n = count instanceof PDFNumber ? count.asNumber() : 0;
   // A negative count means the top level is collapsed; keep the sign.
   root.set(PDFName.of('Count'), PDFNumber.of(n < 0 ? n - 1 : n + 1));
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 /** Add an invisible link over `rect` (user space) on `page`. */
@@ -63,5 +64,5 @@ export async function addLink(bytes: Uint8Array, page: number, rect: Rect, targe
   const annots = p.node.lookup(PDFName.of('Annots'));
   if (annots instanceof PDFArray) annots.push(ref);
   else p.node.set(PDFName.of('Annots'), ctx.obj([ref]));
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }

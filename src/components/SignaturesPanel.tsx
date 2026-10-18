@@ -1,6 +1,6 @@
 import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion } from 'lucide-react';
 import { useStore } from '../store/store';
-import { useCan } from '../store/permissions';
+import { useCan, usePermState } from '../store/permissions';
 import type { SigStatus } from '../lib/signature';
 import { useDialog } from './Dialogs';
 import { ACTION_LABELS, allowed, type Action } from '../store/permissions';
@@ -63,7 +63,7 @@ export function DocBanner() {
   const signatures = useStore((s) => s.signatures);
   const dirty = useStore((s) => s.dirty);
   const show = useDialog((d) => d.show);
-  const state = useStore();
+  const state = usePermState();
   const t = useT();
   const lang = useLang((l) => l.lang);
   if (lock) {

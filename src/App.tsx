@@ -21,7 +21,7 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
 import { createSampleDocument } from './lib/sample';
-import { getFormFields } from './lib/pdfOps';
+import { getFormFields, type FieldInfo } from './lib/pdfOps';
 import type { Tool } from './lib/types';
 import { useT } from './lib/i18n';
 
@@ -54,6 +54,11 @@ function useShortcuts() {
       const s = useStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       if (useDialog.getState().open) return;
+      // While a command runs, only harmless shortcuts work (it would act on a document that is about to change).
+      if (s.busy) {
+        if (!typing && (mod || e.key === 'Delete' || e.key === 'Backspace')) e.preventDefault();
+        return;
+      }
       if (mod) {
         const k = e.key.toLowerCase();
         const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
@@ -88,7 +93,7 @@ function useShortcuts() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && s.selectedField && s.formDesign) {
         e.preventDefault();
         cmd.deleteField(s.selectedField.name);
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) {
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected && can('annotate')) {
         e.preventDefault();
         s.deleteAnnotation(s.selected.pageId, s.selected.id);
       } else if (e.key === 'Escape' && useTextBox.getState().sel) {
@@ -142,33 +147,76 @@ function Welcome() {
   );
 }
 
+/** Form fields per document version: switching tabs or undoing must not re-parse the whole file. */
+const fieldCache = new WeakMap<Uint8Array, FieldInfo[]>();
+
 /** Keep the store's list of form fields in sync with the document bytes. */
 function useFormFields() {
   const bytes = useStore((s) => s.bytes);
   const editable = useStore((s) => s.editable);
   useEffect(() => {
     let live = true;
+    const apply = (fields: FieldInfo[]) => {
+      if (live && !(fields.length === 0 && useStore.getState().fields.length === 0)) useStore.setState({ fields });
+    };
     if (!bytes || !editable) {
-      useStore.setState({ fields: [] });
+      apply([]);
+      return;
+    }
+    const known = fieldCache.get(bytes);
+    if (known) {
+      if (useStore.getState().fields !== known) apply(known);
       return;
     }
     getFormFields(bytes)
-      .then((fields) => live && useStore.setState({ fields }))
-      .catch(() => live && useStore.setState({ fields: [] }));
+      .then((fields) => {
+        fieldCache.set(bytes, fields);
+        apply(fields);
+      })
+      .catch(() => apply([]));
     return () => {
       live = false;
     };
   }, [bytes, editable]);
 }
 
+/** While a command runs: a progress bar, and a transparent layer that keeps clicks and drops from starting another one. Dialogs stay usable (e.g. to cancel OCR). */
+function BusyShield() {
+  const busy = useStore((s) => !!s.busy);
+  if (!busy) return null;
+  return (
+    <>
+      <div className="busy-bar" />
+      <div
+        className="busy-shield"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}
+        onWheel={(e) => e.ctrlKey && e.preventDefault()}
+      />
+    </>
+  );
+}
+
+function Toast() {
+  const toast = useStore((s) => s.toast);
+  return toast ? <div className={`toast ${toast.kind}`} role="status">{toast.msg}</div> : null;
+}
+
+/** The window title follows the document (own component: the rest of the app need not re-render). */
+function TitleSync() {
+  const dirty = useStore((s) => s.dirty);
+  const fileName = useStore((s) => s.fileName);
+  useEffect(() => {
+    document.title = fileName ? `${dirty ? '• ' : ''}${fileName} — PDF-Xploder` : 'PDF-Xploder';
+  }, [dirty, fileName]);
+  return null;
+}
+
 export function App() {
   const t = useT();
   const hasDoc = useStore((s) => !!s.pdf);
   const sidebar = useStore((s) => s.sidebar);
-  const toast = useStore((s) => s.toast);
-  const busy = useStore((s) => s.busy);
-  const dirty = useStore((s) => s.dirty);
-  const fileName = useStore((s) => s.fileName);
   const showTabs = useStore((s) => s.tabs.length > 1 || !!s.pdf);
   const [showProps, setShowProps] = useState(true);
   useEffect(() => {
@@ -187,9 +235,6 @@ export function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
-  useEffect(() => {
-    document.title = fileName ? `${dirty ? '• ' : ''}${fileName} — PDF-Xploder` : 'PDF-Xploder';
-  }, [dirty, hasDoc, fileName]);
 
   return (
     <div className="app">
@@ -221,8 +266,9 @@ export function App() {
       </div>
       {hasDoc && <StatusBar />}
       <Dialogs />
-      {busy && <div className="busy-bar" />}
-      {toast && <div className={`toast ${toast.kind}`} role="status">{toast.msg}</div>}
+      <BusyShield />
+      <Toast />
+      <TitleSync />
     </div>
   );
 }

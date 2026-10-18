@@ -2,15 +2,24 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
+import { loadLanguage, useLang } from './lib/i18n';
 import { setupPwa } from './lib/pwa';
 import { openFiles } from './store/commands';
 import { useStore } from './store/store';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// German strings come in their own chunk; render once the interface language is available.
+loadLanguage(useLang.getState().lang).finally(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  ),
 );
+
+// The command search matches German names too: fetch them when the browser is idle,
+// so the first search does not wait for them.
+const idle = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000));
+idle(() => void loadLanguage('de'), { timeout: 10000 });
 
 setupPwa({
   openFiles,

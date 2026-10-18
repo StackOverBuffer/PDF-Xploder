@@ -6,6 +6,7 @@ import type { Annotation, Rect } from '../lib/types';
 import { confirmPagesEditable, markPagesVerified } from './content';
 import { requirePermission } from './permissions';
 import { styleFor, uid, useStore, type SearchHit } from './store';
+import { saveDoc } from '../lib/pdfSave';
 
 const S = () => useStore.getState();
 
@@ -35,7 +36,7 @@ export async function replaceAll(query: string, replacement: string, o: FindOpti
     const doc = await loadForEditing(S().bytes!);
     let n = 0;
     for (const p of pages) n += await replaceOnPage(doc.getPage(p), query, replacement, o);
-    await S().commitBytes(await doc.save({ useObjectStreams: true }));
+    await S().commitBytes(await saveDoc(doc));
     markPagesVerified(pages);
     S().notify(tf('Replaced {n} occurrence(s) on {pages} page(s).', { n, pages: pages.length }));
   });
@@ -56,7 +57,7 @@ export async function replaceHit(hit: SearchHit, query: string, replacement: str
     if (!target || dist(target) > Math.max(hit.rect.h, 12) * 2) return S().notify(noEditableMatches());
     if (!(await confirmPagesEditable([hit.page])).length) return;
     await replaceOnPage(page, query, replacement, o, { object: target.object, start: target.start });
-    await S().commitBytes(await doc.save({ useObjectStreams: true }));
+    await S().commitBytes(await saveDoc(doc));
     markPagesVerified([hit.page]);
     done = true;
   });

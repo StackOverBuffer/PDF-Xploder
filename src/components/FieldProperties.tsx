@@ -28,7 +28,7 @@ function Committed({ label, value, onCommit, disabled, type = 'text', placeholde
   return (
     <label className="prop">
       <span className="prop-label">{label}</span>
-      <input type={type} value={v} disabled={disabled} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
+      <input type={type} value={v} disabled={disabled} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
     </label>
   );
 }

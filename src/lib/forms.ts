@@ -19,6 +19,7 @@ import {
   StandardFonts,
 } from '@cantoo/pdf-lib';
 import type { Rect } from './types';
+import { saveDoc } from './pdfSave';
 
 // Annotation flags (ISO 32000-1, table 165).
 const F_HIDDEN = 1 << 1;
@@ -99,15 +100,24 @@ function widgetsOf(field: PDFField): { widget: PDFWidgetAnnotation; ref: PDFRef 
   });
 }
 
-function pageIndexOf(doc: PDFDocument, ref: PDFRef, widget: PDFWidgetAnnotation): number {
-  const pages = doc.getPages();
+/** Page lookups for widgets (built once when listing all fields: forms can have thousands of widgets). */
+type PageMaps = { byPage: Map<string, number>; byAnnot: Map<string, number> };
+function pageMapsOf(doc: PDFDocument): PageMaps {
+  const byPage = new Map<string, number>();
+  const byAnnot = new Map<string, number>();
+  doc.getPages().forEach((pg, i) => {
+    byPage.set(pg.ref.toString(), i);
+    const annots = pg.node.Annots();
+    if (annots) for (const a of annots.asArray()) if (a instanceof PDFRef && !byAnnot.has(a.toString())) byAnnot.set(a.toString(), i);
+  });
+  return { byPage, byAnnot };
+}
+
+function pageIndexOf(maps: PageMaps, ref: PDFRef, widget: PDFWidgetAnnotation): number {
+  const { byPage, byAnnot } = maps;
   const p = widget.P();
-  if (p) {
-    const i = pages.findIndex((pg) => pg.ref === p || pg.ref.toString() === p.toString());
-    if (i >= 0) return i;
-  }
-  const page = doc.findPageForAnnotationRef(ref);
-  return page ? pages.indexOf(page) : -1;
+  const i = p ? byPage.get(p.toString()) : undefined;
+  return i ?? byAnnot.get(ref.toString()) ?? -1;
 }
 
 function kindOf(f: PDFField): FieldKind {
@@ -149,7 +159,7 @@ function tooltipOf(f: PDFField): string {
   return t instanceof PDFString || t instanceof PDFHexString ? t.decodeText() : '';
 }
 
-export function describeField(doc: PDFDocument, f: PDFField): FieldInfo {
+export function describeField(doc: PDFDocument, f: PDFField, maps: PageMaps = pageMapsOf(doc)): FieldInfo {
   const ws = widgetsOf(f);
   const flags = ws.reduce((acc, { widget }) => acc | widget.getFlags(), 0);
   const kind = kindOf(f);
@@ -179,7 +189,7 @@ export function describeField(doc: PDFDocument, f: PDFField): FieldInfo {
   const widgets = ws
     .map(({ widget, ref }) => {
       const r = widget.getRectangle();
-      return { page: pageIndexOf(doc, ref, widget), rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
+      return { page: pageIndexOf(maps, ref, widget), rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
     })
     .filter((w) => w.page >= 0);
   const base = { name: f.getName(), readOnly: props.readOnly || props.lockedContents, props, widgets };
@@ -197,13 +207,14 @@ async function load(bytes: Uint8Array) {
 
 export async function getFormFields(bytes: Uint8Array): Promise<FieldInfo[]> {
   const doc = await load(bytes);
-  return doc.getForm().getFields().map((f) => describeField(doc, f));
+  const maps = pageMapsOf(doc);
+  return doc.getForm().getFields().map((f) => describeField(doc, f, maps));
 }
 
 /** Save after form changes, regenerating field appearances where pdf-lib needs to. */
 export async function saveForm(doc: PDFDocument, unicodeFont?: () => Promise<Uint8Array | null>): Promise<Uint8Array> {
   try {
-    return await doc.save({ useObjectStreams: true });
+    return await saveDoc(doc);
   } catch (e) {
     // Values Helvetica cannot encode: regenerate appearances with a Unicode font.
     if (!unicodeFont || !/encode|WinAnsi/i.test(String((e as Error).message))) throw e;
@@ -212,7 +223,7 @@ export async function saveForm(doc: PDFDocument, unicodeFont?: () => Promise<Uin
     const { loadFontkit } = await import('./fonts');
     doc.registerFontkit(await loadFontkit());
     doc.getForm().updateFieldAppearances(await doc.embedFont(bytes, { subset: false }));
-    return doc.save({ useObjectStreams: true });
+    return saveDoc(doc);
   }
 }
 

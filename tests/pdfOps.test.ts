@@ -201,8 +201,26 @@ describe('export', () => {
     // 1x1 transparent PNG
     const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='), (c) => c.charCodeAt(0));
     const bytes = await ops.rotatePages(await makeDoc(2), [1], 90);
-    const out = await PDFDocument.load(await ops.replacePagesWithImages(bytes, [{ index: 1, png }]));
+    const out = await PDFDocument.load((await ops.replacePagesWithImages(bytes, [{ index: 1, png }])).bytes);
     const p = out.getPage(1);
     expect([p.getWidth(), p.getHeight(), p.getRotation().angle]).toEqual([300, 201, 0]);
+  });
+
+  it('drops form fields (and their values) that sit on redacted pages', async () => {
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='), (c) => c.charCodeAt(0));
+    const doc = await PDFDocument.create();
+    const [a, b] = [doc.addPage([300, 300]), doc.addPage([300, 300])];
+    const form = doc.getForm();
+    const keep = form.createTextField('keep');
+    keep.setText('public');
+    keep.addToPage(a, { x: 10, y: 10, width: 100, height: 20 });
+    const secret = form.createTextField('ssn');
+    secret.setText('123-45-6789');
+    secret.addToPage(b, { x: 10, y: 10, width: 100, height: 20 });
+    const res = await ops.replacePagesWithImages(await doc.save(), [{ index: 1, png }]);
+    expect(res.removedFields).toEqual(['ssn']);
+    const out = await PDFDocument.load(res.bytes);
+    expect(out.getForm().getFields().map((f) => f.getName())).toEqual(['keep']);
+    expect(new TextDecoder('latin1').decode(res.bytes)).not.toContain('123-45-6789');
   });
 });

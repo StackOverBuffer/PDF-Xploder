@@ -37,7 +37,7 @@ type Draft =
 
 type Drag =
   | { mode: 'move'; id: string; orig: Annotation; start: Pt; moved: boolean }
-  | { mode: 'resize'; id: string; orig: VRect; start: Pt; moved: boolean }
+  | { mode: 'resize'; id: string; orig: VRect; annot: Annotation; start: Pt; moved: boolean }
   | null;
 
 /** SVG overlay that displays a page's annotations and handles drawing/selection. */
@@ -71,6 +71,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   // ------------------------------------------------------------ drawing
   /** Where the previous click of a polygon/polyline/cloud landed, to detect the closing double click. */
   const lastClick = useRef<Pt | null>(null);
+  const inkFrame = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(inkFrame.current), []);
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
     if (!drawing || e.button !== 0) return;
     e.preventDefault();
@@ -92,7 +94,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
         lastClick.current = null;
         return;
       }
-      setDraft({ kind: 'path', points: [...(draft?.kind === 'path' ? draft.points : []), p] });
+      // The last point is the rubber band that follows the pointer: fix it here and start a new one.
+      setDraft({ kind: 'path', points: draft?.kind === 'path' ? [...draft.points.slice(0, -1), p, p] : [p, p] });
     }
     else if (tool === 'note') createNote(p);
     else setDraft({ kind: 'box', start: p, end: p });
@@ -103,7 +106,14 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     if (tool === 'stamp' && drawing) setHover(viewPt(e));
     if (!draft) return;
     const p = viewPt(e);
-    if (draft.kind === 'ink') setDraft({ kind: 'ink', points: [...draft.points, p] });
+    if (draft.kind === 'ink') {
+      // Collect every point, redraw once per frame.
+      draft.points.push(p);
+      if (!inkFrame.current) inkFrame.current = requestAnimationFrame(() => {
+        inkFrame.current = 0;
+        setDraft((d) => (d?.kind === 'ink' ? { kind: 'ink', points: d.points } : d));
+      });
+    }
     else if (draft.kind === 'path') {
       // The rubber band follows the pointer: only the trailing point moves.
       setDraft({ ...draft, points: [...draft.points.slice(0, -1), p] });
@@ -113,6 +123,11 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
 
   const onPointerUp = () => {
     if (drag.current) {
+      // Apply the last position before letting go.
+      cancelAnimationFrame(moveFrame.current);
+      moveFrame.current = 0;
+      if (pendingMove.current) applyDragMove(pendingMove.current);
+      pendingMove.current = null;
       drag.current = null;
       return;
     }
@@ -157,9 +172,10 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       return;
     }
     if (d.kind === 'path') {
-      // At least an edge; every point is a clicked vertex (no trailing cursor at commit time).
-      if (d.points.length < 2) return;
-      const vertices = simplify(d.points).map((p) => viewToPdf(geom, p));
+      // Every point but the trailing rubber band is a clicked vertex; at least an edge is needed.
+      const clicked = d.points.slice(0, -1);
+      if (clicked.length < 2) return;
+      const vertices = simplify(clicked).map((p) => viewToPdf(geom, p));
       if (vertices.length < 2) return;
       store.addAnnotation(index, { ...base(tool), type: tool as 'polygon' | 'polyline' | 'cloud', width: st.width, fill: st.fill, vertices });
       lastClick.current = null;
@@ -242,10 +258,24 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     drag.current =
       mode === 'move'
         ? { mode, id: a.id, orig: a, start, moved: false }
-        : { mode, id: a.id, orig: viewBounds(a, geom), start, moved: false };
+        : { mode, id: a.id, orig: viewBounds(a, geom), annot: a, start, moved: false };
   };
 
+  // Pointer moves can come faster than frames: apply the latest one once per frame.
+  const pendingMove = useRef<{ clientX: number; clientY: number } | null>(null);
+  const moveFrame = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(moveFrame.current), []);
   function onDragMove(e: RPointerEvent) {
+    pendingMove.current = { clientX: e.clientX, clientY: e.clientY };
+    if (moveFrame.current) return;
+    moveFrame.current = requestAnimationFrame(() => {
+      moveFrame.current = 0;
+      const m = pendingMove.current;
+      if (m && drag.current) applyDragMove(m);
+    });
+  }
+
+  function applyDragMove(e: { clientX: number; clientY: number }) {
     const d = drag.current!;
     const p = viewPt(e);
     if (!d.moved) {
@@ -266,7 +296,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
 
   const onDoubleClick = (a: Annotation) => {
     if (a.type === 'text' && editable) {
-      useStore.getState().checkpoint();
+      useStore.getState().armCheckpoint();
       useStore.getState().setEditing(a.id);
     } else if (a.type === 'note') {
       useStore.getState().setSidebar(useStore.getState().sidebar);
@@ -286,10 +316,19 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       }
     };
     page.addEventListener('pointerdown', onDown);
-    // Escape abandons a partly drawn polygon/polyline/cloud.
+    // Escape abandons a partly drawn polygon/polyline/cloud, or a move/resize in progress.
     const onCancel = () => {
       setDraft(null);
       lastClick.current = null;
+      const d = drag.current;
+      drag.current = null;
+      pendingMove.current = null;
+      if (d?.moved) {
+        const s = useStore.getState();
+        s.updateAnnotation(pageId, d.id, d.mode === 'move' ? d.orig : d.annot, { history: false });
+        // The undo point taken when the drag began is not needed any more.
+        useStore.setState({ past: s.past.slice(0, -1) });
+      }
     };
     window.addEventListener('awesome-pdf:cancel-draft', onCancel);
     return () => {
@@ -463,7 +502,8 @@ function Selection({ a, geom, scale: S, onResize }: { a?: Annotation; geom: Page
 
 const FONT = "'Noto Sans', 'Noto Sans Symbols 2', sans-serif";
 
-function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pageId: string; geom: PageGeom; scale: number; editing: boolean }) {
+// Memoised: while one annotation is dragged, the others on the page need not be redrawn.
+const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pageId: string; geom: PageGeom; scale: number; editing: boolean }) {
   const view = (p: Pt) => {
     const v = pdfToView(geom, p);
     return { x: v.x * S, y: v.y * S };
@@ -604,7 +644,7 @@ function AnnotShape({ a, pageId, geom, scale: S, editing }: { a: Annotation; pag
       return <rect className="redact-mark" x={v.left * S} y={v.top * S} width={v.width * S} height={v.height * S} />;
     }
   }
-}
+});
 
 function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type: 'text' }>; pageId: string; scale: number; editing: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);

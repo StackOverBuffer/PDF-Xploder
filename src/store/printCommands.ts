@@ -4,32 +4,39 @@ import { buildPrintPdf, isPlain, planSheets, type PrintOptions, type Sheet } fro
 import { useStore } from './store';
 import { buildOutput, currentBytes } from './commands';
 import { viewSize } from '../lib/geometry';
+import type { PDFDocument } from '@cantoo/pdf-lib';
 
 const S = () => useStore.getState();
 
 interface Prepared {
-  key: unknown[];
   bytes: Uint8Array;
+  /** The same, loaded once for building every sheet. */
+  doc: PDFDocument;
   sizes: { width: number; height: number }[];
 }
 
-let cache: Prepared | null = null;
+/** The last preparation (shared while it is still being built, so quick option changes do not repeat it). */
+let cache: { key: unknown[]; result: Promise<Prepared> } | null = null;
 
 /** The document as it prints: comments (optional) and form fields painted into the pages. */
-async function prepared(comments: boolean): Promise<Prepared> {
+function prepared(comments: boolean): Promise<Prepared> {
   const s = S();
   const key = [s.bytes, s.annotations, s.formValues, comments];
-  if (cache && cache.key.length === key.length && cache.key.every((k, i) => k === key[i])) return cache;
-  let bytes = comments ? await buildOutput(true) : await currentBytes();
-  try {
-    bytes = await ops.flattenFormFields(bytes);
-  } catch (e) {
-    console.warn('Could not flatten form fields for printing', e);
-  }
-  const doc = await ops.load(bytes);
-  const sizes = doc.getPages().map((p) => viewSize(ops.geomOf(p)));
-  cache = { key, bytes, sizes };
-  return cache;
+  if (cache && cache.key.every((k, i) => k === key[i])) return cache.result;
+  const result = (async () => {
+    let bytes = comments ? await buildOutput(true) : await currentBytes();
+    try {
+      bytes = await ops.flattenFormFields(bytes);
+    } catch (e) {
+      console.warn('Could not flatten form fields for printing', e);
+    }
+    const doc = await ops.load(bytes);
+    const sizes = doc.getPages().map((p) => viewSize(ops.geomOf(p)));
+    return { bytes, doc, sizes };
+  })();
+  cache = { key, result };
+  result.catch(() => cache?.result === result && (cache = null));
+  return result;
 }
 
 /** Sheets for the options (for the preview's sheet count). */
@@ -43,7 +50,7 @@ export async function printPreviewSheet(o: PrintOptions, index: number): Promise
   const sheets = planSheets(o, p.sizes);
   if (!sheets.length) return null;
   const i = Math.min(Math.max(0, index), sheets.length - 1);
-  return { bytes: await buildPrintPdf(p.bytes, [sheets[i]]), count: sheets.length };
+  return { bytes: await buildPrintPdf(p.doc, [sheets[i]]), count: sheets.length };
 }
 
 /** Hand a PDF to the browser's print dialog. */
@@ -61,6 +68,12 @@ function printBytes(out: Uint8Array) {
     }, 60_000);
   };
   document.body.appendChild(frame);
+  // If the frame never loads, still clean up.
+  setTimeout(() => {
+    if (!frame.isConnected) return;
+    frame.remove();
+    URL.revokeObjectURL(url);
+  }, 10 * 60_000);
 }
 
 export async function printWithOptions(o: PrintOptions) {
@@ -69,7 +82,7 @@ export async function printWithOptions(o: PrintOptions) {
     const p = await prepared(o.comments);
     const sheets = planSheets(o, p.sizes);
     if (!sheets.length) throw new Error('There are no pages to print.');
-    printBytes(await buildPrintPdf(p.bytes, sheets));
+    printBytes(await buildPrintPdf(p.doc, sheets));
   });
 }
 

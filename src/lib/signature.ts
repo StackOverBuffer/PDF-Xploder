@@ -7,6 +7,7 @@
  * Web Crypto API (RSA PKCS#1 v1.5 and ECDSA); forge's own RSA verification is
  * deliberately not used (GHSA-86w9-cpqp-85rv).
  */
+import { containsAscii } from './security';
 import type forgeType from 'node-forge';
 import {
   PDFArray,
@@ -509,6 +510,8 @@ async function verifyCms(cmsBytes: Uint8Array, signedData: Uint8Array): Promise<
 
 /** Find and check every signature in the document. */
 export async function verifySignatures(bytes: Uint8Array): Promise<SignatureInfo[]> {
+  // A signature's byte range has to sit uncompressed in the file: without one, skip the full parse.
+  if (!containsAscii(bytes, '/ByteRange')) return [];
   let doc: PDFDocument;
   try {
     doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });

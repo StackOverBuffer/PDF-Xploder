@@ -31,7 +31,7 @@ export async function load(bytes: Uint8Array): Promise<PDFDocument> {
 }
 
 async function save(doc: PDFDocument): Promise<Uint8Array> {
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 export function geomOf(page: PDFPage): PageGeom {
@@ -68,7 +68,8 @@ export async function insertBlankPage(bytes: Uint8Array, at: number, size?: [num
   let dims = size;
   if (!dims) {
     const ref = doc.getPage(Math.min(Math.max(at - 1, 0), doc.getPageCount() - 1));
-    const { width, height } = ref.getSize();
+    // As displayed: a rotated landscape page gets a landscape blank page next to it.
+    const { width, height } = viewSize(geomOf(ref));
     dims = [width, height];
   }
   doc.insertPage(at, dims);
@@ -101,16 +102,16 @@ export async function reorderPages(bytes: Uint8Array, order: number[]): Promise<
 
 export async function duplicatePages(bytes: Uint8Array, indices: number[]): Promise<Uint8Array> {
   const doc = await load(bytes);
-  const sorted = [...new Set(indices)].sort((a, b) => b - a);
-  for (const i of sorted) {
-    const [copy] = await doc.copyPages(doc, [i]);
-    doc.insertPage(i + 1, copy);
-  }
+  const sorted = [...new Set(indices)].sort((a, b) => a - b);
+  // One copy operation, so resources the pages share (fonts, images) are copied once.
+  const copies = await doc.copyPages(doc, sorted);
+  for (let k = sorted.length - 1; k >= 0; k--) doc.insertPage(sorted[k] + 1, copies[k]);
   return save(doc);
 }
 
-export async function extractPages(bytes: Uint8Array, indices: number[]): Promise<Uint8Array> {
-  const src = await load(bytes);
+/** The given pages as a new file. Pass a loaded document to extract several parts without re-parsing. */
+export async function extractPages(source: Uint8Array | PDFDocument, indices: number[]): Promise<Uint8Array> {
+  const src = source instanceof Uint8Array ? await load(source) : source;
   const out = await PDFDocument.create();
   const pages = await out.copyPages(src, indices);
   pages.forEach((p) => out.addPage(p));
@@ -132,7 +133,7 @@ export async function splitEvery(bytes: Uint8Array, n: number): Promise<Uint8Arr
   const parts: Uint8Array[] = [];
   for (let start = 0; start < count; start += n) {
     const idx = Array.from({ length: Math.min(n, count - start) }, (_, k) => start + k);
-    parts.push(await extractPages(bytes, idx));
+    parts.push(await extractPages(src, idx));
   }
   return parts;
 }
@@ -319,6 +320,7 @@ export async function setMetadata(bytes: Uint8Array, m: Metadata): Promise<Uint8
 
 export { getFormFields, type FieldInfo } from './forms';
 import type { FieldValue } from './forms';
+import { saveDoc } from './pdfSave';
 export type { FieldValue };
 
 export async function setFormValues(
@@ -432,8 +434,28 @@ export async function importForEditing(
 export async function replacePagesWithImages(
   bytes: Uint8Array,
   images: { index: number; png: Uint8Array }[],
-): Promise<Uint8Array> {
+): Promise<{ bytes: Uint8Array; removedFields: string[] }> {
   const doc = await load(bytes);
+  // Form fields with a widget on a redacted page go entirely: their values would survive
+  // in the form data even though the page is now an image.
+  const redacted = new Set(images.map(({ index }) => doc.getPage(index).ref.toString()));
+  const removedFields: string[] = [];
+  const form = doc.getForm();
+  for (const field of form.getFields()) {
+    const onRedacted = field.acroField.getWidgets().some((w) => {
+      const p = w.P();
+      if (p && redacted.has(p.toString())) return true;
+      // Widgets without /P: look them up in the pages' annotation arrays.
+      return images.some(({ index }) => {
+        const annots = doc.getPage(index).node.Annots();
+        return !!annots && annots.asArray().some((a) => a === doc.context.getObjectRef(w.dict));
+      });
+    });
+    if (onRedacted) {
+      removedFields.push(field.getName());
+      form.removeField(field);
+    }
+  }
   for (const { index, png } of images) {
     const old = doc.getPage(index);
     const vs = viewSize(geomOf(old));
@@ -444,5 +466,5 @@ export async function replacePagesWithImages(
   }
   // Strip any per-page annotations (links, widgets) that might leak hidden data on the new pages.
   for (const { index } of images) doc.getPage(index).node.delete(PDFName.of('Annots'));
-  return save(doc);
+  return { bytes: await save(doc), removedFields };
 }

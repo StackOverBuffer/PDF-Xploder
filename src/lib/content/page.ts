@@ -238,9 +238,19 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
   const writer = new TextWriter(page, fonts);
   let list: (ContentObject | null)[] = [...objects];
   let selection: ContentObject[] = [];
+  // Positions of the objects in `list` (selecting everything on a dense page means thousands of lookups).
+  let pos = new Map<ContentObject, number>();
+  const reindex = () => {
+    pos = new Map();
+    list.forEach((o, i) => o && pos.set(o, i));
+  };
+  reindex();
   const pick = (ids: number[]) => ids.map((i) => list[i]).filter((o): o is ContentObject => !!o);
   const replace = (o: ContentObject, next: ContentObject) => {
-    list[list.indexOf(o)] = next;
+    const i = pos.get(o)!;
+    list[i] = next;
+    pos.delete(o);
+    pos.set(next, i);
     return next;
   };
 
@@ -250,32 +260,40 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
         selection = pick(e.ids).map((o) => replace(o, { ...o, user: mul(o.user, e.m) }));
         break;
       case 'delete':
-        for (const o of pick(e.ids)) list[list.indexOf(o)] = null;
+        for (const o of pick(e.ids)) {
+          list[pos.get(o)!] = null;
+          pos.delete(o);
+        }
         selection = [];
         break;
       case 'arrange': {
         const chosen = pick(e.ids);
+        const chosenSet = new Set(chosen);
         let all = list.filter((o): o is ContentObject => !!o);
-        const rest = all.filter((o) => !chosen.includes(o));
+        const rest = all.filter((o) => !chosenSet.has(o));
         if (e.to === 'front') all = [...rest, ...chosen];
         else if (e.to === 'back') all = [...chosen, ...rest];
         else {
           // One step: swap each chosen object with its neighbour.
-          const order = e.to === 'forward' ? [...chosen].sort((x, y) => all.indexOf(y) - all.indexOf(x)) : [...chosen].sort((x, y) => all.indexOf(x) - all.indexOf(y));
+          const at = new Map(all.map((o, i) => [o, i]));
+          const order = e.to === 'forward' ? [...chosen].sort((x, y) => at.get(y)! - at.get(x)!) : [...chosen].sort((x, y) => at.get(x)! - at.get(y)!);
           for (const o of order) {
-            const i = all.indexOf(o);
+            const i = at.get(o)!;
             const j = e.to === 'forward' ? i + 1 : i - 1;
-            if (j < 0 || j >= all.length || chosen.includes(all[j])) continue;
+            if (j < 0 || j >= all.length || chosenSet.has(all[j])) continue;
             [all[i], all[j]] = [all[j], all[i]];
+            at.set(all[i], i);
+            at.set(all[j], j);
           }
         }
         list = all;
+        reindex();
         selection = chosen;
         break;
       }
       case 'duplicate': {
         const copies = pick(e.ids).map((o) => ({ ...o, user: mul(o.user, translate(e.dx, e.dy)) }));
-        list.push(...copies);
+        for (const c of copies) pos.set(c, list.push(c) - 1);
         selection = copies;
         break;
       }
@@ -411,7 +429,8 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
   }
   const final = list.filter((o): o is ContentObject => !!o);
   writePage(page, final);
-  return selection.map((o) => final.indexOf(o)).filter((i) => i >= 0);
+  const finalAt = new Map(final.map((o, i) => [o, i]));
+  return selection.map((o) => finalAt.get(o) ?? -1).filter((i) => i >= 0);
 }
 
 const isOcMarker = (m: Op) => m.op === 'BDC' && typeof m.args[0] === 'object' && m.args[0] !== null && 't' in m.args[0] && m.args[0].t === 'name' && m.args[0].v === 'OC';

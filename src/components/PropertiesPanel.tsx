@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useStore, type ToolStyle } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -166,9 +167,14 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
     fontSize: a.type === 'text' ? a.fontSize : undefined,
     stampLabel: a.type === 'stamp' ? a.label : undefined,
   };
+  // Dragging a slider or colour picker sends a stream of changes: one undo step for the lot.
+  const lastStyle = useRef(0);
   const onStyle = (p: Partial<ToolStyle>) => {
     const { stampLabel, ...rest } = p;
-    update((stampLabel !== undefined ? { ...rest, label: stampLabel } : rest) as Partial<Annotation>);
+    const now = Date.now();
+    const history = now - lastStyle.current > 800;
+    lastStyle.current = now;
+    update((stampLabel !== undefined ? { ...rest, label: stampLabel } : rest) as Partial<Annotation>, history);
   };
   return (
     <fieldset disabled={!editable} className="props-body">
@@ -181,7 +187,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
         <>
           <label className="prop">
             <span className="prop-label">{t('Text')}</span>
-            <textarea id="prop-text" rows={4} value={a.text} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
+            <textarea id="prop-text" rows={4} value={a.text} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
           </label>
           <label className="prop inline"><input type="checkbox" checked={a.border} onChange={(e) => update({ border: e.target.checked })} /> {t('Border')}</label>
         </>
@@ -189,13 +195,13 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
       {a.type === 'note' && (
         <label className="prop">
           <span className="prop-label">{t('Note')}</span>
-          <textarea id="prop-text" rows={6} value={a.text} placeholder={t('Type your note…')} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
+          <textarea id="prop-text" rows={6} value={a.text} placeholder={t('Type your note…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
         </label>
       )}
       {a.type !== 'note' && (
         <label className="prop">
           <span className="prop-label">{tOr(t, 'Comment text', 'Comment')}</span>
-          <textarea rows={3} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().checkpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
+          <textarea rows={3} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
         </label>
       )}
       {a.type === 'redact' && <p className="muted small">{t('Redaction marks are only previews. Use')} <b>{t('Protect → Apply redactions')}</b> {t('to permanently remove the content underneath.')}</p>}

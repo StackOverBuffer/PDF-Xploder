@@ -26,9 +26,10 @@ import { normRot, viewRectToPdf, viewSize, viewToPdf } from './geometry';
 import { apply, inv, mul, type M } from './content/matrix';
 import { isName, parseContent, writeContent, type Op, type Operand } from './content/syntax';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
+import { saveDoc } from './pdfSave';
 
 const load = ops.load;
-const save = (doc: PDFDocument) => doc.save({ useObjectStreams: true });
+const save = (doc: PDFDocument) => saveDoc(doc);
 const N = (k: string) => PDFName.of(k);
 const enc = new TextEncoder();
 
@@ -342,14 +343,16 @@ export async function topLevelBookmarks(bytes: Uint8Array): Promise<Bookmark[]> 
 
 /** One file per group of pages. */
 export async function splitByRanges(bytes: Uint8Array, groups: number[][]): Promise<Uint8Array[]> {
+  const src = await load(bytes);
   const parts: Uint8Array[] = [];
-  for (const g of groups) if (g.length) parts.push(await ops.extractPages(bytes, g));
+  for (const g of groups) if (g.length) parts.push(await ops.extractPages(src, g));
   return parts;
 }
 
 /** One file per top-level bookmark, from its page up to the next bookmark's page. */
 export async function splitByBookmarks(bytes: Uint8Array): Promise<{ title: string; bytes: Uint8Array }[]> {
-  const n = (await load(bytes)).getPageCount();
+  const src = await load(bytes);
+  const n = src.getPageCount();
   const marks = (await topLevelBookmarks(bytes)).filter((b) => b.page >= 0 && b.page < n).sort((a, b) => a.page - b.page);
   const starts = marks.filter((b, k) => k === 0 || b.page !== marks[k - 1].page);
   if (!starts.length) throw new Error('This document has no bookmarks that point to its pages.');
@@ -357,15 +360,16 @@ export async function splitByBookmarks(bytes: Uint8Array): Promise<{ title: stri
   for (const [k, b] of starts.entries()) {
     const from = k === 0 ? 0 : b.page;
     const to = k + 1 < starts.length ? starts[k + 1].page : n;
-    out.push({ title: b.title, bytes: await ops.extractPages(bytes, Array.from({ length: to - from }, (_, j) => from + j)) });
+    out.push({ title: b.title, bytes: await ops.extractPages(src, Array.from({ length: to - from }, (_, j) => from + j)) });
   }
   return out;
 }
 
 /** Split into files of at most `maxBytes` each where possible (a single page larger than that gets a file of its own). */
 export async function splitBySize(bytes: Uint8Array, maxBytes: number): Promise<Uint8Array[]> {
-  const n = (await load(bytes)).getPageCount();
-  const range = (from: number, count: number) => ops.extractPages(bytes, Array.from({ length: count }, (_, j) => from + j));
+  const src = await load(bytes);
+  const n = src.getPageCount();
+  const range = (from: number, count: number) => ops.extractPages(src, Array.from({ length: count }, (_, j) => from + j));
   const parts: Uint8Array[] = [];
   for (let start = 0; start < n; ) {
     const rest = n - start;

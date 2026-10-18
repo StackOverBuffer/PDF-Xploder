@@ -7,7 +7,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Search } from 'lucide-react';
-import { useT } from '../lib/i18n';
+import { loadLanguage, useT } from '../lib/i18n';
 import { dedupe, recentCommands, rememberCommand, searchCommands, type CommandEntry } from '../lib/commandSearch';
 import { HarvestContext, type Harvest } from './ribbonParts';
 import { RibbonTab, TABS, type RibbonTabProps } from './Ribbon';
@@ -53,16 +53,19 @@ export function CommandSearch(props: TabProps) {
     return () => window.removeEventListener(FOCUS_COMMAND_SEARCH, focus);
   }, []);
 
+  // Matching also uses the German names, whatever the interface language.
+  const [deReady, setDeReady] = useState(0);
   const results = useMemo(() => {
     if (!entries) return [];
     if (query.trim()) return searchCommands(entries, query);
     const byId = new Map(entries.map((e) => [e.id, e]));
     return recentCommands().flatMap((id) => byId.get(id) ?? []);
-  }, [entries, query]);
+  }, [entries, query, deReady]);
 
   useEffect(() => setSel(0), [query]);
 
   const show = () => {
+    loadLanguage('de').then(() => setDeReady(1));
     const r = input.current!.getBoundingClientRect();
     setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
     setOpen(true);

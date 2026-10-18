@@ -60,6 +60,14 @@ function parsed(key: FontKey) {
       return { bytes, has: (cp: number) => f.hasGlyphForCodePoint(cp) };
     }).catch(() => null);
     parsedCache.set(key, p);
+    // A font that could not be loaded (offline, network error) is tried again next time.
+    const mine = p;
+    p.then((r) => {
+      if (r === null && parsedCache.get(key) === mine) {
+        parsedCache.delete(key);
+        bytesCache.delete(key);
+      }
+    });
   }
   return p;
 }

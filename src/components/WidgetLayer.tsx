@@ -132,7 +132,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
 
 function Widget({ a, f, value, disabled, reason, style, scale }: { a: AnnotData; f: FieldInfo; value: FieldValue | undefined; disabled: boolean; reason?: string; style: React.CSSProperties; scale: number }) {
   const set = (v: FieldValue, history = true) => useStore.getState().setFormValue(f.name, v, { history });
-  const checkpoint = () => useStore.getState().checkpoint();
+  const checkpoint = () => useStore.getState().armCheckpoint();
   const h = Number(style.height);
   // Font size 0 in the field's default appearance means "auto".
   const da = a.defaultAppearanceData?.fontSize;

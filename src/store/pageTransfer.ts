@@ -9,7 +9,6 @@ import { rangeText } from '../lib/organize';
 import { baseName } from '../lib/download';
 import { tf } from '../lib/i18n';
 import type { Annotation } from '../lib/types';
-import { currentBytes } from './commands';
 import { allowed, requirePermission } from './permissions';
 import { uid, useStore } from './store';
 
@@ -22,8 +21,8 @@ interface PageClip {
   tab: string;
   fileName: string;
   pages: number[];
-  /** Only the dragged pages, with form values applied. Started when the drag starts. */
-  bytes: Promise<Uint8Array>;
+  /** Only the dragged pages, with form values applied (built on drop, from the document as it was when the drag started). */
+  bytes: () => Promise<Uint8Array>;
   annotations: Annotation[][];
   canCopy: boolean;
 }
@@ -35,8 +34,11 @@ export function startPageDrag(pages: number[]) {
   const s = S();
   const sorted = [...new Set(pages)].sort((a, b) => a - b);
   const canCopy = allowed(s, 'copy');
-  const bytes = canCopy ? currentBytes().then((b) => ops.extractPages(b, sorted)) : Promise.reject(new Error('copy not allowed'));
-  bytes.catch(() => {}); // Only awaited on a drop.
+  // Nothing is built yet: most drags just reorder pages within the document.
+  const { bytes: source, formValues } = s;
+  let built: Promise<Uint8Array> | null = null;
+  const bytes = () =>
+    (built ??= (Object.keys(formValues).length ? ops.setFormValues(source!, formValues) : Promise.resolve(source!)).then((b) => ops.extractPages(b, sorted)));
   clip = { tab: s.activeTab, fileName: s.fileName, pages: sorted, bytes, annotations: sorted.map((i) => s.annotations[s.pageIds[i]] ?? []), canCopy };
 }
 
@@ -67,7 +69,7 @@ export async function dropPages(at?: number): Promise<void> {
   if (!c || !requirePermission('assemble')) return;
   await S().run('Inserting pages…', async () => {
     const pos = Math.min(at ?? S().pageIds.length, S().pageIds.length);
-    const { bytes, count } = await ops.insertDocument(S().bytes!, await c.bytes, pos);
+    const { bytes, count } = await ops.insertDocument(S().bytes!, await c.bytes(), pos);
     const added = Array.from({ length: count }, () => uid('page'));
     const ids = [...S().pageIds];
     ids.splice(pos, 0, ...added);
@@ -88,7 +90,7 @@ export async function dropPagesAsNewDocument(): Promise<void> {
   if (!c) return;
   await S().run('Opening…', async () => {
     const name = `${baseName(c.fileName || 'document')} (${rangeText(c.pages)}).pdf`;
-    await S().openInNewTab(await c.bytes, name);
+    await S().openInNewTab(await c.bytes(), name);
     const s = S();
     const annotations: Record<string, Annotation[]> = {};
     s.pageIds.forEach((id, k) => {

@@ -25,6 +25,15 @@ export type Action =
 
 type PermState = Pick<Store, 'pdf' | 'editable' | 'permissions' | 'ownerAccess'>;
 
+/** Just the fields permissions depend on, so components re-render only when those change. */
+export function usePermState(): PermState {
+  const pdf = useStore((s) => s.pdf);
+  const editable = useStore((s) => s.editable);
+  const permissions = useStore((s) => s.permissions);
+  const ownerAccess = useStore((s) => s.ownerAccess);
+  return { pdf, editable, permissions, ownerAccess };
+}
+
 export function allowed(s: PermState, a: Action): boolean {
   if (!s.pdf) return false;
   const p = s.permissions;

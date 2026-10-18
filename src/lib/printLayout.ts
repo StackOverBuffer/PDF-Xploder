@@ -139,8 +139,9 @@ export function isPlain(o: PrintOptions, count: number): boolean {
 }
 
 /** Build the sheets as a PDF from the prepared document (comments and form fields already in the page content). */
-export async function buildPrintPdf(bytes: Uint8Array, sheets: Sheet[]): Promise<Uint8Array> {
-  const src = await load(bytes);
+export async function buildPrintPdf(source: Uint8Array | PDFDocument, sheets: Sheet[]): Promise<Uint8Array> {
+  // A loaded document can be reused for every preview sheet (embedding does not change it).
+  const src = source instanceof Uint8Array ? await load(source) : source;
   const srcPages = src.getPages();
   const out = await PDFDocument.create();
   const embedded = new Map<number, { ref: PDFRef; g: PageGeom }>();

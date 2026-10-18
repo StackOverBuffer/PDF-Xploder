@@ -3,8 +3,8 @@ import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
-import { ALL_PERMISSIONS, allPermissionsGranted, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
-import { verifySignatures, type SignatureInfo } from '../lib/signature';
+import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
+import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
 
 let idCounter = 0;
@@ -50,6 +50,21 @@ export interface ScrollRequest {
 }
 
 const MAX_HISTORY = 100;
+/** Undo history keeps at most this many bytes of distinct document versions (per tab). */
+const MAX_HISTORY_BYTES = 300 * 1024 * 1024;
+
+/** Drop the oldest entries while the distinct document versions in `past` + `future` exceed the budget. */
+function capHistory(past: Snapshot[], future: Snapshot[], current: Uint8Array | null): Snapshot[] {
+  const size = (list: Snapshot[]) => {
+    const seen = new Set<Uint8Array>(current ? [current] : []);
+    let n = 0;
+    for (const sn of list) if (!seen.has(sn.bytes)) (seen.add(sn.bytes), (n += sn.bytes.byteLength));
+    return n;
+  };
+  let out = past;
+  while (out.length > 1 && size([...out, ...future]) > MAX_HISTORY_BYTES) out = out.slice(1);
+  return out;
+}
 
 export const DEFAULT_STYLES: Record<string, ToolStyle> = {
   highlight: { color: '#ffeb3b', fill: null, width: 1, opacity: 0.45, fontSize: 12, stampLabel: '' },
@@ -189,6 +204,8 @@ interface Actions {
   setFormValue(name: string, value: FieldValue, opts?: { history?: boolean }): void;
   /** Push the current state onto the undo stack (used before a drag starts). */
   checkpoint(): void;
+  /** Take an undo point before the next change made without history (typing): focusing a field alone adds none. */
+  armCheckpoint(): void;
   undo(): Promise<void>;
   redo(): Promise<void>;
   markSaved(): void;
@@ -270,6 +287,9 @@ function readAuthor(): string {
   }
 }
 
+/** Commands in progress (see run). */
+const running: { label: string }[] = [];
+
 export const useStore = create<Store>()((set, get) => {
   async function loadPdfJs(bytes: Uint8Array, knownPassword?: string, viewRotation = get().viewRotation) {
     let tries = 0;
@@ -286,10 +306,18 @@ export const useStore = create<Store>()((set, get) => {
     return { bytes: s.bytes!, pageIds: s.pageIds, annotations: s.annotations, formValues: s.formValues };
   }
 
+  /** An undo point is due before the next change made without history (see armCheckpoint). */
+  let armed = false;
+  const takeArmed = () => {
+    if (armed) pushHistory();
+  };
+
   function pushHistory() {
+    armed = false;
     const s = get();
     if (!s.bytes) return;
-    set({ past: [...s.past, snapshot()].slice(-MAX_HISTORY), future: [], dirty: true });
+    const past = [...s.past, snapshot()].slice(-MAX_HISTORY);
+    set({ past: capHistory(past, [], s.bytes), future: [], dirty: true });
   }
 
   /** Compute the state change for leaving inline text editing: empty text boxes are discarded. */
@@ -306,14 +334,33 @@ export const useStore = create<Store>()((set, get) => {
   }
 
   async function restore(snap: Snapshot) {
-    const s = get();
-    if (snap.bytes !== s.bytes) {
+    let doc: Partial<State> = {};
+    if (snap.bytes !== get().bytes) {
       const { pdf, geoms } = await loadPdfJs(snap.bytes);
-      s.pdf?.destroy();
-      set({ pdf, geoms, bytes: snap.bytes, docVersion: s.docVersion + 1 });
+      // Read the state after loading: it may have changed meanwhile.
+      const cur = get();
+      if (cur.pdf !== pdf) cur.pdf?.destroy();
+      doc = { pdf, geoms, bytes: snap.bytes, docVersion: cur.docVersion + 1 };
     }
-    set({ pageIds: snap.pageIds, annotations: snap.annotations, formValues: snap.formValues, selected: null, editing: null, dirty: true, search: { ...get().search, hits: [], index: -1 } });
-    set({ currentPage: Math.min(get().currentPage, snap.pageIds.length - 1) });
+    const cur = get();
+    const n = snap.pageIds.length;
+    // One update, so views never see geometry and page ids of different lengths.
+    set({
+      ...doc,
+      pageIds: snap.pageIds,
+      annotations: snap.annotations,
+      formValues: snap.formValues,
+      selected: null,
+      editing: null,
+      selectedField: null,
+      // Object ids are positions in the page content: they do not survive an undo.
+      contentSelection: null,
+      contentEditing: null,
+      selectedPages: cur.selectedPages.filter((i) => i < n),
+      currentPage: Math.min(cur.currentPage, n - 1),
+      dirty: true,
+      search: { ...cur.search, hits: [], index: -1 },
+    });
   }
 
   async function openDocumentImpl(bytes: Uint8Array, name: string, opts: OpenOptions = {}) {
@@ -414,8 +461,16 @@ export const useStore = create<Store>()((set, get) => {
       sidebar: get().sidebar,
     });
     if (!editable) get().notify(tr('This document is damaged or uses unsupported encryption: it is open read-only.'), 'error');
-    verifySignatures(original)
+    const tab = get().activeTab;
+    // Loaded only for files that contain a signature at all.
+    (containsAscii(original, '/ByteRange') ? import('../lib/signature').then((m) => m.verifySignatures(original)) : Promise.resolve([] as SignatureInfo[]))
       .then((signatures) => {
+        // The tab may have been switched away meanwhile: then store the result with it.
+        if (get().activeTab !== tab) {
+          const p = parked.get(tab);
+          if (p?.originalBytes === original) p.signatures = signatures;
+          return;
+        }
         if (get().originalBytes !== original) return;
         set({ signatures });
         if (signatures.length && get().sidebar !== 'signatures') set({ sidebar: 'signatures' });
@@ -594,16 +649,21 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     async commitBytes(bytes, pageIds, annotations, formValues) {
-      const s = get();
       const { pdf, geoms } = await loadPdfJs(bytes);
-      pushHistory();
-      s.pdf?.destroy();
+      // Read the state after loading, so changes made meanwhile are kept.
+      const s = get();
       const ids = pageIds ?? s.pageIds;
-      if (ids.length !== geoms.length) throw new Error('Page id bookkeeping is out of sync');
+      if (ids.length !== geoms.length) {
+        pdf.destroy();
+        throw new Error('Page id bookkeeping is out of sync');
+      }
+      pushHistory();
+      if (s.pdf !== pdf) s.pdf?.destroy();
       const annots = annotations ?? s.annotations;
       // Drop annotations whose page no longer exists.
       const kept: Record<string, Annotation[]> = {};
       for (const id of ids) if (annots[id]) kept[id] = annots[id];
+      const pagesChanged = ids !== s.pageIds;
       set({
         bytes,
         pdf,
@@ -616,6 +676,8 @@ export const useStore = create<Store>()((set, get) => {
         selectedPages: s.selectedPages.filter((i) => i < ids.length),
         currentPage: Math.min(s.currentPage, ids.length - 1),
         search: { ...s.search, hits: [], index: -1 },
+        // Content object ids are positions on a page; after a page change they point elsewhere.
+        ...(pagesChanged ? { contentSelection: null, contentEditing: null } : {}),
       });
     },
 
@@ -628,6 +690,7 @@ export const useStore = create<Store>()((set, get) => {
 
     updateAnnotation(pageId, id, patch, opts = {}) {
       if (opts.history !== false) pushHistory();
+      else takeArmed();
       const list = get().annotations[pageId] ?? [];
       set({
         annotations: {
@@ -649,10 +712,14 @@ export const useStore = create<Store>()((set, get) => {
 
     setFormValue(name, value, opts = {}) {
       if (opts.history !== false) pushHistory();
+      else takeArmed();
       set({ formValues: { ...get().formValues, [name]: value }, dirty: true });
     },
 
     checkpoint: pushHistory,
+    armCheckpoint: () => {
+      armed = true;
+    },
 
     async undo() {
       const s = get();
@@ -709,8 +776,11 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     async run(label, fn) {
-      // Labels and messages are English keys; translate them centrally.
-      set({ busy: tr(label) });
+      // Labels and messages are English keys; translate them centrally. Runs can nest
+      // (a command calling another), so keep a stack: the app is busy until all finish.
+      const entry = { label: tr(label) };
+      running.push(entry);
+      set({ busy: entry.label });
       try {
         return await fn();
       } catch (e) {
@@ -718,7 +788,8 @@ export const useStore = create<Store>()((set, get) => {
         get().notify((e as Error).message || String(e), 'error');
         return undefined;
       } finally {
-        set({ busy: null });
+        running.splice(running.indexOf(entry), 1);
+        set({ busy: running.length ? running[running.length - 1].label : null });
       }
     },
 
@@ -731,6 +802,19 @@ export const useStore = create<Store>()((set, get) => {
     },
   };
 });
+
+/** Resolves once no command is running (e.g. before opening a file the system handed over). */
+export function whenIdle(): Promise<void> {
+  if (!useStore.getState().busy) return Promise.resolve();
+  return new Promise((resolve) => {
+    const stop = useStore.subscribe((s) => {
+      if (!s.busy) {
+        stop();
+        resolve();
+      }
+    });
+  });
+}
 
 /** Annotations ordered by page index. */
 export function annotationsByPage(s: Pick<State, 'pageIds' | 'annotations'>): Annotation[][] {

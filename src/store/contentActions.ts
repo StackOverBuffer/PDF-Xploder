@@ -2,17 +2,19 @@
  * Commands behind the page-object context menu: image tools, object
  * clipboard, arranging, layers, links, bookmarks, stamps and export.
  */
+import { currentLayers } from './content';
 import { create } from 'zustand';
 import { useStore } from './store';
 import { requirePermission } from './permissions';
 import { applyContentEdits, imageBytes, matchesFilter, pageObjects, type ContentFilter } from './content';
-import { createLayer, findLayer, isolateObjects, listLayers, loadForEditing, type LayerInfo, type ObjectInfo, type ContentEdit } from '../lib/content/page';
+import { createLayer, findLayer, isolateObjects, loadForEditing, type LayerInfo, type ObjectInfo, type ContentEdit } from '../lib/content/page';
 import { about, scale as scaleM, translate } from '../lib/content/matrix';
 import { addBookmark, addLink, type LinkTarget } from '../lib/navigation';
 import { openPdf } from '../lib/pdfjs';
 import { baseName, downloadBlob } from '../lib/download';
 import { tr } from '../lib/i18n';
 import type { Rect } from '../lib/types';
+import { saveDoc } from '../lib/pdfSave';
 
 const S = () => useStore.getState();
 
@@ -181,7 +183,7 @@ export async function pasteObjects(page = S().currentPage, opts: { at?: { x: num
     // The embedded page's form maps its box's lower-left corner to the origin.
     const { editPage } = await import('../lib/content/page');
     const ids = await editPage(doc.getPage(page), [{ type: 'addForm', ref: emb.ref, m: translate(bbox.x, bbox.y), bbox }]);
-    await S().commitBytes(await doc.save({ useObjectStreams: true }));
+    await S().commitBytes(await saveDoc(doc));
     S().setTool('content');
     useStore.setState({ contentSelection: ids.length ? { page, ids } : null });
   });
@@ -244,7 +246,7 @@ export function centerOnPageEdits(chosen: ObjectInfo[], pageBox: Rect, axis: 'x'
 // ---------------------------------------------------------------- layers
 
 export async function documentLayers(): Promise<LayerInfo[]> {
-  return listLayers(await loadForEditing(S().bytes!));
+  return currentLayers();
 }
 
 /** Put the selected objects on a layer (`ref`), a new layer (`name`) or no layer (null). */
@@ -255,7 +257,7 @@ export async function setObjectsLayer(page: number, ids: number[], layer: { ref:
     const ocg = layer === null ? null : 'ref' in layer ? findLayer(doc, layer.ref) ?? null : createLayer(doc, layer.name);
     const { editPage } = await import('../lib/content/page');
     const next = await editPage(doc.getPage(page), [{ type: 'layer', ids, ocg }]);
-    await S().commitBytes(await doc.save({ useObjectStreams: true }));
+    await S().commitBytes(await saveDoc(doc));
     useStore.setState({ contentSelection: next.length ? { page, ids: next } : null });
   });
 }

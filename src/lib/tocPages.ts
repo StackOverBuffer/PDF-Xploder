@@ -4,6 +4,7 @@ import { load } from './pdfOps';
 import { createTextEngine } from './fonts';
 import type { OutlineNode } from './outline';
 import type { TextEngine } from './appearance';
+import { saveDoc } from './pdfSave';
 
 export interface TocOptions {
   title: string;
@@ -102,5 +103,5 @@ export async function insertTocPages(bytes: Uint8Array, nodes: OutlineNode[], o:
       y -= line;
     }
   }
-  return { bytes: await doc.save({ useObjectStreams: true }), count };
+  return { bytes: await saveDoc(doc), count };
 }

@@ -1,4 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { PRIORITY, renderSlot } from '../lib/renderQueue';
 import { RotateCcw, RotateCw, Trash2, FilePlus2, Copy, FileOutput } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -9,67 +10,144 @@ import { tf, useT } from '../lib/i18n';
 
 const THUMB_W = 130;
 
-const Thumb = memo(function Thumb({ index }: { index: number }) {
+/** One observer for all thumbnails, relative to the thumbnail list (so the prefetch margin applies there). */
+function useInView(root: HTMLElement | null, el: HTMLElement | null): boolean {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (!el) return;
+    const io = observerFor(root);
+    callbacks.set(el, setInView);
+    io.observe(el);
+    return () => {
+      io.unobserve(el);
+      callbacks.delete(el);
+    };
+  }, [root, el]);
+  return inView;
+}
+
+const callbacks = new WeakMap<Element, (v: boolean) => void>();
+const observers = new WeakMap<object, IntersectionObserver>();
+const NO_ROOT = {};
+function observerFor(root: HTMLElement | null): IntersectionObserver {
+  const key = root ?? NO_ROOT;
+  let io = observers.get(key);
+  if (!io) {
+    io = new IntersectionObserver((entries) => entries.forEach((e) => callbacks.get(e.target)?.(e.isIntersecting)), { root, rootMargin: '400px 0px' });
+    observers.set(key, io);
+  }
+  return io;
+}
+
+const Thumb = memo(function Thumb({ index, root }: { index: number; root: HTMLElement | null }) {
   const pdf = useStore((s) => s.pdf);
   const docVersion = useStore((s) => s.docVersion);
   const opening = useStore((s) => s.opening);
   const geom = useStore((s) => s.geoms[index]);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const inView = useInView(root, host);
+  const done = useRef('');
   const { width, height } = viewSize(geom);
   const scale = THUMB_W / width;
 
   useEffect(() => {
-    const el = hostRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: '300px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!inView || !pdf || opening) return;
+    const key = `${docVersion}:${scale}:${geom.rotation}`;
+    if (!inView || !pdf || opening || done.current === key) return;
     let cancelled = false;
     let task: { cancel(): void } | null = null;
+    // The pages in the main view come first.
+    const slot = renderSlot(PRIORITY.thumbnail);
     (async () => {
       try {
+        await slot.ready;
+        if (cancelled) return;
         const page = await pdf.getPage(index + 1);
-        const viewport = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 2), rotation: geom.rotation });
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 1.5), rotation: geom.rotation });
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
-        const t = page.render({ canvasContext: canvas.getContext('2d')!, viewport });
+        const t = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport });
         task = t;
         await t.promise;
-        if (!cancelled) hostRef.current?.replaceChildren(canvas);
+        if (cancelled) return;
+        hostRef.current?.replaceChildren(canvas);
+        done.current = key;
       } catch {
         /* cancelled */
+      } finally {
+        slot.done();
       }
     })();
     return () => {
       cancelled = true;
       task?.cancel();
+      slot.done();
     };
   }, [inView, pdf, docVersion, index, scale, geom.rotation, opening]);
 
-  return <div ref={hostRef} className="thumb-canvas" style={{ width: THUMB_W, height: Math.round(height * scale) }} />;
+  return (
+    <div
+      ref={(el) => {
+        hostRef.current = el;
+        if (el !== host) setHost(el);
+      }}
+      className="thumb-canvas"
+      style={{ width: THUMB_W, height: Math.round(height * scale) }}
+    />
+  );
+});
+
+interface ItemProps {
+  index: number;
+  root: HTMLElement | null;
+  dropBefore: boolean;
+  dropAfter: boolean;
+  draggable: boolean;
+  onPick: (e: React.MouseEvent, i: number) => void;
+  onDragStart: (e: React.DragEvent, i: number) => void;
+  onDragOver: (e: React.DragEvent, i: number) => void;
+}
+
+/** One thumbnail; subscribes only to what concerns its own page. */
+const ThumbItem = memo(function ThumbItem({ index, root, dropBefore, dropAfter, draggable, onPick, onDragStart, onDragOver }: ItemProps) {
+  const t = useT();
+  const current = useStore((s) => s.currentPage === index);
+  const selected = useStore((s) => s.selectedPages.includes(index));
+  const count = useStore((s) => s.annotations[s.pageIds[index]]?.length ?? 0);
+  return (
+    <div
+      className={`thumb ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${dropBefore ? 'drop-before' : ''} ${dropAfter ? 'drop-after' : ''}`}
+      draggable={draggable}
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDragEnd={endPageDrag}
+      onClick={(e) => onPick(e, index)}
+    >
+      <div className="thumb-frame">
+        <Thumb index={index} root={root} />
+        {count > 0 && <span className="thumb-badge" title={t('Has annotations')}>{count}</span>}
+      </div>
+      <div className="thumb-label">{index + 1}</div>
+    </div>
+  );
 });
 
 export function Thumbnails() {
   const t = useT();
   const count = useStore((s) => s.geoms.length);
   const docSession = useStore((s) => s.docSession);
-  const current = useStore((s) => s.currentPage);
-  const selected = useStore((s) => s.selectedPages);
-  const pageIds = useStore((s) => s.pageIds);
-  const annotations = useStore((s) => s.annotations);
+  const selectedCount = useStore((s) => s.selectedPages.length);
+  const [list, setList] = useState<HTMLDivElement | null>(null);
   const canAssemble = useCan('assemble');
   const canCopy = useCan('copy');
   const [dropAt, setDropAt] = useState<number | null>(null);
   const anchor = useRef(0);
 
-  const onClick = (e: React.MouseEvent, i: number) => {
+  const onClick = useCallback((e: React.MouseEvent, i: number) => {
     const s = useStore.getState();
+    const selected = s.selectedPages;
     if (e.shiftKey) {
       const [a, b] = [Math.min(anchor.current, i), Math.max(anchor.current, i)];
       s.setSelectedPages(Array.from({ length: b - a + 1 }, (_, k) => a + k));
@@ -81,25 +159,27 @@ export function Thumbnails() {
       anchor.current = i;
     }
     s.goToPage(i);
-  };
+  }, []);
 
-  const onDragStart = (e: React.DragEvent, i: number) => {
+  const onDragStart = useCallback((e: React.DragEvent, i: number) => {
     const s = useStore.getState();
+    const selected = s.selectedPages;
     if (!selected.includes(i)) s.setSelectedPages([i]);
     const pages = selected.includes(i) ? selected : [i];
     e.dataTransfer.setData(PAGE_DRAG_TYPE, JSON.stringify(pages));
     // Move within the document; copy into another tab.
     e.dataTransfer.effectAllowed = 'copyMove';
     startPageDrag(pages);
-  };
+  }, []);
 
-  const onDragOver = (e: React.DragEvent, i: number) => {
+  const onDragOver = useCallback((e: React.DragEvent, i: number) => {
     if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = draggingFromOtherTab() ? 'copy' : 'move';
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
-  };
+    const at = e.clientY < r.top + r.height / 2 ? i : i + 1;
+    setDropAt((prev) => (prev === at ? prev : at));
+  }, []);
 
   const onDrop = (e: React.DragEvent) => {
     const to = dropAt;
@@ -112,7 +192,7 @@ export function Thumbnails() {
     if (data && to !== null) cmd.movePages(JSON.parse(data), to);
   };
 
-  const n = selected.length || 1;
+  const n = selectedCount || 1;
   return (
     <div className="panel thumbs-panel">
       <div className="panel-toolbar">
@@ -127,6 +207,7 @@ export function Thumbnails() {
       <div
         className="thumbs"
         key={docSession}
+        ref={setList}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(PAGE_DRAG_TYPE) && draggingFromOtherTab()) {
             e.preventDefault();
@@ -137,21 +218,17 @@ export function Thumbnails() {
         onDrop={onDrop}
       >
         {Array.from({ length: count }, (_, i) => (
-          <div
+          <ThumbItem
             key={i}
-            className={`thumb ${i === current ? 'current' : ''} ${selected.includes(i) ? 'selected' : ''} ${dropAt === i ? 'drop-before' : ''} ${dropAt === i + 1 && i === count - 1 ? 'drop-after' : ''}`}
+            index={i}
+            root={list}
+            dropBefore={dropAt === i}
+            dropAfter={dropAt === i + 1 && i === count - 1}
             draggable={canAssemble}
-            onDragStart={(e) => onDragStart(e, i)}
-            onDragOver={(e) => onDragOver(e, i)}
-            onDragEnd={endPageDrag}
-            onClick={(e) => onClick(e, i)}
-          >
-            <div className="thumb-frame">
-              <Thumb index={i} />
-              {(annotations[pageIds[i]]?.length ?? 0) > 0 && <span className="thumb-badge" title={t('Has annotations')}>{annotations[pageIds[i]].length}</span>}
-            </div>
-            <div className="thumb-label">{i + 1}</div>
-          </div>
+            onPick={onClick}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+          />
         ))}
       </div>
     </div>

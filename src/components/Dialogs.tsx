@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { X } from 'lucide-react';
 import { useStore } from '../store/store';
@@ -8,12 +8,20 @@ import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, ty
 import { fixAccessibility, runAccessibilityCheck } from '../store/extras';
 import type { CheckResult } from '../lib/accessibility';
 import { tf, tr, useLang, useT } from '../lib/i18n';
-import { BarcodesDialog, RecompressDialog } from './ContentDialogs';
-import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } from './SecurityDialogs';
-import { OrganizeDialog, type OrganizeDialogName } from './OrganizeDialogs';
-import { BOOKMARK_DIALOGS, BookmarkDialog, type BookmarkDialogName } from './BookmarkDialogs';
-import { OcrDialog } from './OcrDialog';
-import { PrintDialog } from './PrintDialog';
+import type { SignPlacement } from './SecurityDialogs';
+import type { OrganizeDialogName } from './OrganizeDialogs';
+import type { BookmarkDialogName } from './BookmarkDialogs';
+
+// The bigger dialogs load the first time they are opened, not with the app.
+const BarcodesDialog = lazy(() => import('./ContentDialogs').then((m) => ({ default: m.BarcodesDialog })));
+const RecompressDialog = lazy(() => import('./ContentDialogs').then((m) => ({ default: m.RecompressDialog })));
+const PermissionsDialog = lazy(() => import('./SecurityDialogs').then((m) => ({ default: m.PermissionsDialog })));
+const SecurityDialog = lazy(() => import('./SecurityDialogs').then((m) => ({ default: m.SecurityDialog })));
+const SignDialog = lazy(() => import('./SecurityDialogs').then((m) => ({ default: m.SignDialog })));
+const OrganizeDialog = lazy(() => import('./OrganizeDialogs').then((m) => ({ default: m.OrganizeDialog })));
+const BookmarkDialog = lazy(() => import('./BookmarkDialogs').then((m) => ({ default: m.BookmarkDialog })));
+const OcrDialog = lazy(() => import('./OcrDialog').then((m) => ({ default: m.OcrDialog })));
+const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
 export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | OrganizeDialogName | BookmarkDialogName;
 
@@ -378,7 +386,12 @@ function AccessibilityDialog({ close }: { close: () => void }) {
 
 export function Dialogs() {
   const { open, close } = useDialog();
-  if (open && (BOOKMARK_DIALOGS as string[]).includes(open)) return <BookmarkDialog name={open as BookmarkDialogName} close={close} />;
+  return <Suspense fallback={null}>{dialogFor(open, close)}</Suspense>;
+}
+
+function dialogFor(open: DialogName | null, close: () => void) {
+  // Bookmark dialogs are all named bm…
+  if (open && /^bm[A-Z]/.test(open)) return <BookmarkDialog name={open as BookmarkDialogName} close={close} />;
   switch (open) {
     case 'watermark': return <WatermarkDialog close={close} />;
     case 'headerFooter': return <HeaderFooterDialog close={close} />;

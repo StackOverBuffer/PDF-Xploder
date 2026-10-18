@@ -5,6 +5,17 @@ import type { PageGeom, Rect } from './types';
 import { normRot } from './geometry';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+/**
+ * One worker for every document: otherwise each getDocument (every edit reloads the
+ * document) starts a fresh worker and re-fetches character maps and fonts. Handed to
+ * getDocument explicitly, pdf.js never destroys it along with a document.
+ */
+let sharedWorker: InstanceType<typeof pdfjs.PDFWorker> | null = null;
+function worker() {
+  if (typeof document === 'undefined') return undefined;
+  if (!sharedWorker || sharedWorker.destroyed) sharedWorker = new pdfjs.PDFWorker();
+  return sharedWorker;
+}
 
 export { pdfjs };
 export type { PDFDocumentProxy, PDFPageProxy };
@@ -30,7 +41,7 @@ export async function openPdf(
   askPassword: (retry: boolean) => string | null,
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
-  const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, ...ASSETS });
+  const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, worker: worker(), ...ASSETS });
   task.onPassword = (update: (pw: string) => void, reason: number) => {
     const pw = askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {
@@ -50,12 +61,9 @@ export async function openPdf(
 }
 
 export async function pageGeoms(pdf: PDFDocumentProxy): Promise<PageGeom[]> {
-  const out: PageGeom[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const p = await pdf.getPage(i);
-    out.push({ view: p.view.slice(0, 4) as PageGeom['view'], rotation: normRot(p.rotate) });
-  }
-  return out;
+  // All requests at once: the worker answers them in one go instead of one round trip per page.
+  const pages = await Promise.all(Array.from({ length: pdf.numPages }, (_, i) => pdf.getPage(i + 1)));
+  return pages.map((p) => ({ view: p.view.slice(0, 4) as PageGeom['view'], rotation: normRot(p.rotate) }));
 }
 
 export interface TextRun {

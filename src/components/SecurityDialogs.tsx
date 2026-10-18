@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ShieldCheck, KeyRound, FileKey2, Check, X as XIcon } from 'lucide-react';
 import { useStore } from '../store/store';
 import { signDocument } from '../store/commands';
-import { ACTION_LABELS, allowed, type Action } from '../store/permissions';
+import { ACTION_LABELS, allowed, type Action, usePermState } from '../store/permissions';
 import { ALL_PERMISSIONS, allPermissionsGranted, type Algorithm, type Permissions, type SecuritySettings } from '../lib/security';
 import { createTestCertificate, readP12, type Identity } from '../lib/signature';
 import { downloadBlob, fileBytes } from '../lib/download';
@@ -66,7 +66,7 @@ const SUMMARY: Action[] = ['print', 'modify', 'assemble', 'annotate', 'fillForms
 
 /** What the current session may do, as derived from the document's permissions. */
 function RestrictionsSummary() {
-  const state = useStore();
+  const state = usePermState();
   const t = useT();
   return (
     <table className="perm-summary">

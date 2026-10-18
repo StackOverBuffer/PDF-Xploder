@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { styleFor, uid, useStore } from '../store/store';
 import { can } from '../store/permissions';
 import { pdfToView, viewRectToPdf, viewSize, type VRect } from '../lib/geometry';
 import { PageView } from './PageView';
 import { openDropped } from '../store/commands';
-import type { TextMarkupKind } from '../lib/types';
+import type { PageGeom, TextMarkupKind } from '../lib/types';
 
 const GAP = 16;
 const PAD = 24;
@@ -45,44 +45,105 @@ function selectionTextRects(range: Range): DOMRect[] {
   return out;
 }
 
+/** Pages kept mounted beyond the rendered ones (scrolling back a little needs no re-render). */
+const BUFFER = 3;
+
+interface Layout {
+  scale: number;
+  tops: number[];
+  heights: number[];
+  widths: number[];
+  total: number;
+  maxWidth: number;
+}
+
+/** Page offsets from geometry, so the DOM never has to be measured. */
+function computeLayout(geoms: PageGeom[], scale: number): Layout {
+  const tops: number[] = [];
+  const heights: number[] = [];
+  const widths: number[] = [];
+  let y = PAD;
+  let maxWidth = 0;
+  for (const g of geoms) {
+    const { width, height } = viewSize(g);
+    const h = Math.floor(height * scale);
+    const w = Math.floor(width * scale);
+    tops.push(y);
+    heights.push(h);
+    widths.push(w);
+    if (w > maxWidth) maxWidth = w;
+    y += h + GAP;
+  }
+  return { scale, tops, heights, widths, total: y + PAD - GAP, maxWidth };
+}
+
+/** Index of the last page whose top is at or above `y` (binary search). */
+function pageAtY(L: Layout, y: number): number {
+  let lo = 0;
+  let hi = L.tops.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (L.tops[mid] <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.max(0, lo);
+}
+
+interface PageRange {
+  /** Rendered pages (near the viewport). */
+  r0: number;
+  r1: number;
+  /** Mounted pages (rendered plus a buffer). */
+  m0: number;
+  m1: number;
+}
+
+function pageSlots(r: PageRange, L: Layout): number[] {
+  const out: number[] = [];
+  for (let i = r.m0; i <= Math.min(r.m1, L.tops.length - 1); i++) out.push(i);
+  return out;
+}
+
 export function Viewer() {
   const geoms = useStore((s) => s.geoms);
   const docSession = useStore((s) => s.docSession);
   const scale = useStore((s) => s.scale);
-  const fit = useStore((s) => s.fit);
   const tool = useStore((s) => s.tool);
   const scrollRequest = useStore((s) => s.scrollRequest);
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState<Set<number>>(new Set([0, 1]));
+  const [range, setRange] = useState<PageRange>({ r0: 0, r1: 1, m0: 0, m1: 1 + BUFFER });
   const [dragOver, setDragOver] = useState(false);
 
-  // Page offsets, computed from geometry so we never need to measure the DOM.
-  const tops: number[] = [];
-  let y = PAD;
-  for (const g of geoms) {
-    tops.push(y);
-    y += Math.floor(viewSize(g).height * scale) + GAP;
-  }
+  const layout = useMemo(() => computeLayout(geoms, scale), [geoms, scale]);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   const updateVisible = useCallback(() => {
     const el = ref.current;
-    if (!el) return;
-    const { geoms, scale } = useStore.getState();
+    const L = layoutRef.current;
+    if (!el || !L.tops.length) return;
+    const n = L.tops.length;
     const top = el.scrollTop - el.clientHeight;
     const bottom = el.scrollTop + el.clientHeight * 2;
-    const vis = new Set<number>();
-    let yy = PAD;
-    let current = 0;
-    const probe = el.scrollTop + el.clientHeight / 3;
-    geoms.forEach((g, i) => {
-      const h = Math.floor(viewSize(g).height * scale);
-      if (yy + h >= top && yy <= bottom) vis.add(i);
-      if (yy <= probe) current = i;
-      yy += h + GAP;
-    });
-    setVisible((prev) => (prev.size === vis.size && [...vis].every((v) => prev.has(v)) ? prev : vis));
+    let r0 = pageAtY(L, top);
+    if (L.tops[r0] + L.heights[r0] < top) r0 = Math.min(n - 1, r0 + 1);
+    const r1 = pageAtY(L, bottom);
+    const next = { r0, r1, m0: Math.max(0, r0 - BUFFER), m1: Math.min(n - 1, r1 + BUFFER) };
+    setRange((prev) => (prev.r0 === next.r0 && prev.r1 === next.r1 && prev.m0 === next.m0 && prev.m1 === next.m1 ? prev : next));
+    const current = pageAtY(L, el.scrollTop + el.clientHeight / 3);
     if (useStore.getState().currentPage !== current) useStore.getState().setCurrentPage(current);
   }, []);
+
+  // Scroll events can come faster than frames: handle at most one per frame.
+  const frame = useRef(0);
+  const onScroll = useCallback(() => {
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      updateVisible();
+    });
+  }, [updateVisible]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   // Fit-to-width / fit-to-page.
   const applyFit = useCallback(() => {
@@ -91,13 +152,14 @@ export function Viewer() {
     if (!el || !fit || !geoms.length) return;
     const g = geoms[currentPage] ?? geoms[0];
     const { width, height } = viewSize(g);
-    const maxW = Math.max(...geoms.map((x) => viewSize(x).width));
+    const maxW = layoutRef.current.scale ? layoutRef.current.maxWidth / layoutRef.current.scale : Math.max(...geoms.map((x) => viewSize(x).width));
     const availW = el.clientWidth - PAD * 2;
     const availH = el.clientHeight - PAD * 2;
     const s = fit === 'width' ? availW / maxW : Math.min(availW / width, availH / height);
     setScale(Math.max(0.1, s), fit);
   }, []);
 
+  const fit = useStore((s) => s.fit);
   useLayoutEffect(() => {
     applyFit();
   }, [fit, geoms, applyFit]);
@@ -126,47 +188,74 @@ export function Viewer() {
     });
   }, [docSession, updateVisible]);
 
-  // Keep the same document position when zooming.
-  const prevScale = useRef(scale);
+  // Keep the same spot of the same page under the anchor (the pointer for Ctrl+wheel, else the centre) when zooming.
+  const zoomAnchor = useRef<{ x: number; y: number } | null>(null);
+  const prevLayout = useRef(layout);
   useLayoutEffect(() => {
     const el = ref.current;
-    // At the very top (e.g. right after opening) stay there instead of anchoring on the centre.
-    if (el && prevScale.current !== scale && el.scrollTop > 0) {
-      const ratio = scale / prevScale.current;
-      el.scrollTop = (el.scrollTop + el.clientHeight / 2) * ratio - el.clientHeight / 2;
-      el.scrollLeft = (el.scrollLeft + el.clientWidth / 2) * ratio - el.clientWidth / 2;
+    const prev = prevLayout.current;
+    prevLayout.current = layout;
+    const anchor = zoomAnchor.current;
+    zoomAnchor.current = null;
+    // At the very top (e.g. right after opening) stay there unless zooming at the pointer.
+    if (el && prev !== layout && prev.scale !== layout.scale && prev.tops.length === layout.tops.length && (el.scrollTop > 0 || anchor)) {
+      const ay = anchor?.y ?? el.clientHeight / 2;
+      const ax = anchor?.x ?? el.clientWidth / 2;
+      const docY = el.scrollTop + ay;
+      const i = pageAtY(prev, docY);
+      const frac = (docY - prev.tops[i]) / Math.max(1, prev.heights[i]);
+      el.scrollTop = layout.tops[i] + frac * layout.heights[i] - ay;
+      // Horizontally the pages are centred in a box at least as wide as the viewer.
+      const boxW = (L: Layout) => Math.max(el.clientWidth, L.maxWidth + PAD * 2);
+      const docX = el.scrollLeft + ax - boxW(prev) / 2;
+      el.scrollLeft = docX * (layout.scale / prev.scale) + boxW(layout) / 2 - ax;
     }
-    prevScale.current = scale;
     updateVisible();
-  }, [scale, geoms, updateVisible]);
+  }, [layout, updateVisible]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el || !scrollRequest) return;
     const { page, y: uy } = scrollRequest;
-    let target = tops[page] ?? 0;
-    if (uy !== undefined && geoms[page]) {
-      const v = pdfToView(geoms[page], { x: geoms[page].view[0], y: uy });
-      target += v.y * scale - el.clientHeight / 3;
+    const L = layoutRef.current;
+    let target = L.tops[page] ?? 0;
+    const g = useStore.getState().geoms[page];
+    if (uy !== undefined && g) {
+      const v = pdfToView(g, { x: g.view[0], y: uy });
+      target += v.y * L.scale - el.clientHeight / 3;
     } else {
       target -= GAP / 2;
     }
     el.scrollTo({ top: Math.max(0, target) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRequest]);
 
-  // Ctrl + wheel zooms.
+  // Ctrl + wheel zooms, proportionally to the wheel (smooth on touchpads), at most once per frame.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    let factor = 1;
+    let raf = 0;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      const s = useStore.getState();
-      s.setScale(s.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      factor *= Math.exp(-Math.max(-100, Math.min(100, dy)) * 0.0012);
+      const r = el.getBoundingClientRect();
+      zoomAnchor.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const s = useStore.getState();
+        const f = factor;
+        factor = 1;
+        s.setScale(s.scale * f);
+      });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   // Text markup: turn the current text selection into highlight/underline/strikeout annotations.
@@ -219,13 +308,11 @@ export function Viewer() {
   };
   const endPan = () => (pan.current = null);
 
-  const maxWidth = Math.max(0, ...geoms.map((g) => Math.floor(viewSize(g).width * scale)));
-
   return (
     <div
       ref={ref}
       className={`viewer tool-${tool} ${dragOver ? 'drag-over' : ''}`}
-      onScroll={updateVisible}
+      onScroll={onScroll}
       onMouseUp={onMouseUp}
       onCopy={(e) => {
         if (can('copy')) return;
@@ -251,10 +338,11 @@ export function Viewer() {
       }}
     >
       {/* A different document gets fresh page views, so nothing of the previous one can linger. */}
-      <div className="pages" key={docSession} style={{ height: y + PAD - GAP, minWidth: maxWidth + PAD * 2 }}>
-        {geoms.map((g, i) => (
-          <div key={i} className="page-slot" style={{ top: tops[i], width: Math.floor(viewSize(g).width * scale) }}>
-            <PageView index={i} visible={visible.has(i)} />
+      {/* Only pages near the viewport are mounted; the rest is empty space of the right height. */}
+      <div className="pages" key={docSession} style={{ height: layout.total, minWidth: layout.maxWidth + PAD * 2 }}>
+        {pageSlots(range, layout).map((i) => (
+          <div key={i} className="page-slot" style={{ top: layout.tops[i], width: layout.widths[i] }}>
+            <PageView index={i} visible={i >= range.r0 && i <= range.r1} />
           </div>
         ))}
       </div>

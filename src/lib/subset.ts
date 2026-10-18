@@ -39,9 +39,14 @@ export function setSubsetWasmLoader(l: WasmLoader) {
 }
 
 function hb(): Promise<HbExports> {
-  instance ??= loader()
-    .then((bin) => WebAssembly.instantiate(bin, {}))
-    .then((r) => r.instance.exports as unknown as HbExports);
+  if (!instance) {
+    const p = loader()
+      .then((bin) => WebAssembly.instantiate(bin, {}))
+      .then((r) => r.instance.exports as unknown as HbExports);
+    instance = p;
+    // A failed load (e.g. offline) is retried next time instead of disabling subsetting for the session.
+    p.catch(() => instance === p && (instance = null));
+  }
   return instance;
 }
 

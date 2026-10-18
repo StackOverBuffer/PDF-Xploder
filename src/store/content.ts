@@ -10,6 +10,7 @@ import { openPdf, renderToCanvas } from '../lib/pdfjs';
 import { downloadBlob, baseName } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import type { Rect } from '../lib/types';
+import { saveDoc } from '../lib/pdfSave';
 
 const S = () => useStore.getState();
 
@@ -40,8 +41,16 @@ export function pageObjects(page: number): Promise<ObjectInfo[]> {
   if (!p) {
     p = currentDoc().then((doc) => describeObjects(readPage(doc.getPage(page))));
     objectCache.set(key, p);
+    // A failure must not stick: try again next time.
+    p.catch(() => objectCache.get(key) === p && objectCache.delete(key));
   }
   return p;
+}
+
+/** The layers of the current document (cached with the parsed document). */
+export async function currentLayers() {
+  const { listLayers } = await import('../lib/content/page');
+  return listLayers(await currentDoc());
 }
 
 // ---------------------------------------------------------------- safety check
@@ -131,14 +140,23 @@ export function markPagesVerified(pages: number[]) {
 
 // ---------------------------------------------------------------- editing
 
+/** Content edits run one after another: each starts from the result of the previous one. */
+let chain: Promise<unknown> = Promise.resolve();
+
 /** Apply edits to a page's content; selects the affected objects afterwards. */
-export async function applyContentEdits(page: number, edits: ContentEdit[]) {
+export function applyContentEdits(page: number, edits: ContentEdit[]): Promise<void> {
+  const next = chain.then(() => applyNow(page, edits));
+  chain = next.catch(() => {});
+  return next;
+}
+
+async function applyNow(page: number, edits: ContentEdit[]) {
   if (!edits.length || !requirePermission('modify')) return;
   await S().run('Editing page…', async () => {
     if (!(await confirmPageIsEditable(page))) return;
     const doc = await loadForEditing(S().bytes!);
     const ids = await editPage(doc.getPage(page), edits);
-    await S().commitBytes(await doc.save({ useObjectStreams: true }));
+    await S().commitBytes(await saveDoc(doc));
     // The rewritten page is in normalised form: no need to check it again.
     verified.add(S().pageIds[page]);
     useStore.setState({ contentSelection: ids.length ? { page, ids } : null });

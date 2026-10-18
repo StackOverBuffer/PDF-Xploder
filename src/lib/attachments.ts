@@ -1,6 +1,7 @@
 /** Embedded files (the document's EmbeddedFiles name tree). */
 import { PDFArray, PDFDict, PDFHexString, PDFName, PDFRawStream, PDFString, decodePDFRawStream, type PDFObject } from '@cantoo/pdf-lib';
 import { load } from './pdfOps';
+import { saveDoc } from './pdfSave';
 
 export interface AttachmentInfo {
   /** Key in the name tree; unique within the document. */
@@ -84,7 +85,7 @@ export async function addAttachment(bytes: Uint8Array, file: { name: string; typ
     description: description || undefined,
     modificationDate: file.lastModified ? new Date(file.lastModified) : undefined,
   });
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }
 
 export async function removeAttachment(bytes: Uint8Array, key: string): Promise<Uint8Array> {
@@ -100,5 +101,5 @@ export async function removeAttachment(bytes: Uint8Array, key: string): Promise<
     const i = af.indexOf(specRef);
     if (i !== undefined && i >= 0) af.remove(i);
   }
-  return doc.save({ useObjectStreams: true });
+  return saveDoc(doc);
 }

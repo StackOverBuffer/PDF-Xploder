@@ -18,7 +18,7 @@ export function FormsPanel() {
   const canFlatten = useCan('modify');
   const highlight = useStore((s) => s.highlightFields);
   const set = (name: string, v: FieldValue, history = true) => useStore.getState().setFormValue(name, v, { history });
-  const checkpoint = () => useStore.getState().checkpoint();
+  const checkpoint = () => useStore.getState().armCheckpoint();
   const pending = Object.keys(edits).length;
 
   return (

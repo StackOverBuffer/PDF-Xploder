@@ -473,3 +473,6 @@ select.widget { padding: 0; }
 .search-replace input { width: 100%; }
 .search-replace-buttons { display: flex; gap: 6px; }
 .search-replace-buttons button { flex: 1; }
+
+/* Blocks input while a command runs (below dialogs, above everything else). */
+.busy-shield { position: fixed; inset: 0; z-index: 45; cursor: progress; }
