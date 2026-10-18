@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  MonitorDown, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
+  MonitorDown, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
   ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
@@ -16,7 +16,7 @@ import * as extra from '../store/extras';
 import { selectContent, type ContentFilter } from '../store/content';
 import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
-import { goToHit } from './SearchPanel';
+import { goToHit, openSearch } from './SearchPanel';
 import { OrganizeTab } from './OrganizeTab';
 import { BookmarksTab } from './BookmarksTab';
 import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } from '../store/contentActions';
@@ -204,7 +204,8 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
               { label: 'Paste image as comment', icon: <ClipboardPaste size={14} />, disabled: !canAnnotate, onClick: extra.pasteImage },
             ]} />
             <Btn size="small" icon={<Search size={I} />} label="Find" disabled={noDoc} menu={[
-              { label: 'Find…', icon: <Search size={14} />, hint: 'Ctrl+F', onClick: () => { S().setSidebar('search'); requestAnimationFrame(() => window.dispatchEvent(new Event('awesome-pdf:focus-search'))); } },
+              { label: 'Find…', icon: <Search size={14} />, hint: 'Ctrl+F', onClick: () => openSearch('find') },
+              { label: 'Find and replace…', icon: <Replace size={14} />, disabled: !canModify, onClick: () => openSearch('replace') },
               { label: 'Next result', icon: <ChevronDown size={14} />, disabled: !hits, onClick: () => goToHit(hitIndex + 1) },
               { label: 'Previous result', icon: <ChevronUp size={14} />, disabled: !hits, onClick: () => goToHit(hitIndex - 1) },
             ]} />
@@ -332,6 +333,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
       <>
         <Group label="Redaction">
           <ToolBtn tool="redact" icon={<EraserIcon size={L} />} label="Mark area" />
+          <Btn icon={<SearchCheck size={L} />} label="Search & redact" title="Find text and mark every match for redaction" disabled={!canAnnotate} onClick={() => openSearch('redact')} />
           <Btn icon={<ShieldCheck size={L} />} label="Apply" disabled={!canModify} onClick={cmd.applyRedactions} />
         </Group>
         <Group label="Security">

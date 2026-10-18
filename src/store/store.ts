@@ -143,7 +143,7 @@ interface State {
   selectedPages: number[];
   sidebar: SidebarTab | null;
 
-  search: { query: string; hits: SearchHit[]; index: number; matchCase: boolean };
+  search: { query: string; hits: SearchHit[]; index: number; matchCase: boolean; wholeWord?: boolean };
 
   /** Open document tabs, in display order. The active tab's document is the top-level state. */
   tabs: TabInfo[];

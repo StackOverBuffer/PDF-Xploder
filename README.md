@@ -68,7 +68,8 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ✅ Snapshot tool: drag a box to copy that part of the page (with comments) to the clipboard as an image; copy/save a whole page as an image
 - ✅ Attachments pane: list, save, add and remove embedded files
 - ✅ Page thumbnails, bookmarks (outline) pane, comments pane
-- ✅ Find text with match list, next/previous, match case, highlight all matches
+- ✅ Find text with match list, next/previous, match case, whole words, highlight all matches
+- ✅ Find and replace in the page text (Home → Find → Find and replace…): replace the current match or all of them; the line is rewritten in its own font where it has the characters (Noto Sans otherwise). Matches within one line of text; text in comments, form fields or embedded graphics is not replaced
 - ✅ Go to page, first/previous/next/last, keyboard shortcuts
 - ✅ Rotate view (without changing the file); new comments follow the orientation on screen
 - ⬜ Single-page / two-page / facing layouts
@@ -135,7 +136,8 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - ✅ Signature validation: integrity, signature (RSA and ECDSA) and coverage; signer, issuer, time, reason
 - 🟡 Signer identity is not checked against trusted certificates (no trust list, revocation or timestamp checks yet)
 - ⬜ Signing password-protected files, certification (DocMDP) signatures, long-term validation (LTV), timestamps
-- ⬜ Search & redact, sanitize document (metadata, hidden data)
+- ✅ Search & redact (Protect → Redaction): mark every match of a search for redaction, with boxes that fit the words exactly, then apply
+- ⬜ Sanitize document (metadata, hidden data)
 
 ### Document & output
 - ✅ New blank document, open (picker or drag & drop), save, save as, save flattened copy, print

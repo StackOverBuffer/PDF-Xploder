@@ -11,13 +11,12 @@ Roughly in order of everyday usefulness versus effort:
 1. **Restore session and autosave**: reopen the last tabs after a browser restart, with unsaved changes recovered; recent documents (rows *Autosave/Autorecovery*, *Save Current Session*, *Recent Documents*).
 2. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
 3. **Compare documents**: side by side, with changed text and changed areas marked.
-4. **Find and replace text, find and redact**.
-5. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
-6. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
-7. **Page layouts**: single page, two pages, facing pages; split view.
-8. **Measurement tools and callouts**.
-9. **QR codes and barcodes** as page content or stamps.
-10. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
+5. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
+6. **Page layouts**: single page, two pages, facing pages; split view.
+7. **Measurement tools and callouts**.
+8. **QR codes and barcodes** as page content or stamps.
+9. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -183,7 +182,7 @@ Roughly in order of everyday usefulness versus effort:
 | Export Snapshots to Images from the Shortcut Menu / Take Snapshots | ✅ |
 | Select Base Content Text, Multiple Word Selection Options | ✅ rectangle text selection like PDF-XChange |
 | Select Highlighted Text | ⬜ |
-| Find and Replace Text | ⬜ |
+| Find and Replace Text | ✅ replace the current match or all, match case, whole words; within one line of text, in the line's own font where possible |
 | Spell Check | ⬜ |
 | Correct Text with the Text Correction Tool | 🟡 inline text editing |
 | Font Replacement | 🟡 change the font of text objects |
@@ -199,7 +198,7 @@ Roughly in order of everyday usefulness versus effort:
 | Split Pages by Guide Lines | ⬜ |
 | Select Pages Options for Thumbnails | 🟡 multi-select with Ctrl/Shift |
 | Redact Documents | ✅ |
-| Find and Redact, Redaction Code Sets, Blurred/Pixelated Overlays | ⬜ |
+| Find and Redact, Redaction Code Sets, Blurred/Pixelated Overlays | 🟡 find and redact (exact boxes around every match); ⬜ code sets, blurred/pixelated overlays |
 | Sanitize Documents | ⬜ |
 | Compare Documents | ⬜ |
 | Layers Pane, Add/Edit/Merge/Remove/Reorder Layers, Links to Layers, Flatten Layers | 🟡 objects can be moved to existing or new layers; ⬜ layers pane |

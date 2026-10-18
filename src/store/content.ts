@@ -88,6 +88,47 @@ async function confirmPageIsEditable(page: number): Promise<boolean> {
   }
 }
 
+/**
+ * Check several pages at once (find and replace): asks once about pages the
+ * editor cannot reproduce exactly. Returns the pages that may be edited.
+ */
+export async function confirmPagesEditable(pages: number[]): Promise<number[]> {
+  const s = S();
+  const todo = pages.filter((p) => !verified.has(s.pageIds[p]));
+  if (!todo.length) return pages;
+  const doc = await loadForEditing(s.bytes!);
+  const unknown = new Set<number>();
+  for (const p of todo) {
+    const pc = readPage(doc.getPage(p));
+    if (pc.unknown.length) unknown.add(p);
+    writePage(doc.getPage(p), pc.objects);
+  }
+  const { pdf } = await openPdf(await doc.save(), () => null);
+  const risky: number[] = [];
+  try {
+    for (const p of todo) {
+      const before = await renderToCanvas(await s.pdf!.getPage(p + 1), 0.75);
+      const after = await renderToCanvas(await pdf.getPage(p + 1), 0.75);
+      if (unknown.has(p) || diffFraction(before, after) > 0.002) risky.push(p);
+      else verified.add(s.pageIds[p]);
+    }
+  } finally {
+    pdf.destroy();
+  }
+  if (!risky.length) return pages;
+  const list = risky.map((p) => p + 1).join(', ');
+  if (confirm(tf('The editor cannot reproduce some pages exactly (pages {list}): they would look slightly different after the change. Edit them anyway? Cancel leaves those pages unchanged.', { list }))) {
+    for (const p of risky) verified.add(s.pageIds[p]);
+    return pages;
+  }
+  return pages.filter((p) => !risky.includes(p));
+}
+
+/** Pages rewritten by the editor are in normalised form and need no further check. */
+export function markPagesVerified(pages: number[]) {
+  for (const p of pages) verified.add(S().pageIds[p]);
+}
+
 // ---------------------------------------------------------------- editing
 
 /** Apply edits to a page's content; selects the affected objects afterwards. */
