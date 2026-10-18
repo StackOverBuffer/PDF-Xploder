@@ -129,11 +129,14 @@ export function annotSummary(a: Annotation): string {
 /**
  * A "cloudy" outline: scallops (arcs bulging outwards) along the edges, as
  * PDF-XChange and Acrobat draw /BE S /Cloudy. The shared geometry for the
- * on-screen SVG and the PDF appearance stream: each edge a→b is replaced by
- * a quadratic Bézier with the control point `bulge` above the midpoint,
- * outwards (the winding of a closed outline is detected so the bumps always
- * point away from the interior; open paths bulge to the left of travel).
+ * on-screen SVG and the PDF appearance stream: each edge is cut into chords
+ * about 2 × `bulge` long, each replaced by a quadratic Bézier bulging outwards
+ * (the winding of a closed outline is detected so the bumps always point away
+ * from the interior; open paths bulge to the left of travel).
  */
+/** Scallop radius of a cloud drawn with a given line width (points). */
+export const cloudRadius = (width: number) => Math.max(6, width * 3);
+
 export function cloudEdges(points: Pt[], bulge: number, close: boolean): { a: Pt; c: Pt; b: Pt }[] {
   if (points.length < 2) return points.map((p) => ({ a: p, c: p, b: p }));
   const n = points.length;
@@ -146,16 +149,26 @@ export function cloudEdges(points: Pt[], bulge: number, close: boolean): { a: Pt
   }
   const flip = close && area2 > 0 ? -1 : 1;
   const segs: { a: Pt; c: Pt; b: Pt }[] = [];
+  // Scallops about `radius` wide each: every edge is cut into equal chords of roughly 2 × radius.
+  const radius = Math.max(1, bulge);
   for (let i = 0; i < (close ? n : n - 1); i++) {
     const a = points[i];
     const b = points[(i + 1) % n];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
     if (!len) continue;
-    // Rotating the direction (dx, dy) by ±90° gives the outward normal.
-    const nx = (-(b.y - a.y) / len) * bulge * flip;
-    const ny = ((b.x - a.x) / len) * bulge * flip;
-    const c = { x: (a.x + b.x) / 2 + nx, y: (a.y + b.y) / 2 + ny };
-    segs.push({ a, c, b });
+    const k = Math.max(1, Math.round(len / (2 * radius)));
+    const ux = (b.x - a.x) / len;
+    const uy = (b.y - a.y) / len;
+    // Rotating the direction by ±90° gives the outward normal; a control point one chord out
+    // makes a bump about half a chord high, like the arcs of a drawn revision cloud.
+    const chord = len / k;
+    const nx = -uy * chord * flip;
+    const ny = ux * chord * flip;
+    for (let j = 0; j < k; j++) {
+      const p = { x: a.x + ux * chord * j, y: a.y + uy * chord * j };
+      const q = j === k - 1 ? b : { x: a.x + ux * chord * (j + 1), y: a.y + uy * chord * (j + 1) };
+      segs.push({ a: p, c: { x: (p.x + q.x) / 2 + nx, y: (p.y + q.y) / 2 + ny }, b: q });
+    }
   }
   return segs;
 }

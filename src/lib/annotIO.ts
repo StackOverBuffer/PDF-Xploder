@@ -6,6 +6,7 @@
  * edit them. A private /AwesomePDF entry (the name is kept for files saved by earlier versions) keeps the exact model for lossless
  * round trips; standard keys still win where another editor changed them.
  */
+import { UNITS, type Measure, type MeasureUnit } from './measure';
 import {
   decodePDFRawStream,
   PDFArray,
@@ -20,7 +21,7 @@ import {
   PDFString,
 } from '@cantoo/pdf-lib';
 import { hexToRgbTuple } from './color';
-import { buildAppearance, type AppearanceOptions, type DrawContext } from './appearance';
+import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 
@@ -115,6 +116,41 @@ const SUBTYPE: Record<Annotation['type'], string> = {
   text: 'FreeText', note: 'Text', image: 'Stamp', stamp: 'Stamp', redact: 'Redact',
 };
 
+/**
+ * The standard measurement entries (ISO 32000 12.9 and the PDF 1.7 dimension intents),
+ * so Acrobat and PDF-XChange treat it as a measurement at the same scale.
+ */
+function writeMeasure(dict: PDFDict, m: Measure, pdf: PDFDocument['context']) {
+  const it = m.kind === 'distance' ? 'LineDimension' : m.kind === 'perimeter' ? 'PolyLineDimension' : 'PolygonDimension';
+  dict.set(PDFName.of('IT'), PDFName.of(it));
+  const fmt = (unit: string, c: number) => pdf.obj({ Type: 'NumberFormat', U: PDFString.of(unit), C: c, D: 100, F: 'D' });
+  const measure = pdf.obj({
+    Type: 'Measure',
+    Subtype: 'RL',
+    R: PDFString.of(m.scale.label),
+    X: [fmt(m.scale.unit, m.scale.perPoint)],
+    D: [fmt(m.scale.unit, 1)],
+    A: [fmt(`${m.scale.unit}²`, 1)],
+  });
+  dict.set(PDFName.of('Measure'), measure);
+}
+
+/** Read the scale of a measurement another viewer made (X: the first number format converts points to the unit). */
+function readMeasure(dict: PDFDict): Measure | undefined {
+  const it = (dict.lookup(PDFName.of('IT')) as PDFName | undefined)?.decodeText();
+  const kind = it === 'LineDimension' ? 'distance' : it === 'PolyLineDimension' ? 'perimeter' : it === 'PolygonDimension' ? 'area' : undefined;
+  const measure = dict.lookup(PDFName.of('Measure'));
+  if (!kind || !(measure instanceof PDFDict)) return undefined;
+  const x = measure.lookup(PDFName.of('X'));
+  const first = x instanceof PDFArray ? x.lookup(0) : undefined;
+  if (!(first instanceof PDFDict)) return undefined;
+  const c = (first.lookup(PDFName.of('C')) as PDFNumber | undefined)?.asNumber();
+  const u = text(first.lookup(PDFName.of('U')))?.trim();
+  if (!c || !u || !(UNITS as string[]).includes(u)) return undefined;
+  const r = text(measure.lookup(PDFName.of('R')));
+  return { kind, scale: { perPoint: c, unit: u as MeasureUnit, label: r || '' } };
+}
+
 /** Add `a` to the page as a native annotation with an appearance stream. */
 export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: PageGeom, a: Annotation, opts: AppearanceOptions = {}) {
   const doc = ctx.doc;
@@ -135,8 +171,11 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     CA: a.opacity,
   });
   const set = (k: string, v: unknown) => dict.set(PDFName.of(k), pdf.obj(v as never));
-  const contents = a.type === 'text' || a.type === 'note' ? a.text : a.comment;
+  // A measurement's value is its text in other viewers' comment lists.
+  const label = measureLabel(a, g);
+  const contents = a.type === 'text' || a.type === 'note' ? a.text : label ? [label.text, a.comment].filter(Boolean).join('\n') : a.comment;
   if (contents) dict.set(PDFName.of('Contents'), PDFHexString.fromText(contents));
+  if ('measure' in a && a.measure) writeMeasure(dict, a.measure, pdf);
 
   switch (a.type) {
     case 'highlight':
@@ -328,7 +367,8 @@ function fromStandard(dict: PDFDict, env: ParseEnv): Annotation | null {
       const arrowAtStart = /Arrow/.test(ends[0] ?? '');
       const arrowAtEnd = /Arrow/.test(ends[1] ?? '');
       const [p1, p2] = arrowAtStart && !arrowAtEnd ? [{ x: l[2], y: l[3] }, { x: l[0], y: l[1] }] : [{ x: l[0], y: l[1] }, { x: l[2], y: l[3] }];
-      return { ...b, type: arrowAtStart || arrowAtEnd ? 'arrow' : 'line', p1, p2, width: borderWidth(dict) };
+      const measure = readMeasure(dict);
+      return { ...b, type: arrowAtStart || arrowAtEnd ? 'arrow' : 'line', p1, p2, width: borderWidth(dict), ...(measure?.kind === 'distance' ? { measure } : {}) };
     }
     case 'Polygon':
     case 'PolyLine': {
@@ -338,7 +378,9 @@ function fromStandard(dict: PDFDict, env: ParseEnv): Annotation | null {
       if (vertices.length < 2) return null;
       const cloudy = (dict.lookup(PDFName.of('BE')) as PDFDict | undefined)?.lookup(PDFName.of('S'))?.toString() === '/Cloudy';
       const type: 'cloud' | 'polygon' | 'polyline' = cloudy ? 'cloud' : subtype === 'Polygon' ? 'polygon' : 'polyline';
-      return { ...b, type, vertices, width: borderWidth(dict), fill: toHex(numbers(dict.lookup(PDFName.of('IC')))) ?? null };
+      const measure = readMeasure(dict);
+      const fits = measure && ((measure.kind === 'area' && type === 'polygon') || (measure.kind === 'perimeter' && type === 'polyline'));
+      return { ...b, type, vertices, width: borderWidth(dict), fill: toHex(numbers(dict.lookup(PDFName.of('IC')))) ?? null, ...(fits ? { measure } : {}) };
     }
     case 'FreeText': {
       const da = parseDA(text(dict.lookup(PDFName.of('DA'))));

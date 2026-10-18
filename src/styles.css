@@ -126,7 +126,7 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .a11y-warn .a11y-icon { background: #ed8b00; }
 .a11y-fail .a11y-icon { background: var(--danger); }
 /* Accessibility: invert page colours for reading in the dark */
-.invert-pages .page .canvas-host canvas { filter: invert(1) hue-rotate(180deg); }
+.invert-pages .page .canvas-host canvas, .invert-pages .page .detail-host canvas { filter: invert(1) hue-rotate(180deg); }
 .annot-layer.drawing.tool-snapshot { cursor: crosshair; }
 .zoom-chip { font-weight: 600; font-size: 12px; }
 
@@ -223,6 +223,8 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .page-slot { position: absolute; left: 50%; transform: translateX(-50%); }
 .page { position: relative; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); overflow: hidden; }
 .canvas-host, .canvas-host canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.detail-host { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.detail-host canvas { position: absolute; }
 .page-label { position: absolute; bottom: -1px; right: 4px; font-size: 10px; color: #aaa; pointer-events: none; user-select: none; display: none; }
 .viewer.tool-hand { cursor: grab; }
 .viewer.tool-hand:active { cursor: grabbing; }
@@ -485,3 +487,9 @@ select.widget { padding: 0; }
 .welcome-recent button:hover { background: var(--panel-2); }
 .welcome-recent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main-loading { flex: 1; background: var(--viewer); }
+
+/* QR code / barcode preview */
+.barcode-preview { margin: 8px auto 0; width: 200px; min-height: 40px; display: flex; justify-content: center; }
+.barcode-preview canvas { border: 1px solid var(--border); }
+/* Measurements */
+.measure-value { font-variant-numeric: tabular-nums; }

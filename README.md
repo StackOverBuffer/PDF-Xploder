@@ -81,14 +81,16 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 ### Comment & markup
 - ✅ Highlight, underline, strikeout from a text selection
 - ✅ Pencil (freehand), rectangle, ellipse, line, arrow (Shift to constrain)
-- ✅ Polygon, polyline and cloud (click the vertices, double-click to finish)
+- ✅ Polygon, polyline and cloud (click the vertices, double-click to finish); clouds have scallops all along their edges, like revision clouds
 - ✅ Text box (typewriter) with inline editing, sticky notes
 - ✅ Stamps (Approved, Draft, Confidential, … or custom text)
 - ✅ Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
 - ✅ Comment text and author on every annotation; comments list
 - ✅ Saved as native, editable PDF annotations with appearance streams (or flattened on request)
 - ✅ Import and edit annotations already present in a PDF (Highlight, Underline, Squiggly, StrikeOut, Ink, Square, Circle, Line, FreeText, Text, Redact), with lossless round trips of our own
-- ⬜ Callouts, measurement tools (distance, perimeter, area)
+- ✅ Measure tools (Comment → Measure): distance (M), perimeter and area with live values while drawing; drawing scale 1:n in mm/cm/m/km/in/ft/yd/mi, or calibrated from a measured line of known length; values shown on the page and in the properties; export as CSV; saved as standard PDF measurement annotations (/Measure, LineDimension / PolyLineDimension / PolygonDimension) that other viewers recognise
+- ✅ QR codes (with error correction level) and barcodes (Code 128, EAN-13 with check digit), inserted like a stamp that hangs on the pointer until placed
+- ⬜ Callouts
 - ⬜ Comment replies/status, summarize comments, import/export FDF/XFDF
 
 ### Organize pages

@@ -9,6 +9,7 @@ import { fixAccessibility, runAccessibilityCheck } from '../store/extras';
 import type { CheckResult } from '../lib/accessibility';
 import { tf, tr, useLang, useT } from '../lib/i18n';
 import type { SignPlacement } from './SecurityDialogs';
+import type { Annotation } from '../lib/types';
 import type { OrganizeDialogName } from './OrganizeDialogs';
 import type { BookmarkDialogName } from './BookmarkDialogs';
 
@@ -21,9 +22,12 @@ const SignDialog = lazy(() => import('./SecurityDialogs').then((m) => ({ default
 const OrganizeDialog = lazy(() => import('./OrganizeDialogs').then((m) => ({ default: m.OrganizeDialog })));
 const BookmarkDialog = lazy(() => import('./BookmarkDialogs').then((m) => ({ default: m.BookmarkDialog })));
 const OcrDialog = lazy(() => import('./OcrDialog').then((m) => ({ default: m.OcrDialog })));
+const ScaleDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default: m.ScaleDialog })));
+const CalibrateDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default: m.CalibrateDialog })));
+const BarcodeDialog = lazy(() => import('./BarcodeDialog').then((m) => ({ default: m.BarcodeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -408,6 +412,9 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'ocr': return <OcrDialog close={close} />;
     case 'print': return <PrintDialog close={close} />;
+    case 'measureScale': return <ScaleDialog close={close} />;
+    case 'insertBarcode': return <BarcodeDialog close={close} />;
+    case 'calibrate': return <CalibrateDialog close={close} annotation={useDialog.getState().payload as Annotation} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
     case 'orgDuplicate': case 'orgReplace': case 'orgSwap': case 'orgOverlay': case 'orgNormalize': case 'orgFindDuplicates': case 'orgRotate': case 'orgCrop':

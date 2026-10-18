@@ -89,12 +89,14 @@ export async function inspectEncryption(bytes: Uint8Array): Promise<EncryptionIn
 }
 
 export function containsAscii(bytes: Uint8Array, word: string): boolean {
-  const codes = [...word].map((c) => c.charCodeAt(0));
-  const first = codes[0];
-  for (let i = bytes.indexOf(first); i >= 0 && i <= bytes.length - codes.length; i = bytes.indexOf(first, i + 1)) {
-    let k = 1;
-    while (k < codes.length && bytes[i + k] === codes[k]) k++;
-    if (k === codes.length) return true;
+  // The native string search over latin-1 chunks is far faster than a byte loop
+  // ('/' starts every PDF name, so a first-byte scan stops everywhere).
+  const CHUNK = 4 * 1024 * 1024;
+  const dec = new TextDecoder('latin1');
+  for (let at = 0; at < bytes.length; at += CHUNK) {
+    // Overlap the chunks so a word across a boundary is found.
+    const end = Math.min(bytes.length, at + CHUNK + word.length - 1);
+    if (dec.decode(bytes.subarray(at, end)).includes(word)) return true;
   }
   return false;
 }

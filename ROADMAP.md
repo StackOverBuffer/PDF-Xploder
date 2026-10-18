@@ -6,16 +6,14 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 ## Next up
 
-Roughly in order of everyday usefulness versus effort:
+Roughly in order of everyday usefulness versus effort (callouts are still open from the measure/markup group):
 
 1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
 2. **Compare documents**: side by side, with changed text and changed areas marked.
 3. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
 4. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
 5. **Page layouts**: single page, two pages, facing pages; split view.
-6. **Measurement tools and callouts**.
-7. **QR codes and barcodes** as page content or stamps.
-8. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -44,7 +42,7 @@ Roughly in order of everyday usefulness versus effort:
 | Feature | Status |
 |---|---|
 | 3D Comment Support | ⬜ |
-| Area, Distance and Perimeter Measurement Annotations | ⬜ |
+| Area, Distance and Perimeter Measurement Annotations | ✅ with live values, labels on the page, standard /Measure dictionaries |
 | Audio File Annotations | ⬜ |
 | Callout Annotations | ⬜ |
 | Caret Annotations | ⬜ |
@@ -67,7 +65,7 @@ Roughly in order of everyday usefulness versus effort:
 | Cross Section Support for 3D PDFs | ⬜ |
 | Customize/Localize the Fonts Used for Default Stamps | ⬜ |
 | Export Comments to Data File (FDF/XFDF) / Export Selected Comments | ⬜ |
-| Export Measurements to CSV | ⬜ |
+| Export Measurements to CSV | ✅ |
 | Fit Box by Text Content | ⬜ |
 | Flatten Comments | ✅ |
 | Summarize Comments (with font customization) | ⬜ |
@@ -222,7 +220,7 @@ Roughly in order of everyday usefulness versus effort:
 |---|---|
 | Add/Remove Watermarks | ✅ |
 | Add Backgrounds | ✅ colour or image, removable |
-| Add Barcodes | ⬜ |
+| Add Barcodes | ✅ QR code, Code 128, EAN-13 (placed like a stamp) |
 | Add JavaScript | ⬜ |
 | Convert Document Colours | ⬜ |
 | Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
@@ -258,7 +256,7 @@ Roughly in order of everyday usefulness versus effort:
 | Split the Page View, Spreadsheet Split | ⬜ |
 | Loupe Tool, Pan and Zoom Pane | ⬜ |
 | Zoom Features | ✅ zoom box, presets, fit width/page, Zoom tool, rotate view |
-| Calibrate Measurement Scales | ⬜ |
+| Calibrate Measurement Scales | ✅ drawing scale 1:n or calibration from a line of known length; applies to existing measurements |
 | History Pane / Recent Documents | 🟡 recent files (start screen, File → Recent); ⬜ history pane |
 | Webcam Images | ⬜ |
 | Print All Open Documents, External Repositories, UI Automation | 🚫 desktop-only |

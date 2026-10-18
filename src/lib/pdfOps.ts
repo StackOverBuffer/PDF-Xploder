@@ -373,7 +373,7 @@ export interface ExportOptions {
 /** Text drawn by an annotation, used to decide which fonts to embed. */
 function annotationTexts(list: Annotation[]): { regular: string[]; bold: string[] } {
   return {
-    regular: list.flatMap((a) => (a.type === 'text' ? [a.text] : [])),
+    regular: list.flatMap((a) => (a.type === 'text' ? [a.text] : 'measure' in a && a.measure ? ['0123456789.,  mmcmkminftydmi²'] : [])),
     bold: list.flatMap((a) => (a.type === 'stamp' ? [a.label.toUpperCase()] : [])),
   };
 }

@@ -44,8 +44,15 @@ export const getValue = <T>(key: string) => run<T>('kv', 'readonly', (s) => s.ge
 export const setValue = (key: string, value: unknown) => run('kv', 'readwrite', (s) => void s.put(value, key));
 export const deleteValue = (key: string) => run('kv', 'readwrite', (s) => void s.delete(key));
 
-export const getBlob = (id: string) => run<Uint8Array>('blobs', 'readonly', (s) => s.get(id) as IDBRequest<Uint8Array>);
-export const putBlob = (id: string, bytes: Uint8Array) => run('blobs', 'readwrite', (s) => void s.put(bytes, id));
+/**
+ * Documents are stored as Blobs: the browser writes those out in the background,
+ * where a byte array would be copied on the main thread (seconds for a big plan).
+ */
+export async function getBlob(id: string): Promise<Uint8Array | undefined> {
+  const v = await run<Blob | Uint8Array>('blobs', 'readonly', (s) => s.get(id) as IDBRequest<Blob | Uint8Array>);
+  return v instanceof Blob ? new Uint8Array(await v.arrayBuffer()) : v;
+}
+export const putBlob = (id: string, bytes: Uint8Array) => run('blobs', 'readwrite', (s) => void s.put(new Blob([bytes]), id));
 
 /** Delete every stored document that is not in `keep`. */
 export async function pruneBlobs(keep: Set<string>): Promise<void> {

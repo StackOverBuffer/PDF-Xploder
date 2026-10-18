@@ -1,3 +1,5 @@
+import type { Measure } from './measure';
+
 /** A point in PDF user space (origin bottom-left, y up, units = points). */
 export interface Pt {
   x: number;
@@ -68,6 +70,8 @@ export interface LineAnnot extends AnnotBase {
   p1: Pt;
   p2: Pt;
   width: number;
+  /** A distance measurement (Measure tools). */
+  measure?: Measure;
 }
 
 /** Polygon (closed), polyline (open) and cloud (closed, scalloped border). */
@@ -76,6 +80,8 @@ export interface PolygonAnnot extends AnnotBase {
   vertices: Pt[];
   width: number;
   fill: string | null;
+  /** A perimeter (polyline) or area (polygon) measurement. */
+  measure?: Measure;
 }
 
 export interface TextBoxAnnot extends AnnotBase, Oriented {
@@ -165,6 +171,10 @@ export type Tool =
   | 'contentText'
   | 'contentRect'
   | 'contentEllipse'
-  | 'contentLine';
+  | 'contentLine'
+  /** Measure tools: distance (drag), perimeter and area (click the points, double-click to finish). */
+  | 'measureDistance'
+  | 'measurePerimeter'
+  | 'measureArea';
 
 export const NOTE_SIZE = 20;

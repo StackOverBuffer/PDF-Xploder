@@ -35,8 +35,10 @@ import {
   type Color,
 } from '@cantoo/pdf-lib';
 import { hexToRgb } from './color';
-import { frameGeom, pdfRectToView, pdfToView, viewToPdf } from './geometry';
-import { cloudEdges } from './annotGeom';
+import { frameGeom, pdfRectToView, pdfToView, viewRectToPdf, viewToPdf } from './geometry';
+import { formatMeasure, labelAnchor, measuredValue, type Measure } from './measure';
+import { useLang } from './i18n';
+import { cloudEdges, cloudRadius } from './annotGeom';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { NOTE_SIZE } from './types';
 
@@ -172,7 +174,7 @@ export class Canvas {
 
     /** A "cloudy" border: outward scallops along the outline (see cloudEdges). */
   cloudy(points: Pt[], o: { color: string; width: number; opacity: number; fill: string | null; close: boolean }) {
-    const segs = cloudEdges(points, Math.max(4, o.width * 2.5), o.close);
+    const segs = cloudEdges(points, cloudRadius(o.width), o.close);
     if (!segs.length) return;
     const gs = this.gs(o.opacity);
     this.ops.push(pushGraphicsState());
@@ -268,7 +270,27 @@ export function arrowHeadPoints(p1: Pt, p2: Pt, width: number): [Pt, Pt] {
 }
 
 /** User-space rectangle an annotation occupies (its /Rect and appearance BBox). */
+/** Measurement label: text, font size and where it sits (a page-upright box, user space). */
+const LABEL_SIZE = 9;
+export function measureLabel(a: Annotation, g: PageGeom): { text: string; box: Rect; at: Pt } | null {
+  const m: Measure | undefined = 'measure' in a ? a.measure : undefined;
+  if (!m) return null;
+  const pts = a.type === 'line' || a.type === 'arrow' ? [a.p1, a.p2] : 'vertices' in a ? a.vertices : [];
+  const text = formatMeasure(m.kind, measuredValue(m.kind, pts, m.scale), m.scale.unit, useLang.getState().lang);
+  const anchor = labelAnchor(m.kind, pts.map((p) => pdfToView(g, p)));
+  const w = text.length * LABEL_SIZE * 0.56 + LABEL_SIZE * 0.8;
+  const h = LABEL_SIZE * 1.5;
+  const view = { left: anchor.x - w / 2, top: anchor.y - LABEL_SIZE * 0.9, width: w, height: h };
+  return { text, box: viewRectToPdf(g, view), at: viewToPdf(g, { x: anchor.x, y: anchor.y + LABEL_SIZE * 0.35 }) };
+}
+
 export function annotationRect(a: Annotation, g: PageGeom): Rect {
+  const label = measureLabel(a, g);
+  const r = annotationShapeRect(a, g);
+  return label ? unionRects([r, label.box]) : r;
+}
+
+function annotationShapeRect(a: Annotation, g: PageGeom): Rect {
   switch (a.type) {
     case 'highlight':
     case 'underline':
@@ -284,7 +306,7 @@ export function annotationRect(a: Annotation, g: PageGeom): Rect {
     case 'polyline':
       return pad(boundsOf(a.vertices), a.width / 2 + 1);
     case 'cloud': {
-      const segs = cloudEdges(a.vertices, Math.max(4, a.width * 2.5), true);
+      const segs = cloudEdges(a.vertices, cloudRadius(a.width), true);
       const pts = segs.flatMap((s) => [s.a, s.b, s.c]);
       return pad(boundsOf(pts), a.width / 2 + 1);
     }
@@ -379,6 +401,12 @@ export async function buildAppearance(
         const [h1, h2] = arrowHeadPoints(a.p1, a.p2, a.width);
         c.polyline([h1, a.p2, h2], { color: a.color, width: a.width, opacity: op });
       }
+      if (a.measure) {
+        // Ticks across the ends, as on dimension lines.
+        const l = Math.hypot(a.p2.x - a.p1.x, a.p2.y - a.p1.y) || 1;
+        const n = { x: (-(a.p2.y - a.p1.y) / l) * 5, y: ((a.p2.x - a.p1.x) / l) * 5 };
+        for (const p of [a.p1, a.p2]) c.polyline([{ x: p.x - n.x, y: p.y - n.y }, { x: p.x + n.x, y: p.y + n.y }], { color: a.color, width: a.width, opacity: op });
+      }
       break;
     case 'polygon':
     case 'polyline':
@@ -436,6 +464,14 @@ export async function buildAppearance(
       c.polyline([P(5, 9.5), P(12, 9.5)], { color: '#5d4037', width: 1, opacity: 1 });
       break;
     }
+  }
+  // Measurements show their value on a white box.
+  const label = measureLabel(a, g);
+  if (label) {
+    c.rect(label.box, { stroke: a.color, fill: '#ffffff', width: 0.5, opacity: Math.max(op, 0.9) });
+    const w = ctx.engine.width(label.text, LABEL_SIZE);
+    const at = pdfToView(g, label.at);
+    c.text(ctx.engine, label.text, viewToPdf(g, { x: at.x - w / 2, y: at.y }), { size: LABEL_SIZE, color: a.color, opacity: 1, angle: g.rotation });
   }
   const rect = annotationRect(a, g);
   return { ref: c.toXObject(ctx.doc, rect), rect };

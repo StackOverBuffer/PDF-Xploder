@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  MonitorDown, History, ArchiveRestore, FileText, Trash2, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
+  MonitorDown, QrCode, Ruler, LandPlot, Scale, FileSpreadsheet, History, ArchiveRestore, FileText, Trash2, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
   ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
@@ -23,6 +23,7 @@ import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } fr
 import { tr, useLang, useT } from '../lib/i18n';
 import { installApp, usePwa } from '../lib/pwa';
 import { CommandSearch } from './CommandSearch';
+import { exportMeasurementsCsv } from '../store/measureCommands';
 import { forgetRecent, setSessionEnabled, useSession, type RecentFile } from '../store/session';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
@@ -129,6 +130,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
   const invert = extra.useExtras((x) => x.invert);
   const noDoc = !hasDoc;
   const installPrompt = usePwa((p) => !!p.prompt);
+  const measureScale = useStore((s) => s.measureScale);
   const recent = useSession((x) => x.recent);
   const sessionOn = useSession((x) => x.enabled);
   const installed = usePwa((p) => p.installed);
@@ -344,7 +346,17 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Stack>
             <Btn size="small" icon={<ImagePlus size={I} />} label="Image" disabled={!canAnnotate} onClick={cmd.insertImageFromFile} />
             <Btn size="small" icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
+            <Btn size="small" icon={<QrCode size={I} />} label="QR / Barcode" title="Insert a QR code or barcode (Code 128, EAN-13)" disabled={!canAnnotate} onClick={() => show('insertBarcode')} />
           </Stack>
+        </Group>
+        <Group label="Measure">
+          <ToolBtn tool="measureDistance" icon={<Ruler size={L} />} label="Distance" keys="M" title="Drag to measure a distance (Shift: straight angles)" />
+          <Stack>
+            <ToolBtn size="small" tool="measurePerimeter" icon={<Spline size={I} />} label="Perimeter" title="Click the points, double-click to finish" />
+            <ToolBtn size="small" tool="measureArea" icon={<LandPlot size={I} />} label="Area" title="Click the corners, double-click to finish" />
+            <Btn size="small" icon={<Scale size={I} />} label="Scale" title={`${tr('Measurement scale')}: ${measureScale.label} (${measureScale.unit})`} disabled={noDoc} onClick={() => show('measureScale')} />
+          </Stack>
+          <Btn icon={<FileSpreadsheet size={L} />} label="Export" title="Export the measurements as a CSV file (for spreadsheets)" disabled={noDoc} onClick={exportMeasurementsCsv} />
         </Group>
         <Group label="Manage">
           <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments" />

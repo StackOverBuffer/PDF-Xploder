@@ -6,6 +6,7 @@ import { importForEditing, load as loadPdfLib, type FieldInfo, type FieldValue }
 import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, decrypt, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
+import { DEFAULT_SCALE, type MeasureScale } from '../lib/measure';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -78,6 +79,9 @@ export const DEFAULT_STYLES: Record<string, ToolStyle> = {
   polygon: { color: '#e53935', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
   polyline: { color: '#e53935', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
   cloud: { color: '#e53935', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
+  measureDistance: { color: '#1565c0', fill: null, width: 1, opacity: 1, fontSize: 10, stampLabel: '' },
+  measurePerimeter: { color: '#1565c0', fill: null, width: 1, opacity: 1, fontSize: 10, stampLabel: '' },
+  measureArea: { color: '#1565c0', fill: '#90caf9', width: 1, opacity: 0.6, fontSize: 10, stampLabel: '' },
   text: { color: '#111111', fill: null, width: 1, opacity: 1, fontSize: 14, stampLabel: '' },
   note: { color: '#fbc02d', fill: null, width: 1, opacity: 1, fontSize: 12, stampLabel: '' },
   stamp: { color: '#2e7d32', fill: null, width: 3, opacity: 0.9, fontSize: 12, stampLabel: 'Approved' },
@@ -146,6 +150,8 @@ interface State {
   fit: 'width' | 'page' | null;
   /** Extra clockwise rotation of the display only (the document is unchanged). */
   viewRotation: number;
+  /** Scale for new measurements (each measurement keeps its own). */
+  measureScale: MeasureScale;
   currentPage: number;
   scrollRequest: ScrollRequest | null;
 
@@ -247,7 +253,7 @@ export function anyTabDirty(): boolean {
 /** What the session backup keeps of a document (enough to reopen it with its unsaved changes). */
 export const SESSION_KEYS = [
   'fileName', 'bytes', 'originalBytes', 'pageIds', 'annotations', 'formValues', 'dirty', 'savedOnce', 'fileHandle',
-  'encryption', 'permissions', 'ownerAccess', 'restrictionsLifted', 'editable', 'signatures', 'viewRotation', 'currentPage', 'scale', 'fit',
+  'encryption', 'permissions', 'ownerAccess', 'restrictionsLifted', 'editable', 'signatures', 'viewRotation', 'currentPage', 'scale', 'fit', 'measureScale',
 ] as const satisfies readonly (keyof State)[];
 export type SessionDoc = Pick<State, (typeof SESSION_KEYS)[number]>;
 
@@ -324,6 +330,7 @@ const initialDoc = {
   scrollRequest: null,
   search: { query: '', hits: [], index: -1, matchCase: false },
   viewRotation: 0,
+  measureScale: DEFAULT_SCALE,
 } satisfies Partial<State>;
 
 function readAuthor(): string {
@@ -331,6 +338,23 @@ function readAuthor(): string {
     return localStorage.getItem('awesome-pdf.author') || 'Guest';
   } catch {
     return 'Guest';
+  }
+}
+
+/** Comment types that are imported into the editable model (see annotIO's fromStandard). */
+const IMPORTED_SUBTYPES = new Set(['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Ink', 'Square', 'Circle', 'Line', 'Polygon', 'PolyLine', 'FreeText', 'Text', 'Stamp', 'Redact']);
+
+/** Whether any page has a comment that the import would turn into an editable one (asked of the pdf.js worker, which already has the file). */
+async function hasImportableAnnotations(pdf: PDFDocumentProxy): Promise<boolean> {
+  try {
+    const pages = await Promise.all(Array.from({ length: pdf.numPages }, (_, i) => pdf.getPage(i + 1)));
+    for (const page of pages) {
+      const list = await page.getAnnotations();
+      if (list.some((a: { subtype?: string }) => a.subtype && IMPORTED_SUBTYPES.has(a.subtype))) return true;
+    }
+    return false;
+  } catch {
+    return true;
   }
 }
 
@@ -465,7 +489,11 @@ export const useStore = create<Store>()((set, get) => {
     if (editable) {
       // Existing comments become editable: they move from the file into the model.
       try {
-        const imp = await importForEditing(bytes, () => uid('annot'));
+        // Big files: parsing them with pdf-lib takes seconds on the main thread. Skip it
+        // when the viewer finds no comments that would become editable.
+        const imp = (await hasImportableAnnotations(loaded.pdf))
+          ? await importForEditing(bytes, () => uid('annot'))
+          : { count: 0, bytes, annotations: [] as Annotation[][] };
         if (imp.count) {
           const reloaded = await loadPdfJs(imp.bytes, undefined, 0);
           loaded.pdf.destroy();
@@ -506,6 +534,8 @@ export const useStore = create<Store>()((set, get) => {
       docSession: get().docSession + 1,
       fit: 'width',
       sidebar: get().sidebar,
+      // Measuring goes on at the scale of the measurements already in the file.
+      measureScale: Object.values(annotations).flat().map((a) => ('measure' in a ? a.measure?.scale : undefined)).find(Boolean) ?? DEFAULT_SCALE,
     });
     if (!editable) get().notify(tr('This document is damaged or uses unsupported encryption: it is open read-only.'), 'error');
     const tab = get().activeTab;

@@ -1,4 +1,7 @@
 import { useRef } from 'react';
+import { formatMeasure, measuredValue } from '../lib/measure';
+import { setMeasureScale } from '../store/measureCommands';
+import { useDialog } from './Dialogs';
 import { Trash2 } from 'lucide-react';
 import { useStore, type ToolStyle } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -6,7 +9,7 @@ import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
 import { ContentProperties } from './ContentProperties';
 import { makeAllFieldsEditable, setAllFieldsLocked } from '../store/commands';
-import { useT } from '../lib/i18n';
+import { tf, useLang, useT } from '../lib/i18n';
 
 /** `t(key)`, or `en` while `key` has no translation: for words whose plain key ("Fill") means something else in the ribbon. */
 const tOr = (t: (s: string) => string, key: string, en: string) => (t(key) === key ? en : t(key));
@@ -155,6 +158,30 @@ function StyleEditor({ type, style, onChange }: { type: string; style: Partial<T
   );
 }
 
+const MEASURE_LABELS = { distance: 'Distance', perimeter: 'Perimeter', area: 'Area' } as const;
+const measureOf = (a: Annotation) => ('measure' in a ? a.measure : undefined);
+
+/** A measurement's value and scale, with calibration. */
+function MeasureInfo({ a }: { a: Annotation }) {
+  const t = useT();
+  const lang = useLang((l) => l.lang);
+  const current = useStore((s) => s.measureScale);
+  const show = useDialog((d) => d.show);
+  const m = measureOf(a)!;
+  const pts = 'p1' in a ? [a.p1, a.p2] : 'vertices' in a ? a.vertices : [];
+  const value = formatMeasure(m.kind, measuredValue(m.kind, pts, m.scale), m.scale.unit, lang);
+  return (
+    <div className="prop-group">
+      <div className="prop"><span className="prop-label">{t('Value')}</span><b className="measure-value">{value}</b></div>
+      <div className="prop"><span className="prop-label">{t('Scale')}</span><span>{m.scale.label} ({m.scale.unit})</span></div>
+      {m.kind === 'distance' && <button onClick={() => show('calibrate', a)}>{t('Set scale from this line…')}</button>}
+      {(m.scale.perPoint !== current.perPoint || m.scale.unit !== current.unit) && (
+        <button onClick={() => setMeasureScale(current, true)}>{tf('Use the current scale ({s}) for all', { s: current.label })}</button>
+      )}
+    </div>
+  );
+}
+
 function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   const update = (patch: Partial<Annotation>, history = true) => useStore.getState().updateAnnotation(pageId, a.id, patch, { history });
   const editable = useCan('annotate');
@@ -179,10 +206,11 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   return (
     <fieldset disabled={!editable} className="props-body">
       <div className="props-head">
-        <b>{t(ANNOT_LABELS[a.type])}</b>
+        <b>{t(measureOf(a) ? MEASURE_LABELS[measureOf(a)!.kind] : ANNOT_LABELS[a.type])}</b>
         <span className="muted small">{a.author} · {new Date(a.createdAt).toLocaleString()}</span>
       </div>
       <StyleEditor type={a.type} style={style} onChange={onStyle} />
+      {measureOf(a) && <MeasureInfo a={a} />}
       {a.type === 'text' && (
         <>
           <label className="prop">

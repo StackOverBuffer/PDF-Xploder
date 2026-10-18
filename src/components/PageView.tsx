@@ -27,6 +27,23 @@ function useDevicePixelRatio(): number {
   return dpr;
 }
 
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+/** Extra area drawn around the visible part, so small scrolls need no new detail render. */
+const DETAIL_MARGIN = 300;
+const contains = (a: Box, b: Box) => b.left >= a.left - 1 && b.top >= a.top - 1 && b.left + b.width <= a.left + a.width + 1 && b.top + b.height <= a.top + a.height + 1;
+function clip(b: Box, w: number, h: number): Box | null {
+  const left = Math.max(0, Math.floor(b.left));
+  const top = Math.max(0, Math.floor(b.top));
+  const right = Math.min(w, Math.ceil(b.left + b.width));
+  const bottom = Math.min(h, Math.ceil(b.top + b.height));
+  return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
+}
+
 interface Props {
   index: number;
   /** Whether the page is near the viewport and should be rendered. */
@@ -51,6 +68,8 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   const renderedText = useRef('');
   const textLayer = useRef<{ layer: TextLayer; scale: number } | null>(null);
   const dpr = useDevicePixelRatio();
+  const pageRef = useRef<HTMLDivElement>(null);
+  const detailHost = useRef<HTMLDivElement>(null);
 
   useEffect(() => registerTextLayer(textRef.current!), []);
 
@@ -162,8 +181,86 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
     };
   }, [pdf, docVersion, index, scale, visible, geom.rotation, opening, dpr]);
 
+  // Zoomed far into a big page (plans, maps): the page canvas is capped (see MAX_CANVAS_PIXELS),
+  // so the visible part gets a second, full-resolution canvas, as in pdf.js's viewer.
+  const capped = w * h * dpr * dpr > MAX_CANVAS_PIXELS;
+  const [region, setRegion] = useState<Box | null>(null);
+  const drawn = useRef<Box | null>(null);
+  useLayoutEffect(() => {
+    // A detail drawn for another zoom level no longer fits.
+    detailHost.current?.replaceChildren();
+    drawn.current = null;
+    setRegion(null);
+  }, [scale, docVersion, geom.rotation]);
+  useEffect(() => {
+    if (!visible || !capped) return;
+    const el = pageRef.current;
+    const viewer = el?.closest<HTMLElement>('.viewer');
+    if (!el || !viewer) return;
+    let timer = 0;
+    const update = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const pr = el.getBoundingClientRect();
+        const vr = viewer.getBoundingClientRect();
+        const seen = clip({ left: vr.left - pr.left, top: vr.top - pr.top, width: vr.width, height: vr.height }, w, h);
+        if (!seen) return;
+        // Still inside what was drawn: nothing to do.
+        if (drawn.current && contains(drawn.current, seen)) return;
+        setRegion(clip({ left: seen.left - DETAIL_MARGIN, top: seen.top - DETAIL_MARGIN, width: seen.width + 2 * DETAIL_MARGIN, height: seen.height + 2 * DETAIL_MARGIN }, w, h));
+      }, 150);
+    };
+    update();
+    viewer.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      clearTimeout(timer);
+      viewer.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [visible, capped, scale, w, h, docVersion]);
+  useEffect(() => {
+    if (!region || !pdf || opening || !visible) return;
+    let cancelled = false;
+    let task: { cancel(): void } | null = null;
+    const slot = renderSlot(PRIORITY.page);
+    (async () => {
+      try {
+        await slot.ready;
+        if (cancelled) return;
+        const page = await pdf.getPage(index + 1);
+        if (cancelled) return;
+        const k = dpr;
+        const viewport = page.getViewport({ scale: scale * k, rotation: geom.rotation, offsetX: -region.left * k, offsetY: -region.top * k });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(region.width * k);
+        canvas.height = Math.ceil(region.height * k);
+        canvas.className = 'page-detail';
+        Object.assign(canvas.style, { left: `${region.left}px`, top: `${region.top}px`, width: `${region.width}px`, height: `${region.height}px` });
+        const t = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
+        task = t;
+        await t.promise;
+        if (cancelled) return;
+        const old = detailHost.current?.firstChild;
+        detailHost.current?.replaceChildren(canvas);
+        if (old instanceof HTMLCanvasElement) old.width = old.height = 0;
+        drawn.current = region;
+      } catch (e) {
+        if ((e as Error)?.name !== 'RenderingCancelledException' && !cancelled) console.error(e);
+      } finally {
+        slot.done();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      task?.cancel();
+      slot.done();
+    };
+  }, [region, pdf, opening, visible, index, scale, geom.rotation, dpr]);
+
   return (
     <div
+      ref={pageRef}
       className="page"
       data-index={index}
       style={{ width: w, height: h }}
@@ -175,6 +272,7 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
       }}
     >
       <div className="canvas-host" ref={canvasHost} />
+      <div className="detail-host" ref={detailHost} />
       <div className="textLayer" ref={textRef} />
       {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
       {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}

@@ -12,30 +12,34 @@ describe('cloud geometry', () => {
     { x: 200, y: 200 },
   ];
 
-  it('makes one scallop per closed edge, bulging outwards', () => {
+  it('cuts every edge into scallops about two radii wide, bulging outwards', () => {
     const segs = cloudEdges(triangle, 10, true);
-    expect(segs).toHaveLength(3);
-    // The shoelace area of the triangle is positive (counter-clockwise in y-up
-    // space), so the bumps flip to the outside of the outline.
+    // Edges of 100, 100 and 141 units with radius 10: 5 + 5 + 7 scallops.
+    expect(segs).toHaveLength(17);
+    // The scallops of an edge join up from corner to corner.
     expect(segs[0].a).toEqual(triangle[0]);
-    expect(segs[0].b).toEqual(triangle[1]);
-    // First edge is the bottom: the bump must sit below it (outside).
+    expect(segs[4].b).toEqual(triangle[1]);
+    for (let i = 1; i < segs.length; i++) expect(segs[i].a).toEqual(segs[i - 1].b);
+    // The shoelace area of the triangle is positive (counter-clockwise in y-up
+    // space), so the bumps flip to the outside: below the bottom edge…
     expect(segs[0].c.y).toBeLessThan(95);
-    expect(segs[0].c.x).toBeCloseTo(150);
-    // Second edge is the right side: the bump must be to its right (outside).
-    expect(segs[1].c.x).toBeGreaterThan(205);
-    expect(segs[1].c.y).toBeCloseTo(150);
+    expect(segs[0].c.x).toBeCloseTo(110);
+    // …and to the right of the right-hand edge.
+    expect(segs[5].c.x).toBeGreaterThan(205);
   });
 
-  it('makes one scallop fewer for open polylines', () => {
-    expect(cloudEdges(triangle, 10, false)).toHaveLength(2);
+  it('leaves the closing edge out for open polylines', () => {
+    expect(cloudEdges(triangle, 10, false)).toHaveLength(10);
   });
 
-  it('scales the bump with the bulge parameter', () => {
-    const [s10] = cloudEdges([{ x: 0, y: 0 }, { x: 100, y: 0 }], 10, false);
-    const [s30] = cloudEdges([{ x: 0, y: 0 }, { x: 100, y: 0 }], 30, false);
-    expect(s10.c.y).toBeCloseTo(10);
-    expect(s30.c.y).toBeCloseTo(30);
+  it('makes bigger scallops for a bigger radius', () => {
+    const s10 = cloudEdges([{ x: 0, y: 0 }, { x: 100, y: 0 }], 10, false);
+    const s25 = cloudEdges([{ x: 0, y: 0 }, { x: 100, y: 0 }], 25, false);
+    expect(s10).toHaveLength(5);
+    expect(s25).toHaveLength(2);
+    // The control point sits one chord out, so the bump is about half a chord high.
+    expect(s10[0].c.y).toBeCloseTo(20);
+    expect(s25[0].c.y).toBeCloseTo(50);
   });
 
   it('samples quadratic Bézier scallops from endpoint to endpoint through the bump', () => {

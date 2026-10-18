@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, type PointerEvent as RPointerEvent }
 import { styleFor, uid, useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import { frameGeom, frameMatrix, pdfRectToView, pdfToView, rectFromPoints, viewRectToPdf, viewToPdf, type VRect } from '../lib/geometry';
-import { hasRect, resizePatch, translatePatch, viewBounds, cloudEdges } from '../lib/annotGeom';
+import { hasRect, resizePatch, translatePatch, viewBounds, cloudEdges, cloudRadius } from '../lib/annotGeom';
 import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
@@ -12,7 +12,8 @@ import { zoomAt, zoomToBox } from '../store/viewActions';
 import { stampViewSize, usePendingStamp } from '../store/contentActions';
 import { viewSize } from '../lib/geometry';
 import type { NewFieldKind } from '../lib/forms';
-import { useT } from '../lib/i18n';
+import { useLang, useT } from '../lib/i18n';
+import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 
 interface Props {
   index: number;
@@ -26,8 +27,10 @@ interface Props {
 const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
   fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
 };
-const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'polyline', 'cloud', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
+const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'polyline', 'cloud', 'measureDistance', 'measurePerimeter', 'measureArea', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
+/** Tools that collect clicked points (double-click to finish). */
+const PATH_TOOLS: Tool[] = ['polygon', 'polyline', 'cloud', 'measurePerimeter', 'measureArea'];
 
 type Draft =
   | { kind: 'ink'; points: Pt[] }
@@ -84,7 +87,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       return;
     }
     if (tool === 'ink') setDraft({ kind: 'ink', points: [p] });
-    else if (tool === 'polygon' || tool === 'polyline' || tool === 'cloud') {
+    else if (PATH_TOOLS.includes(tool)) {
       // A click near the previous one (a double click) closes the shape.
       const prev = lastClick.current;
       lastClick.current = p;
@@ -177,6 +180,13 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       if (clicked.length < 2) return;
       const vertices = simplify(clicked).map((p) => viewToPdf(geom, p));
       if (vertices.length < 2) return;
+      if (tool === 'measurePerimeter' || tool === 'measureArea') {
+        if (tool === 'measureArea' && vertices.length < 3) return;
+        const kind = tool === 'measureArea' ? 'area' : 'perimeter';
+        store.addAnnotation(index, { ...base(tool), type: kind === 'area' ? 'polygon' : 'polyline', width: st.width, fill: st.fill, vertices, measure: { kind, scale: store.measureScale } });
+        lastClick.current = null;
+        return;
+      }
       store.addAnnotation(index, { ...base(tool), type: tool as 'polygon' | 'polyline' | 'cloud', width: st.width, fill: st.fill, vertices });
       lastClick.current = null;
       if (tool !== 'polyline') store.setTool('select');
@@ -188,6 +198,12 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     if (tool === 'line' || tool === 'arrow') {
       if (click) return;
       store.addAnnotation(index, { ...base(tool), type: tool, width: st.width, p1: viewToPdf(geom, d.start), p2: viewToPdf(geom, d.end) });
+      return;
+    }
+    if (tool === 'measureDistance') {
+      if (click) return;
+      // Measurements stay on: measure the next distance right away.
+      store.addAnnotation(index, { ...base(tool), type: 'line', width: st.width, p1: viewToPdf(geom, d.start), p2: viewToPdf(geom, d.end), measure: { kind: 'distance', scale: store.measureScale } });
       return;
     }
     const defaults: Record<string, [number, number]> = {
@@ -339,7 +355,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
 
   // Starting another tool or leaving the page abandons a partly drawn shape.
   useEffect(() => {
-    if (draft?.kind === 'path' && !['polygon', 'polyline', 'cloud'].includes(tool)) {
+    if (draft?.kind === 'path' && !PATH_TOOLS.includes(tool)) {
       setDraft(null);
       lastClick.current = null;
     }
@@ -405,10 +421,32 @@ function StampPreview({ at, scale: S, pending, geom }: { at: Pt; scale: number; 
   );
 }
 
+/** A measurement's value on a light background, readable over a busy drawing. */
+function MeasureLabel({ kind, value, unit, at, color, S }: { kind: MeasureKind; value: number; unit: MeasureUnit; at: Pt; color: string; S: number }) {
+  const lang = useLang((l) => l.lang);
+  const text = formatMeasure(kind, value, unit, lang);
+  const size = Math.max(9, 9 * S);
+  const w = text.length * size * 0.56 + size * 0.8;
+  return (
+    <g className="measure-label" pointerEvents="none">
+      <rect x={at.x - w / 2} y={at.y - size * 0.9} width={w} height={size * 1.5} rx={size * 0.25} fill="#ffffff" fillOpacity={0.88} stroke={color} strokeWidth={0.75} />
+      <text x={at.x} y={at.y + size * 0.15} fill={color} stroke="none" fontSize={size} fontFamily={FONT} textAnchor="middle" dominantBaseline="middle">{text}</text>
+    </g>
+  );
+}
+
+/** Short ticks across both ends of a distance line, as on dimension lines. */
+function endTicks(a: Pt, b: Pt, len: number): string {
+  const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = (-(b.y - a.y) / l) * len;
+  const ny = ((b.x - a.x) / l) * len;
+  return `M${a.x - nx},${a.y - ny} L${a.x + nx},${a.y + ny} M${b.x - nx},${b.y - ny} L${b.x + nx},${b.y + ny}`;
+}
+
 function constrain(start: Pt, p: Pt, tool: Tool): Pt {
   const dx = p.x - start.x;
   const dy = p.y - start.y;
-  if (tool === 'line' || tool === 'arrow') {
+  if (tool === 'line' || tool === 'arrow' || tool === 'measureDistance') {
     // Snap to multiples of 45°.
     const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
     const len = Math.hypot(dx, dy);
@@ -441,7 +479,7 @@ function arrowHead(x1: number, y1: number, x2: number, y2: number, len: number):
 /** SVG path of the scalloped preview for the cloud tool (same geometry as the PDF appearance). */
 function cloudPreviewPath(points: Pt[], S: number, width: number): string {
   const scaled = points.map((p) => ({ x: p.x * S, y: p.y * S }));
-  const segs = cloudEdges(scaled, Math.max(4, width * 2.5) * S, true);
+  const segs = cloudEdges(scaled, cloudRadius(width) * S, true);
   if (!segs.length) return '';
   let d = `M${segs[0].a.x},${segs[0].a.y}`;
   for (const s of segs) d += ` Q${s.c.x},${s.c.y} ${s.b.x},${s.b.y}`;
@@ -455,7 +493,7 @@ function DraftShape({ draft, tool, scale: S }: { draft: NonNullable<Draft>; tool
   }
   if (draft.kind === 'path') {
     const pts = draft.points.map((p) => `${p.x * S},${p.y * S}`);
-    const closed = tool !== 'polyline';
+    const closed = tool !== 'polyline' && tool !== 'measurePerimeter';
     const d = pts.length < 2 ? '' : closed
       ? `M${pts[0]} L${pts.slice(1).join(' L')} Z`
       : `M${pts[0]} L${pts.slice(1).join(' L')}`;
@@ -466,10 +504,28 @@ function DraftShape({ draft, tool, scale: S }: { draft: NonNullable<Draft>; tool
         {draft.points.map((p, i) => (
           <circle key={i} cx={p.x * S} cy={p.y * S} r={2.5} fill={st.color} />
         ))}
+        {(tool === 'measurePerimeter' || tool === 'measureArea') && draft.points.length > 1 && (() => {
+          // View space at scale 1 is in points: the value can be shown while drawing.
+          const kind = tool === 'measureArea' ? 'area' : 'perimeter';
+          const scale = useStore.getState().measureScale;
+          return <MeasureLabel kind={kind} value={measuredValue(kind, draft.points, scale)} unit={scale.unit} at={labelAnchor(kind, draft.points.map((p) => ({ x: p.x * S, y: p.y * S })))} color={st.color} S={S} />;
+        })()}
       </g>
     );
   }
   const { start, end } = draft;
+  if (tool === 'measureDistance') {
+    const scale = useStore.getState().measureScale;
+    const a = { x: start.x * S, y: start.y * S };
+    const b = { x: end.x * S, y: end.y * S };
+    return (
+      <g className="draft" stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" fill="none">
+        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+        <path d={endTicks(a, b, 5 * S)} />
+        <MeasureLabel kind="distance" value={measuredValue('distance', [start, end], scale)} unit={scale.unit} at={labelAnchor('distance', [a, b])} color={st.color} S={S} />
+      </g>
+    );
+  }
   if (tool === 'line' || tool === 'arrow') {
     return (
       <g className="draft" stroke={st.color} strokeWidth={st.width * S} strokeLinecap="round" fill="none">
@@ -567,6 +623,8 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} />
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
           {a.type === 'arrow' && <path d={arrowHead(p1.x, p1.y, p2.x, p2.y, Math.max(8, a.width * 4) * S)} />}
+          {a.measure && <path d={endTicks(p1, p2, 5 * S)} />}
+          {a.measure && <MeasureLabel kind="distance" value={measuredValue('distance', [a.p1, a.p2], a.measure.scale)} unit={a.measure.scale.unit} at={labelAnchor('distance', [p1, p2])} color={a.color} S={S} />}
         </g>
       );
     }
@@ -574,15 +632,19 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
     case 'polyline': {
       const pts = a.vertices.map(view);
       const points = pts.map((v) => `${v.x},${v.y}`).join(' ');
+      // A polyline stays open.
+      const Shape = a.type === 'polyline' ? 'polyline' : 'polygon';
+      const m = a.measure;
       return (
         <g opacity={a.opacity}>
-          <polygon points={points} fill={a.fill ?? 'none'} stroke={a.color} strokeWidth={a.width * S} strokeLinecap="round" strokeLinejoin="round" />
-          <polygon points={points} fill="none" stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
+          <Shape points={points} fill={a.type === 'polyline' ? 'none' : a.fill ?? 'none'} stroke={a.color} strokeWidth={a.width * S} strokeLinecap="round" strokeLinejoin="round" />
+          <Shape points={points} fill="none" stroke="transparent" strokeWidth={Math.max(8, a.width * S)} />
+          {m && <MeasureLabel kind={m.kind} value={measuredValue(m.kind, a.vertices, m.scale)} unit={m.scale.unit} at={labelAnchor(m.kind, pts)} color={a.color} S={S} />}
         </g>
       );
     }
     case 'cloud': {
-      const segs = cloudEdges(a.vertices.map(view), Math.max(4, a.width * 2.5) * S, true);
+      const segs = cloudEdges(a.vertices.map(view), cloudRadius(a.width) * S, true);
       if (!segs.length) return null;
       let d = `M${segs[0].a.x},${segs[0].a.y}`;
       for (const s of segs) d += ` Q${s.c.x},${s.c.y} ${s.b.x},${s.b.y}`;

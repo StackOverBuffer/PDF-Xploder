@@ -38,7 +38,7 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
 
 const TOOL_KEYS: Record<string, Tool> = {
   v: 'select', x: 'selectText', g: 'snapshot', z: 'zoom', h: 'hand', H: 'highlight', u: 'underline', k: 'strikeout', p: 'ink', r: 'rect', o: 'ellipse',
-  l: 'line', a: 'arrow', y: 'polygon', j: 'polyline', w: 'cloud', t: 'text', n: 'note', s: 'stamp',
+  l: 'line', m: 'measureDistance', a: 'arrow', y: 'polygon', j: 'polyline', w: 'cloud', t: 'text', n: 'note', s: 'stamp',
 };
 
 async function openSample() {
@@ -171,6 +171,7 @@ const fieldCache = new WeakMap<Uint8Array, FieldInfo[]>();
 function useFormFields() {
   const bytes = useStore((s) => s.bytes);
   const editable = useStore((s) => s.editable);
+  const pdf = useStore((s) => s.pdf);
   useEffect(() => {
     let live = true;
     const apply = (fields: FieldInfo[]) => {
@@ -185,7 +186,12 @@ function useFormFields() {
       if (useStore.getState().fields !== known) apply(known);
       return;
     }
-    getFormFields(bytes)
+    // A restored tab gets its viewer document a moment later: wait for it.
+    if (!pdf) return;
+    // pdf.js already has the file: without any form field there, skip the (slow, for big files) pdf-lib parse.
+    const anyFields = useStore.getState().bytes === bytes ? pdf.getFieldObjects().then((o) => !!o && Object.keys(o).length > 0).catch(() => true) : Promise.resolve(true);
+    anyFields
+      .then((has) => (has ? getFormFields(bytes) : []))
       .then((fields) => {
         fieldCache.set(bytes, fields);
         apply(fields);
@@ -194,7 +200,7 @@ function useFormFields() {
     return () => {
       live = false;
     };
-  }, [bytes, editable]);
+  }, [bytes, editable, pdf]);
 }
 
 /** While a command runs: a progress bar, and a transparent layer that keeps clicks and drops from starting another one. Dialogs stay usable (e.g. to cancel OCR). */
