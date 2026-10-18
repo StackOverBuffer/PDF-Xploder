@@ -87,7 +87,7 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ✅ Comment text and author on every annotation; comments list
 - ✅ Saved as native, editable PDF annotations with appearance streams (or flattened on request)
 - ✅ Import and edit annotations already present in a PDF (Highlight, Underline, Squiggly, StrikeOut, Ink, Square, Circle, Line, FreeText, Text, Redact), with lossless round trips of our own
-- ⬜ Callouts, polygons, polylines, clouds, measurement tools (distance, perimeter, area)
+- ⬜ Callouts, measurement tools (distance, perimeter, area)
 - ⬜ Comment replies/status, summarize comments, import/export FDF/XFDF
 
 ### Organize pages

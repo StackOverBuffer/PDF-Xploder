@@ -4,6 +4,21 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 ✅ available · 🟡 partly available · 🔧 in progress · ⬜ planned · 🚫 not applicable to a browser app (reason given)
 
+## Next up
+
+Roughly in order of everyday usefulness versus effort:
+
+1. **Restore session and autosave**: reopen the last tabs after a browser restart, with unsaved changes recovered; recent documents (rows *Autosave/Autorecovery*, *Save Current Session*, *Recent Documents*).
+2. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
+3. **Compare documents**: side by side, with changed text and changed areas marked.
+4. **Find and replace text, find and redact**.
+5. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
+6. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
+7. **Page layouts**: single page, two pages, facing pages; split view.
+8. **Measurement tools and callouts**.
+9. **QR codes and barcodes** as page content or stamps.
+10. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+
 ## 1. New in recent PDF-XChange versions
 
 | Feature | Status |
@@ -176,7 +191,9 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Text List Formatting, Tab Stops, Overtype | ⬜ |
 | Paste Copied Text as Plain Text / Paste Options | 🟡 paste objects, paste in place |
 | Crop Pages, Partial Cropping, Crop to White Margins | ✅ |
-| Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ |
+| Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ (also copy pages between open documents by dragging thumbnails onto another tab) |
+| Interleave Pages (combine separately scanned front and back sides) | ⬜ |
+| Booklet Imposition | ⬜ (N-up printing exists) |
 | Delete Empty Pages, Merge, Normalize, Overlay, Replace, Resize, Swap Pages, Set Margins, Split by Size | ✅ |
 | Normalize Media Box Offsets | ✅ |
 | Split Pages by Guide Lines | ⬜ |
@@ -244,7 +261,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Loupe Tool, Pan and Zoom Pane | ⬜ |
 | Zoom Features | ✅ zoom box, presets, fit width/page, Zoom tool, rotate view |
 | Calibrate Measurement Scales | ⬜ |
-| History Pane / Recent Documents | ⬜ |
+| History Pane / Recent Documents | ⬜ (with restore session) |
 | Webcam Images | ⬜ |
 | Print All Open Documents, External Repositories, UI Automation | 🚫 desktop-only |
 
@@ -268,7 +285,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Specify the Visibility of New Watermarks | ⬜ |
 | Translate Documents | ⬜ |
 | Type Your Signature | ✅ |
-| Word Count | ⬜ |
+| Word Count / Document Statistics | ⬜ |
 | Continuous Zoom | ✅ Ctrl+wheel |
 | Shell extensions, Terminal Server, command line, ARM64, Windows 11 corners, WebDAV, DocuSign, Azure Purview, tab-title and close-button options, recycle bin, WebP/MRC/PRC import… | 🚫 desktop/Windows-specific or third-party services |
 
