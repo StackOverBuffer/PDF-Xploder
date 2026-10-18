@@ -135,6 +135,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Feature | Status |
 |---|---|
 | Ribbon UI | ✅ PDF-XChange style tabs, groups, split buttons and menus |
+| Quick Launch / search for commands | ✅ search box beside the ribbon tabs (Ctrl+K): finds every ribbon button and menu entry in English or German, shows where it lives and its shortcut, recently used first |
 | Set the UI Language | ✅ German/English throughout, following the browser |
 | Dark Page Mode | 🟡 inverted page colours |
 | Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |

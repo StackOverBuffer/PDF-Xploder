@@ -61,7 +61,8 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .quick button { background: transparent; border: none; color: #fff; padding: 4px 6px; }
 .quick button:hover:not(:disabled) { background: rgba(255,255,255,0.15); }
 .doc-title { flex: 1; text-align: center; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 120px; }
-.tabs-row { display: flex; gap: 2px; padding: 0 8px; background: var(--panel-2); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs-bar { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border-bottom: 1px solid var(--border); padding-right: 8px; }
+.tabs-row { display: flex; gap: 2px; padding: 0 8px; overflow-x: auto; flex: 1; min-width: 0; align-self: stretch; }
 .rtab { border: none; border-radius: 0; background: none; padding: 5px 12px; white-space: nowrap; flex-shrink: 0; border-bottom: 2px solid transparent; }
 .rtab:hover { background: #eceff3 !important; }
 .rtab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; background: var(--panel) !important; }
@@ -429,3 +430,21 @@ select.widget { padding: 0; }
 .doctab.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
 .doctab-new { border: none; background: none; padding: 4px 6px; margin-bottom: 2px; border-radius: 3px; }
 .doctab-new:hover { background: var(--accent-soft); }
+
+/* Command search ("Quick Launch") */
+.cmdsearch { position: relative; flex: 0 1 240px; min-width: 120px; }
+.tabs-bar .cmdsearch input[type=search] { width: 100%; padding: 3px 8px 3px 26px; font-size: 12.5px; border-radius: 4px; }
+.cmdsearch-icon { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.cmdsearch-pop { position: fixed; z-index: 1000; width: min(440px, calc(100vw - 16px)); max-height: min(480px, 70vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(20, 30, 50, 0.22); padding: 4px; }
+.cmdsearch-pop ul { list-style: none; margin: 0; padding: 0; }
+.cmdsearch-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 6px 8px 2px; }
+.cmdsearch-empty { padding: 10px; color: var(--muted); font-size: 12.5px; }
+.cmdsearch-item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+.cmdsearch-item.sel { background: var(--accent-soft); }
+.cmdsearch-item.disabled { opacity: 0.5; cursor: default; }
+.cmdsearch-glyph { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text); }
+.cmdsearch-glyph svg { width: 16px; height: 16px; }
+.cmdsearch-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.cmdsearch-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdsearch-where { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdsearch-item kbd { font: 11px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; background: var(--panel-2); }

@@ -1,11 +1,12 @@
 /** Building blocks of the PDF-XChange style ribbon. */
-import { useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed } from '../store/permissions';
 import { formatPercent, parsePercent, useLang, useT } from '../lib/i18n';
 import { Menu, rectAnchor, wrapClose, type MenuItem } from './Menu';
 import type { Tool } from '../lib/types';
+import type { CommandEntry } from '../lib/commandSearch';
 
 export type { MenuItem };
 
@@ -13,6 +14,50 @@ const S = useStore.getState;
 
 export const L = 24; // big button icon size
 export const I = 16; // small button icon size
+
+// ---------------------------------------------------------------- command harvesting
+
+/**
+ * While the command search renders the ribbon off-screen, buttons and groups
+ * report themselves here instead of drawing anything.
+ */
+export interface Harvest {
+  add(e: CommandEntry): void;
+  /** English keys of the enclosing tab, group and menu button. */
+  path: string[];
+}
+
+export const HarvestContext = createContext<Harvest | null>(null);
+
+function harvestMenu(h: Harvest, path: string[], items: MenuItem[], off = false) {
+  for (const it of items) {
+    if (!it) continue;
+    if (it.submenu) harvestMenu(h, [...path, it.label], it.submenu, off || !!it.disabled);
+    else if (it.onClick || it.unavailable) {
+      h.add({
+        id: [...path, it.label, it.value ?? ''].join('/'),
+        label: it.label,
+        path,
+        value: it.value,
+        keys: it.hint,
+        icon: it.icon,
+        run: it.onClick,
+        disabled: off || it.disabled || !!it.unavailable || !it.onClick,
+        reason: it.unavailable,
+        checked: it.checked,
+      });
+    }
+  }
+}
+
+function harvestButton(h: Harvest, p: BtnProps) {
+  const label = p.searchLabel ?? p.label;
+  if (p.onClick) {
+    h.add({ id: [...h.path, label].join('/'), label, path: h.path, title: p.title, keys: p.keys, icon: p.icon, run: p.onClick, disabled: p.disabled, checked: p.active });
+  }
+  // "Stamp › Stamp › Approved" reads better as "Stamp › Approved".
+  if (p.menu) harvestMenu(h, h.path[h.path.length - 1] === label ? h.path : [...h.path, label], typeof p.menu === 'function' ? p.menu() : p.menu, p.disabled);
+}
 
 // ---------------------------------------------------------------- buttons
 
@@ -29,12 +74,20 @@ export interface BtnProps {
   size?: 'big' | 'small' | 'icon';
   /** Keyboard shortcut shown in the tooltip. */
   keys?: string;
+  /** Name in the command search, for buttons whose label shows a current value. */
+  searchLabel?: string;
 }
 
-export function Btn({ icon, label, onClick, active, disabled, title, menu, size = 'big', keys }: BtnProps) {
+export function Btn(props: BtnProps) {
+  const { icon, label, onClick, active, disabled, title, menu, size = 'big', keys } = props;
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const harvest = useContext(HarvestContext);
+  if (harvest) {
+    harvestButton(harvest, props);
+    return null;
+  }
   const text = t(label);
   const tip = `${title ? t(title) : text}${keys ? ` (${keys})` : ''}`;
   const open = () => setAnchor(anchor ? null : ref.current!.getBoundingClientRect());
@@ -69,6 +122,8 @@ export function Btn({ icon, label, onClick, active, disabled, title, menu, size 
 
 export function Group({ label, children }: { label: string; children: ReactNode }) {
   const t = useT();
+  const harvest = useContext(HarvestContext);
+  if (harvest) return <HarvestContext.Provider value={{ ...harvest, path: [...harvest.path, label] }}>{children}</HarvestContext.Provider>;
   return (
     <div className="rgroup" role="group" aria-label={t(label)}>
       <div className="rgroup-items">{children}</div>
@@ -129,6 +184,7 @@ export function ZoomBox() {
   const [text, setText] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const harvest = useContext(HarvestContext);
   const commit = () => {
     const v = text === null ? null : parsePercent(text);
     if (v) S().setScale(v);
@@ -140,6 +196,7 @@ export function ZoomBox() {
     { label: 'Fit page', checked: fit === 'page', onClick: () => S().setScale(scale, 'page') },
     { label: 'Fit width', checked: fit === 'width', onClick: () => S().setScale(scale, 'width') },
   ];
+  if (harvest) return null;
   return (
     <div className="rzoom" ref={ref}>
       <input

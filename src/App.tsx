@@ -5,6 +5,7 @@ import { anyTabDirty, useStore, type SidebarTab } from './store/store';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
 import { TabBar } from './components/TabBar';
+import { FOCUS_COMMAND_SEARCH } from './components/CommandSearch';
 import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
 import { addBookmarkAt } from './store/contentActions';
 import { goToBookmark } from './store/bookmarkCommands';
@@ -57,6 +58,7 @@ function useShortcuts() {
         const k = e.key.toLowerCase();
         const run = (fn: () => unknown) => { e.preventDefault(); fn(); };
         if (k === 'o') return run(cmd.openFromDialog);
+        if (k === 'k') return run(() => window.dispatchEvent(new Event(FOCUS_COMMAND_SEARCH)));
         // Next/previous tab (Ctrl+Tab belongs to the browser).
         if (e.altKey && (e.key === 'PageDown' || e.key === 'PageUp')) {
           return run(() => {

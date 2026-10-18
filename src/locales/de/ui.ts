@@ -332,6 +332,9 @@ const DE: Record<string, string> = {
   'Own window, works offline and opens PDFs from your computer': 'Eigenes Fenster, funktioniert offline und öffnet PDFs von Ihrem Computer',
   'Your browser does not offer installation here (Chrome and Edge do; on other browsers use “Add to Home Screen” or similar)': 'Ihr Browser bietet hier keine Installation an (Chrome und Edge schon; in anderen Browsern „Zum Startbildschirm hinzufügen“ o. Ä. verwenden)',
   'PDF-Xploder is ready to work offline.': 'PDF-Xploder ist jetzt auch offline nutzbar.',
+  'Search commands': 'Befehle suchen', 'No matching commands': 'Keine passenden Befehle', 'Recently used': 'Zuletzt verwendet', 'Commands': 'Befehle',
+  'Type to search every command, e.g. “rotate”, “watermark” or “OCR”.': 'Tippen, um alle Befehle zu durchsuchen, z. B. „drehen“, „Wasserzeichen“ oder „OCR“.',
+  'Not available right now': 'Gerade nicht verfügbar',
   'Saved to {name}': 'Gespeichert in {name}',
   'Could not write to the file, so a copy was downloaded instead.': 'Die Datei konnte nicht geschrieben werden, daher wurde stattdessen eine Kopie heruntergeladen.',
 };

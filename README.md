@@ -56,6 +56,7 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 
 ### Ribbon
 - ✅ PDF-XChange style ribbon: File, Home, View, Comment, Protect, Form, Organize, Convert, Share, Review, Accessibility tabs
+- ✅ Command search (Ctrl+K) beside the ribbon tabs: type part of a command name in English or German ("rotate", "Wasserzeichen") and press Enter; lists every ribbon button and menu entry with its location, recently used commands first
 - ✅ Home tab laid out like PDF-XChange: Tools (Hand, Select Text, Edit Comments, Snapshot/Clipboard/Find menus), View (zoom box with presets, 1:1, fit page/width, rotate view, pane toggles), Objects (Edit Text, Edit Objects, Add, Select)
 - ✅ Big, small and icon buttons, split buttons with drop-down menus
 - ✅ German and English interface for the ribbon (follows the browser language; switch under View → Language)
@@ -168,7 +169,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 ## Keyboard shortcuts
 
-`Ctrl+O` open · `Ctrl+Alt+PgDn`/`Ctrl+Alt+PgUp` next/previous tab · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
+`Ctrl+K` search commands · `Ctrl+O` open · `Ctrl+Alt+PgDn`/`Ctrl+Alt+PgUp` next/previous tab · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
 `Alt+PgDn`/`Alt+PgUp` next/previous bookmark · `V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
