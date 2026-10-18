@@ -8,15 +8,14 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 Roughly in order of everyday usefulness versus effort:
 
-1. **Restore session and autosave**: reopen the last tabs after a browser restart, with unsaved changes recovered; recent documents (rows *Autosave/Autorecovery*, *Save Current Session*, *Recent Documents*).
-2. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
-3. **Compare documents**: side by side, with changed text and changed areas marked.
-4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
-5. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
-6. **Page layouts**: single page, two pages, facing pages; split view.
-7. **Measurement tools and callouts**.
-8. **QR codes and barcodes** as page content or stamps.
-9. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
+2. **Compare documents**: side by side, with changed text and changed areas marked.
+3. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
+4. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
+5. **Page layouts**: single page, two pages, facing pages; split view.
+6. **Measurement tools and callouts**.
+7. **QR codes and barcodes** as page content or stamps.
+8. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -156,8 +155,8 @@ Roughly in order of everyday usefulness versus effort:
 | Right-to-Left Page Layout | ⬜ |
 | Tabbed Interface and Multiple Tab Groups | 🟡 document tabs (open several files, switch, reorder, close others/right/all, unsaved marker, per-tab undo, zoom and position; drag pages between tabs or onto "+" for a new document); ⬜ multiple tab groups |
 | Desktop application, shell integration ("Open with", default PDF app) | ✅ installable app (own window, works offline, registered for PDFs; files opened from the system arrive as tabs in the running window) |
-| Autosave/Autorecovery | ⬜ (IndexedDB) |
-| Save Current Session | ⬜ |
+| Autosave/Autorecovery | ✅ open tabs and their unsaved changes are kept in browser storage and reopened at the next start (not for password-protected documents) |
+| Save Current Session | ✅ restore session (File → Session), on by default |
 | Customize Layout of Panes, Custom Toolbars/Ribbons, Quick Tools | ⬜ |
 | Export/Import/Reset Settings, Preferences | ⬜ |
 | Specify the Default Ribbon Tab | ⬜ |
@@ -260,7 +259,7 @@ Roughly in order of everyday usefulness versus effort:
 | Loupe Tool, Pan and Zoom Pane | ⬜ |
 | Zoom Features | ✅ zoom box, presets, fit width/page, Zoom tool, rotate view |
 | Calibrate Measurement Scales | ⬜ |
-| History Pane / Recent Documents | ⬜ (with restore session) |
+| History Pane / Recent Documents | 🟡 recent files (start screen, File → Recent); ⬜ history pane |
 | Webcam Images | ⬜ |
 | Print All Open Documents, External Repositories, UI Automation | 🚫 desktop-only |
 

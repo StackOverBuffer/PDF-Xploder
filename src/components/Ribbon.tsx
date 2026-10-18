@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  MonitorDown, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
+  MonitorDown, History, ArchiveRestore, FileText, Trash2, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
   ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
   ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
@@ -23,6 +23,7 @@ import { customStamps, deleteCustomStamp, placeCustomStamp, usePendingStamp } fr
 import { tr, useLang, useT } from '../lib/i18n';
 import { installApp, usePwa } from '../lib/pwa';
 import { CommandSearch } from './CommandSearch';
+import { forgetRecent, setSessionEnabled, useSession, type RecentFile } from '../store/session';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 
 export type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
@@ -95,6 +96,16 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
   );
 }
 
+/** The recent files as menu entries. */
+export function recentMenu(recent: RecentFile[]): MenuItem[] {
+  if (!recent.length) return [{ label: 'No recent files', disabled: true }];
+  return [
+    ...recent.map((r): MenuItem => ({ label: r.name, value: '', hint: new Date(r.openedAt).toLocaleDateString(), icon: <FileText size={14} />, onClick: () => cmd.openRecent(r) })),
+    null,
+    { label: 'Clear list', icon: <Trash2 size={14} />, onClick: () => forgetRecent() },
+  ];
+}
+
 export interface RibbonTabProps {
   tab: TabName;
   showProps: boolean;
@@ -118,6 +129,8 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
   const invert = extra.useExtras((x) => x.invert);
   const noDoc = !hasDoc;
   const installPrompt = usePwa((p) => !!p.prompt);
+  const recent = useSession((x) => x.recent);
+  const sessionOn = useSession((x) => x.enabled);
   const installed = usePwa((p) => p.installed);
   const canModify = useCan('modify');
   const canCopy = useCan('copy');
@@ -164,6 +177,16 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Btn icon={<Save size={L} />} label="Save" disabled={noDoc} onClick={cmd.save} />
           <Btn icon={<SaveAll size={L} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
           <Btn icon={<X size={L} />} label="Close" disabled={noDoc} onClick={() => S().closeTab(S().activeTab)} />
+        </Group>
+        <Group label="Session">
+          <Btn icon={<History size={L} />} label="Recent" menu={() => recentMenu(recent)} />
+          <Btn
+            icon={<ArchiveRestore size={L} />}
+            label="Restore session"
+            active={sessionOn}
+            title="Keep the open documents, with unsaved changes, in this browser and reopen them at the next start (password-protected documents are not kept)"
+            onClick={() => setSessionEnabled(!sessionOn)}
+          />
         </Group>
         <Group label="Output">
           <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />

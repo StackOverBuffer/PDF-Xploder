@@ -2,6 +2,7 @@
 import * as ops from '../lib/pdfOps';
 import * as forms from '../lib/forms';
 import { annotationsByPage, uid, useStore, whenIdle } from './store';
+import { rememberRecent, type RecentFile } from './session';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
 import { encrypt, reencryptLike } from '../lib/security';
@@ -28,7 +29,23 @@ export async function openFiles(files: File[], handles: (FileSystemFileHandle | 
     // Files can arrive while a command runs (dropped, or opened from the system): wait for it.
     await whenIdle();
     await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name, { handle }));
+    if (S().fileName === f.name && S().pdf) rememberRecent(f.name, handle);
   }
+}
+
+/** Reopen a file from the recent list (with its handle where the browser keeps one). */
+export async function openRecent(r: RecentFile) {
+  const h = r.handle as (FileSystemFileHandle & { requestPermission?(o: { mode: 'read' }): Promise<PermissionState> }) | undefined;
+  if (h) {
+    try {
+      if (h.requestPermission && (await h.requestPermission({ mode: 'read' })) !== 'granted') return;
+      return await openFiles([await h.getFile()], [h]);
+    } catch {
+      // Moved or deleted: fall through to choosing it again.
+    }
+  }
+  S().notify(tf('Choose “{name}” again: this browser cannot reopen files by itself.', { name: r.name }));
+  await openFromDialog();
 }
 
 /** Open dropped files, keeping their file handles where the browser provides them. Call from the drop event itself. */
@@ -98,6 +115,7 @@ async function writeOut(handle: FileSystemFileHandle | null, name: string) {
       try {
         await writeToHandle(handle, out);
         useStore.setState({ fileHandle: handle, fileName: handle.name });
+        rememberRecent(handle.name, handle);
         S().markSaved();
         S().notify(tf('Saved to {name}', { name: handle.name }));
         return;

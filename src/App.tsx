@@ -1,7 +1,8 @@
 import { can } from './store/permissions';
 import { useEffect, useState } from 'react';
-import { FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
-import { anyTabDirty, useStore, type SidebarTab } from './store/store';
+import { FileText, FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
+import { anyUnsavedUnprotected, useStore, type SidebarTab } from './store/store';
+import { useSession } from './store/session';
 import * as cmd from './store/commands';
 import { Ribbon } from './components/Ribbon';
 import { TabBar } from './components/TabBar';
@@ -125,6 +126,7 @@ function useShortcuts() {
 
 function Welcome() {
   const t = useT();
+  const recent = useSession((x) => x.recent);
   const [over, setOver] = useState(false);
   return (
     <div
@@ -142,6 +144,21 @@ function Welcome() {
           <button className="big" onClick={openSample}><Sparkles size={18} /> {t('Try a sample')}</button>
         </div>
         <p className="muted small">{t('…or drop PDF files here. Dropping several combines them into one document.')}</p>
+        {recent.length > 0 && (
+          <div className="welcome-recent">
+            <h2>{t('Recent files')}</h2>
+            <ul>
+              {recent.slice(0, 8).map((r) => (
+                <li key={r.name}>
+                  <button onClick={() => cmd.openRecent(r)} title={r.handle ? r.name : t('This browser asks you to choose the file again')}>
+                    <FileText size={16} /> <span className="welcome-recent-name">{r.name}</span>
+                    <span className="muted small">{new Date(r.openedAt).toLocaleDateString()}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -216,6 +233,8 @@ function TitleSync() {
 export function App() {
   const t = useT();
   const hasDoc = useStore((s) => !!s.pdf);
+  // A document being opened or restored: no start screen in between.
+  const opening = useStore((s) => s.opening || (!s.pdf && !!s.bytes));
   const sidebar = useStore((s) => s.sidebar);
   const showTabs = useStore((s) => s.tabs.length > 1 || !!s.pdf);
   const [showProps, setShowProps] = useState(true);
@@ -229,7 +248,8 @@ export function App() {
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (anyTabDirty()) e.preventDefault();
+      // Changes kept by the session backup come back at the next start; only warn about the rest.
+      if (anyUnsavedUnprotected(useSession.getState().enabled)) e.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
@@ -261,7 +281,7 @@ export function App() {
             {sidebar === 'signatures' && <SignaturesPanel />}
           </aside>
         )}
-        <main className="main">{hasDoc ? <><DocBanner /><Viewer /></> : <Welcome />}</main>
+        <main className="main">{hasDoc ? <><DocBanner /><Viewer /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
         {hasDoc && showProps && <PropertiesPanel />}
       </div>
       {hasDoc && <StatusBar />}

@@ -6,6 +6,7 @@ import { loadLanguage, useLang } from './lib/i18n';
 import { setupPwa } from './lib/pwa';
 import { openFiles } from './store/commands';
 import { useStore } from './store/store';
+import { loadRecent, restoreSession, startAutosave } from './store/session';
 
 // German strings come in their own chunk; render once the interface language is available.
 loadLanguage(useLang.getState().lang).finally(() =>
@@ -20,6 +21,13 @@ loadLanguage(useLang.getState().lang).finally(() =>
 // so the first search does not wait for them.
 const idle = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 3000));
 idle(() => void loadLanguage('de'), { timeout: 10000 });
+
+// Reopen the last session's tabs (files handed over by the system open after them).
+loadRecent();
+void useStore.getState().run('Restoring the last session…', async () => {
+  await restoreSession();
+});
+startAutosave();
 
 setupPwa({
   openFiles,

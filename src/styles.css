@@ -476,3 +476,12 @@ select.widget { padding: 0; }
 
 /* Blocks input while a command runs (below dialogs, above everything else). */
 .busy-shield { position: fixed; inset: 0; z-index: 45; cursor: progress; }
+
+/* Recent files on the start screen */
+.welcome-recent { margin-top: 18px; text-align: left; border-top: 1px solid var(--border); padding-top: 12px; }
+.welcome-recent h2 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+.welcome-recent ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.welcome-recent button { width: 100%; display: flex; align-items: center; gap: 8px; border: none; background: none; padding: 6px 8px; text-align: left; }
+.welcome-recent button:hover { background: var(--panel-2); }
+.welcome-recent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-loading { flex: 1; background: var(--viewer); }

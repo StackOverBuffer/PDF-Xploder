@@ -151,7 +151,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - ✅ OCR for scanned documents (see below)
 - ✅ Share the PDF via the system share sheet (where the browser supports it)
 - ✅ Accessibility: quick check (tags, language, title, text, field tooltips, permissions) with one-click fixes; read aloud; inverted page colours
-- ⬜ Autosave (e.g. IndexedDB)
+- ✅ Restore session and autosave: the open tabs, with unsaved changes, are kept in this browser (IndexedDB) a moment after each change and reopen at the next start, at the same page; File → Session → Restore session turns it off (and deletes what was kept). Password-protected documents are not kept. Recent files on the start screen and under File → Recent (reopened directly in Chrome and Edge)
 
 ### OCR
 - ✅ **OCR Pages** dialog like PDF-XChange's Enhanced OCR plugin: all / current / a range of pages; German, English, French, Italian, Spanish, Dutch and Polish (any combination); 150–400 dpi; pages that already contain text are skipped unless asked

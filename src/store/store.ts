@@ -196,6 +196,8 @@ interface Actions {
   /** Close a tab, asking first if it has unsaved changes; resolves false if the user cancelled. */
   closeTab(id: string, opts?: { force?: boolean }): boolean;
   moveTab(id: string, toIndex: number): void;
+  /** Reopen documents from the session backup as tabs (replacing an empty start tab). */
+  restoreTabs(docs: { doc: SessionDoc; scroll?: { top: number; left: number } }[], activeIndex: number): void;
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
   commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>, formValues?: Record<string, FieldValue>): Promise<void>;
   addAnnotation(pageIndex: number, a: Annotation): void;
@@ -240,6 +242,51 @@ const parked = new Map<string, Parked>();
 /** Whether any open tab has unsaved changes. */
 export function anyTabDirty(): boolean {
   return useStore.getState().dirty || [...parked.values()].some((p) => p.dirty);
+}
+
+/** What the session backup keeps of a document (enough to reopen it with its unsaved changes). */
+export const SESSION_KEYS = [
+  'fileName', 'bytes', 'originalBytes', 'pageIds', 'annotations', 'formValues', 'dirty', 'savedOnce', 'fileHandle',
+  'encryption', 'permissions', 'ownerAccess', 'restrictionsLifted', 'editable', 'signatures', 'viewRotation', 'currentPage', 'scale', 'fit',
+] as const satisfies readonly (keyof State)[];
+export type SessionDoc = Pick<State, (typeof SESSION_KEYS)[number]>;
+
+/**
+ * Whether a document may be kept in the session backup: not when it is password
+ * protected or new passwords are pending (its decrypted content and passwords
+ * would end up in browser storage).
+ */
+export function sessionStorable(d: Pick<State, 'bytes' | 'encryption' | 'security'>): boolean {
+  return !!d.bytes && !d.encryption?.encrypted && !d.security;
+}
+
+export interface TabSnapshot {
+  id: string;
+  doc: SessionDoc;
+  storable: boolean;
+  scroll?: { top: number; left: number };
+}
+
+/** Every tab with a document, in tab order, for the session backup. */
+export function sessionTabs(): { tabs: TabSnapshot[]; active: string } {
+  const s = useStore.getState();
+  const viewer = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.viewer') : null;
+  const tabs: TabSnapshot[] = [];
+  for (const t of s.tabs) {
+    const live = t.id === s.activeTab;
+    const src = (live ? s : parked.get(t.id)) as (Partial<State> & { scroll?: { top: number; left: number } }) | undefined;
+    if (!src?.bytes) continue;
+    const doc = Object.fromEntries(SESSION_KEYS.map((k) => [k, src[k]])) as SessionDoc;
+    const scroll = live && viewer ? { top: viewer.scrollTop, left: viewer.scrollLeft } : src.scroll;
+    tabs.push({ id: t.id, doc, storable: sessionStorable(src as State), scroll });
+  }
+  return { tabs, active: s.activeTab };
+}
+
+/** Whether any tab has unsaved changes the session backup cannot keep. */
+export function anyUnsavedUnprotected(backupOn: boolean): boolean {
+  if (!backupOn) return anyTabDirty();
+  return sessionTabs().tabs.some((t) => t.doc.dirty && !t.storable);
 }
 
 const initialDoc = {
@@ -505,6 +552,25 @@ export const useStore = create<Store>()((set, get) => {
       docSession: get().docSession + 1,
       docVersion: get().docVersion + 1,
     });
+    // A tab restored from the last session gets its viewer document when first shown.
+    if (!fields.pdf && fields.bytes) void loadRestored(id);
+  }
+
+  async function loadRestored(id: string) {
+    set({ opening: true });
+    try {
+      const { pdf, geoms } = await loadPdfJs(get().bytes!, undefined, get().viewRotation);
+      if (get().activeTab !== id || get().pdf) {
+        pdf.destroy();
+        return;
+      }
+      set({ pdf, geoms, docVersion: get().docVersion + 1, docSession: get().docSession + 1 });
+    } catch (e) {
+      console.error(e);
+      if (get().activeTab === id) get().notify(tr('This document could not be restored.'), 'error');
+    } finally {
+      if (get().activeTab === id) set({ opening: false });
+    }
   }
 
   function addEmptyTab(): string {
@@ -637,6 +703,22 @@ export const useStore = create<Store>()((set, get) => {
       if (dirty && !opts.force && !confirm(tr('“{name}” has unsaved changes. Close it anyway?').replace('{name}', name || tr('Untitled')))) return false;
       removeTab(id);
       return true;
+    },
+
+    restoreTabs(docs, activeIndex) {
+      if (!docs.length) return;
+      const s = get();
+      // An empty tab (as at start) makes way for the restored ones.
+      const keepCurrent = !!s.pdf || !!s.bytes;
+      if (keepCurrent) park();
+      const restored = docs.map(({ doc, scroll }) => {
+        const id = newTabId();
+        parked.set(id, { ...initialDoc, ...doc, scroll });
+        return { id, fileName: doc.fileName, dirty: doc.dirty };
+      });
+      const others = keepCurrent ? get().tabs : get().tabs.filter((t) => t.id !== s.activeTab);
+      set({ tabs: [...others, ...restored] });
+      activate(restored[Math.min(Math.max(0, activeIndex), restored.length - 1)].id);
     },
 
     moveTab(id, toIndex) {
