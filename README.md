@@ -138,6 +138,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 
 ### Document & output
 - ✅ New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
+- ✅ Print dialog with preview: page range, odd/even pages, reverse order, with or without comments, paper size and orientation, margins, fit/shrink/actual/custom scaling, 2–16 pages per sheet with page borders
 - ✅ Save writes back to the opened file in Chrome and Edge (File System Access API; the browser asks once for write access), Save As shows a save dialog there; other browsers download the file
 - ✅ Install as an app (File → Install app, in Chrome and Edge): own window, works fully offline, and appears under "Open with…" for PDF files; files opened that way arrive as tabs in the running window
 - ✅ Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)

@@ -350,6 +350,15 @@ export async function setFormValues(
   return save(doc);
 }
 
+/** Paint form fields into the page content (their current appearances), e.g. for N-up printing. */
+export async function flattenFormFields(bytes: Uint8Array): Promise<Uint8Array> {
+  const doc = await load(bytes);
+  const form = doc.getForm();
+  if (!form.getFields().length) return bytes;
+  form.flatten({ updateFieldAppearances: false });
+  return save(doc);
+}
+
 // ---------------------------------------------------------------- export annotations
 
 export interface ExportOptions {

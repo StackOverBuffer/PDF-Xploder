@@ -145,24 +145,11 @@ export async function saveAs() {
   await writeOut(null, /\.pdf$/i.test(name) ? name : `${name}.pdf`);
 }
 
+/** Print: open the print dialog (pages, paper, scaling, pages per sheet). */
 export async function print() {
-  if (!requirePermission('print')) return;
-  await S().run('Preparing to print…', async () => {
-    const out = await buildOutput();
-    const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
-    const frame = document.createElement('iframe');
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-    frame.src = url;
-    frame.onload = () => {
-      frame.contentWindow?.focus();
-      frame.contentWindow?.print();
-      setTimeout(() => {
-        frame.remove();
-        URL.revokeObjectURL(url);
-      }, 60_000);
-    };
-    document.body.appendChild(frame);
-  });
+  if (!S().pdf || !requirePermission('print')) return;
+  // Loaded lazily: the dialogs import this module.
+  (await import('../components/Dialogs')).useDialog.getState().show('print');
 }
 
 // ---------------------------------------------------------------- pages

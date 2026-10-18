@@ -238,7 +238,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 | Import Pages to a Layer | ⬜ |
 | Open Documents from a URL | ⬜ (works for servers that allow CORS) |
 | Optimize Documents | ⬜ |
-| Print Documents | ✅ |
+| Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
 | Autoscroll, Playback, Page Transitions | ⬜ |
 | Split the Page View, Spreadsheet Split | ⬜ |
 | Loupe Tool, Pan and Zoom Pane | ⬜ |

@@ -13,8 +13,9 @@ import { PermissionsDialog, SecurityDialog, SignDialog, type SignPlacement } fro
 import { OrganizeDialog, type OrganizeDialogName } from './OrganizeDialogs';
 import { BOOKMARK_DIALOGS, BookmarkDialog, type BookmarkDialogName } from './BookmarkDialogs';
 import { OcrDialog } from './OcrDialog';
+import { PrintDialog } from './PrintDialog';
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -393,6 +394,7 @@ export function Dialogs() {
     case 'recompress': return <RecompressDialog close={close} />;
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'ocr': return <OcrDialog close={close} />;
+    case 'print': return <PrintDialog close={close} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
     case 'orgDuplicate': case 'orgReplace': case 'orgSwap': case 'orgOverlay': case 'orgNormalize': case 'orgFindDuplicates': case 'orgRotate': case 'orgCrop':
