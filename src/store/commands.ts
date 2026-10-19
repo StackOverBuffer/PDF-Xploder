@@ -1,13 +1,14 @@
 /** User-level commands: glue between UI, the store and pdf operations. */
 import type * as OpsT from '../lib/pdfOps';
 import * as forms from '../lib/forms';
-import { annotationsByPage, uid, useStore, whenIdle } from './store';
+import { annotationsByPage, reportProgress, uid, useStore, whenIdle } from './store';
 import { rememberRecent, type RecentFile } from './session';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
 import { ops, sec } from '../lib/worker';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
+import { ask, askText } from '../lib/ask';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import type { SignOptions } from '../lib/signature';
 import { openPdf, renderToCanvas } from '../lib/pdfjs';
@@ -95,10 +96,10 @@ export async function buildFileForSave(): Promise<Uint8Array> {
 }
 
 /** Ask before a save that would invalidate digital signatures. */
-function confirmBreakingSignatures(): boolean {
+async function confirmBreakingSignatures(): Promise<boolean> {
   const s = S();
   if (!s.dirty || !s.signatures.length) return true;
-  return confirm(tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'));
+  return ask({ title: 'Signed document', message: tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'), ok: 'Save anyway', danger: true });
 }
 
 /** The opened bytes are still exactly the document (nothing edited or saved since). */
@@ -133,7 +134,7 @@ async function writeOut(handle: FileSystemFileHandle | null, name: string) {
 /** Save: write back to the opened file where the browser allows it (Chrome, Edge), else download. */
 export async function save() {
   const s = S();
-  if (!s.bytes || !confirmBreakingSignatures()) return;
+  if (!s.bytes || !(await confirmBreakingSignatures())) return;
   // Ask for write access first, while the key press or click still counts as a user gesture.
   const handle = s.fileHandle && (await ensureWritable(s.fileHandle)) ? s.fileHandle : null;
   await writeOut(handle, S().fileName || 'document.pdf');
@@ -154,12 +155,12 @@ export async function saveAs() {
   const handle = await pickSaveHandle(suggested);
   if (handle === undefined) return;
   if (handle) {
-    if (!confirmBreakingSignatures()) return;
+    if (!(await confirmBreakingSignatures())) return;
     return writeOut(handle, handle.name);
   }
-  const name = prompt(tr('File name'), suggested);
+  const name = (await askText({ title: 'Save as', message: tr('File name'), value: suggested, ok: 'Save' }))?.trim();
   if (!name) return;
-  if (!confirmBreakingSignatures()) return;
+  if (!(await confirmBreakingSignatures())) return;
   // A downloaded copy: later saves must not overwrite the file opened before.
   useStore.setState({ fileHandle: null });
   await writeOut(null, /\.pdf$/i.test(name) ? name : `${name}.pdf`);
@@ -182,12 +183,14 @@ export async function rotate(delta: number, pages = targetPages()) {
 export async function deletePages(pages = targetPages()) {
   if (!requirePermission('assemble')) return;
   if (pages.length >= S().pageIds.length) return S().notify('A document must keep at least one page.', 'error');
-  if (!confirm(tf('Delete {n} page(s)?', { n: pages.length }))) return;
-  await S().run('Deleting…', async () => {
+  // No question first: the message that follows offers Undo.
+  const done = await S().run('Deleting…', async () => {
     const ids = S().pageIds.filter((_, i) => !pages.includes(i));
     await S().commitBytes(await ops.deletePages(S().bytes!, pages), ids);
     S().setSelectedPages([]);
+    return true;
   });
+  if (done) S().notify(tf('Deleted {n} page(s).', { n: pages.length }), 'info', { undo: true });
 }
 
 export async function insertBlank(after = S().currentPage) {
@@ -363,13 +366,14 @@ export async function applyRedactions() {
   const byPage = annotationsByPage(s);
   const pages = byPage.flatMap((l, i) => (l.some((a) => a.type === 'redact') ? [i] : []));
   if (!pages.length) return s.notify('Mark areas with the Redact tool first.');
-  if (!confirm(tf('Apply redactions on {n} page(s)? Those pages will be converted to images: their text will no longer be selectable or searchable.', { n: pages.length }))) return;
+  if (!(await ask({ title: 'Apply redactions', message: tf('Apply redactions on {n} page(s)? Those pages will be converted to images: their text will no longer be selectable or searchable.', { n: pages.length }), ok: 'Apply', danger: true }))) return;
   await s.run('Applying redactions…', async () => {
     const flat = await ops.exportWithAnnotations(await currentBytes(), byPage.map((l, i) => (pages.includes(i) ? l : [])), { flatten: true, burnRedactions: true });
     const { pdf } = await openPdf(flat, () => null);
     const images: { index: number; png: Uint8Array }[] = [];
     try {
-      for (const i of pages) {
+      for (const [k, i] of pages.entries()) {
+        reportProgress(k, pages.length);
         const canvas = await renderToCanvas(await pdf.getPage(i + 1), 200 / 72);
         const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
         images.push({ index: i, png: new Uint8Array(await blob.arrayBuffer()) });
@@ -444,7 +448,7 @@ export async function signDocument(o: SignOptions) {
   if (!s.bytes) return;
   const willEncrypt = s.securityChanged ? !!s.security : !!s.keepEncryption;
   if (willEncrypt) return s.notify('Remove password protection before signing (signing encrypted files is not supported yet).', 'error');
-  if (!requirePermission('fillForms') || !confirmBreakingSignatures()) return;
+  if (!requirePermission('fillForms') || !(await confirmBreakingSignatures())) return;
   await s.run('Signing…', async () => {
     const base = unchangedSinceOpen() ? s.originalBytes! : await buildOutput();
     const { signPdf } = await import('../lib/signature');
@@ -492,7 +496,7 @@ export async function updateFieldProps(name: string, patch: forms.FieldPatch) {
 
 export async function deleteField(name: string) {
   if (!requirePermission('designForms')) return;
-  if (!confirm(tf('Delete the form field “{name}”?', { name }))) return;
+  if (!(await ask({ message: tf('Delete the form field “{name}”?', { name }), ok: 'Delete', danger: true }))) return;
   await S().run('Deleting field…', async () => {
     await S().commitBytes(await forms.deleteField(S().bytes!, name), undefined, undefined, moveFormValue(name, null));
     useStore.setState({ selectedField: null });

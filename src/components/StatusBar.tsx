@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useStore } from '../store/store';
 import { pageRot, viewSize } from '../lib/geometry';
-import { tf, useLang, useT } from '../lib/i18n';
+import { formatPercent, tf, useLang, useT } from '../lib/i18n';
 
 export function StatusBar() {
   const t = useT();
@@ -12,6 +12,7 @@ export function StatusBar() {
   const scale = useStore((s) => s.scale);
   const geom = useStore((s) => s.geoms[s.currentPage]);
   const busy = useStore((s) => s.busy);
+  const progress = useStore((s) => s.progress);
   const pdf = useStore((s) => s.pdf);
   // Page labels (e.g. "iv", "A-3"), shown like PDF-XChange: label in the box, number after it.
   const [labels, setLabels] = useState<string[] | null>(null);
@@ -52,7 +53,7 @@ export function StatusBar() {
         <button onClick={() => S().goToPage(count - 1)} disabled={current >= count - 1} title={t('Last page')}><ChevronLast size={16} /></button>
       </div>
       <div className="muted small">
-        {busy ?? (size ? `${inches(size.width)} × ${inches(size.height)} in${pageRot(geom) ? ` · ${tf('rotated {deg}°', { deg: pageRot(geom) })}` : ''}${geom.pageRotation !== undefined ? ` · ${t('view rotated')}` : ''}` : '')}
+        {busy ? `${busy}${progress ? ` ${progress.done + 1} / ${progress.total}` : ''}` : (size ? `${inches(size.width)} × ${inches(size.height)} in${pageRot(geom) ? ` · ${tf('rotated {deg}°', { deg: pageRot(geom) })}` : ''}${geom.pageRotation !== undefined ? ` · ${t('view rotated')}` : ''}` : '')}
       </div>
       <div className="zoom">
         <button onClick={() => S().setScale(scale / 1.2)} title={t('Zoom out')}><ZoomOut size={16} /></button>
@@ -61,8 +62,8 @@ export function StatusBar() {
           if (v === 'width' || v === 'page') S().setScale(scale, v);
           else S().setScale(Number(v) / 100);
         }}>
-          {![25, 50, 75, 100, 125, 150, 200, 300, 400].includes(Math.round(scale * 100)) && <option value={String(Math.round(scale * 100))}>{Math.round(scale * 100)}%</option>}
-          {[25, 50, 75, 100, 125, 150, 200, 300, 400].map((z) => <option key={z} value={String(z)}>{z}%</option>)}
+          {![25, 50, 75, 100, 125, 150, 200, 300, 400].includes(Math.round(scale * 100)) && <option value={String(Math.round(scale * 100))}>{formatPercent(lang, scale)}</option>}
+          {[25, 50, 75, 100, 125, 150, 200, 300, 400].map((z) => <option key={z} value={String(z)}>{formatPercent(lang, z / 100)}</option>)}
           <option value="width">{t('Fit width')}</option>
           <option value="page">{t('Fit page')}</option>
         </select>

@@ -11,6 +11,7 @@ import { downloadBlob, baseName } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import type { Rect } from '../lib/types';
 import { saveDoc } from '../lib/pdfSave';
+import { ask } from '../lib/ask';
 
 const S = () => useStore.getState();
 
@@ -88,7 +89,7 @@ async function confirmPageIsEditable(page: number): Promise<boolean> {
     if (diff > 0.002 || pc.unknown.length) {
       const pct = (diff * 100).toFixed(1);
       const ops = pc.unknown.length ? tf('; unsupported operators: {ops}', { ops: [...new Set(pc.unknown)].join(', ') }) : '';
-      if (!confirm(tf('This page uses content the editor cannot reproduce exactly ({pct}% of the page would look different{ops}). Edit it anyway?', { pct, ops }))) return false;
+      if (!(await ask({ title: 'Edit page content', message: tf('This page uses content the editor cannot reproduce exactly ({pct}% of the page would look different{ops}). Edit it anyway?', { pct, ops }), ok: 'Edit anyway' }))) return false;
     }
     verified.add(id);
     return true;
@@ -126,7 +127,7 @@ export async function confirmPagesEditable(pages: number[]): Promise<number[]> {
   }
   if (!risky.length) return pages;
   const list = risky.map((p) => p + 1).join(', ');
-  if (confirm(tf('The editor cannot reproduce some pages exactly (pages {list}): they would look slightly different after the change. Edit them anyway? Cancel leaves those pages unchanged.', { list }))) {
+  if (await ask({ title: 'Edit page content', message: tf('The editor cannot reproduce some pages exactly (pages {list}): they would look slightly different after the change. Edit them anyway? Cancel leaves those pages unchanged.', { list }), ok: 'Edit anyway' })) {
     for (const p of risky) verified.add(s.pageIds[p]);
     return pages;
   }

@@ -1,3 +1,4 @@
+import { AskHost } from './components/AskHost';
 import { can } from './store/permissions';
 import { useEffect, useState } from 'react';
 import { FileText, FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
@@ -26,6 +27,8 @@ import type { FieldInfo } from './lib/pdfOps';
 import { ops as opsW } from './lib/worker';
 import type { Tool } from './lib/types';
 import { useT } from './lib/i18n';
+import { setPrefs, usePrefs } from './lib/prefs';
+import { PaneResizer } from './components/PaneResizer';
 
 const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'pages', icon: LayoutGrid, label: 'Pages' },
@@ -140,8 +143,8 @@ function Welcome() {
         <h1>PDF-Xploder</h1>
         <p className="muted">{t('View, annotate, organise, fill and sign PDFs — entirely in your browser. Files never leave your device.')}</p>
         <div className="welcome-actions">
-          <button className="primary big" onClick={cmd.openFromDialog}><FolderOpen size={18} /> {t('Open PDF…')}</button>
-          <button className="big" onClick={cmd.newDocument}><FilePlus size={18} /> {t('New blank')}</button>
+          <button className="primary big" title="Ctrl+O" onClick={cmd.openFromDialog}><FolderOpen size={18} /> {t('Open PDF…')}</button>
+          <button className="big" title="Ctrl+N" onClick={cmd.newDocument}><FilePlus size={18} /> {t('New blank')}</button>
           <button className="big" onClick={openSample}><Sparkles size={18} /> {t('Try a sample')}</button>
         </div>
         <p className="muted small">{t('…or drop PDF files here. Dropping several combines them into one document.')}</p>
@@ -207,10 +210,17 @@ function useFormFields() {
 /** While a command runs: a progress bar, and a transparent layer that keeps clicks and drops from starting another one. Dialogs stay usable (e.g. to cancel OCR). */
 function BusyShield() {
   const busy = useStore((s) => !!s.busy);
+  const progress = useStore((s) => s.progress);
   if (!busy) return null;
   return (
     <>
-      <div className="busy-bar" />
+      {progress ? (
+        <div className="busy-bar determinate" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done}>
+          <div style={{ width: `${(100 * progress.done) / progress.total}%` }} />
+        </div>
+      ) : (
+        <div className="busy-bar" />
+      )}
       <div
         className="busy-shield"
         onDragOver={(e) => e.preventDefault()}
@@ -223,8 +233,26 @@ function BusyShield() {
 }
 
 function Toast() {
+  const t = useT();
   const toast = useStore((s) => s.toast);
-  return toast ? <div className={`toast ${toast.kind}`} role="status">{toast.msg}</div> : null;
+  const canUndo = useStore((s) => !!toast?.undo && s.activeTab === toast.undo.tab && s.past.length === toast.undo.depth);
+  if (!toast) return null;
+  return (
+    <div key={toast.msg} className={`toast ${toast.kind}`} role="status">
+      <span>{toast.msg}</span>
+      {canUndo && (
+        <button
+          className="toast-action"
+          onClick={() => {
+            useStore.setState({ toast: null });
+            void useStore.getState().run('Undoing…', () => useStore.getState().undo());
+          }}
+        >
+          {t('Undo')}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /** The window title follows the document (own component: the rest of the app need not re-render). */
@@ -244,9 +272,12 @@ export function App() {
   const opening = useStore((s) => s.opening || (!s.pdf && !!s.bytes));
   const sidebar = useStore((s) => s.sidebar);
   const showTabs = useStore((s) => s.tabs.length > 1 || !!s.pdf);
-  const [showProps, setShowProps] = useState(true);
+  const showProps = usePrefs((p) => p.showProps);
+  const sidebarWidth = usePrefs((p) => p.sidebarWidth);
+  const propsWidth = usePrefs((p) => p.propsWidth);
+  const setShowProps = (v: boolean) => setPrefs({ showProps: v });
   useEffect(() => {
-    const show = () => setShowProps(true);
+    const show = () => setPrefs({ showProps: true });
     window.addEventListener('awesome-pdf:show-properties', show);
     return () => window.removeEventListener('awesome-pdf:show-properties', show);
   }, []);
@@ -267,7 +298,7 @@ export function App() {
     <div className="app">
       <Ribbon showProps={showProps} toggleProps={() => setShowProps(!showProps)} />
       {showTabs && <TabBar />}
-      <div className="workspace">
+      <div className="workspace" style={{ '--sidebar-w': `${sidebarWidth}px`, '--props-w': `${propsWidth}px` } as React.CSSProperties}>
         {hasDoc && (
           <nav className="sidebar-rail">
             {SIDEBAR.map(({ tab, icon: Icon, label }) => (
@@ -288,13 +319,16 @@ export function App() {
             {sidebar === 'signatures' && <SignaturesPanel />}
           </aside>
         )}
+        {hasDoc && sidebar && <PaneResizer pane="sidebar" />}
         <main className="main">{hasDoc ? <><DocBanner /><Viewer /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
+        {hasDoc && showProps && <PaneResizer pane="props" />}
         {hasDoc && showProps && <PropertiesPanel />}
       </div>
       {hasDoc && <StatusBar />}
       <Dialogs />
       <BusyShield />
       <Toast />
+      <AskHost />
       <TitleSync />
     </div>
   );

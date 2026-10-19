@@ -15,6 +15,7 @@ import { openPdf, renderToCanvas, type PDFDocumentProxy } from '../lib/pdfjs';
 import * as att from '../lib/attachments';
 import { applyAccessibilityFix, checkAccessibility, type CheckResult, type FixId } from '../lib/accessibility';
 import type { Rect } from '../lib/types';
+import { ask, askText } from '../lib/ask';
 
 const S = () => useStore.getState();
 
@@ -163,7 +164,7 @@ export async function attachFiles() {
 }
 
 export async function deleteAttachment(a: att.AttachmentInfo) {
-  if (!requirePermission('modify') || !confirm(tf('Remove the attachment “{name}”?', { name: a.fileName }))) return;
+  if (!requirePermission('modify') || !(await ask({ message: tf('Remove the attachment “{name}”?', { name: a.fileName }), ok: 'Remove', danger: true }))) return;
   await S().run('Removing attachment…', async () => {
     await S().commitBytes(await att.removeAttachment(S().bytes!, a.key));
     useExtras.setState((x) => ({ attachmentsVersion: x.attachmentsVersion + 1 }));
@@ -238,11 +239,11 @@ export async function fixAccessibility(fix: FixId): Promise<boolean> {
   if (!requirePermission('modify')) return false;
   let value = '';
   if (fix === 'lang') {
-    value = prompt(tr('Document language (e.g. de-DE, en-US):'), navigator.language || 'en-US')?.trim() ?? '';
+    value = (await askText({ title: 'Document language', message: tr('Document language (e.g. de-DE, en-US):'), value: navigator.language || 'en-US' }))?.trim() ?? '';
     if (!value) return false;
   }
   if (fix === 'title') {
-    value = prompt(tr('Document title:'), baseName(S().fileName || ''))?.trim() ?? '';
+    value = (await askText({ title: 'Document title', message: tr('Document title:'), value: baseName(S().fileName || '') }))?.trim() ?? '';
     if (!value) return false;
   }
   await S().run('Updating document…', async () => S().commitBytes(await applyAccessibilityFix(S().bytes!, fix, value)));

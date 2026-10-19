@@ -50,8 +50,10 @@ describe('ribbon helpers', () => {
     expect(translate('de', 'Select Text')).toBe('Textauswahl');
     expect(translate('de', 'No such label')).toBe('No such label');
     expect(translate('en', 'Select Text')).toBe('Select Text');
-    expect(formatPercent('de', 1.5814)).toBe('158,14%');
-    expect(formatPercent('en', 1.5814)).toBe('158.14%');
+    expect(formatPercent('de', 1.5814)).toBe('158%');
+    expect(formatPercent('en', 1.5864)).toBe('159%');
+    expect(formatPercent('de', 0.0525)).toBe('5,3%');
+    expect(formatPercent('en', 12.5)).toBe('1,250%');
     expect(parsePercent('158,14 %')).toBeCloseTo(1.5814);
     expect(parsePercent('75')).toBe(0.75);
     expect(parsePercent('abc')).toBeNull();

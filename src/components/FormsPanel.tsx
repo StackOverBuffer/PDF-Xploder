@@ -4,6 +4,7 @@ import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import { fillBlockers } from '../lib/forms';
 import { fillForm, resetFormEdits } from '../store/commands';
 import { tf, useT } from '../lib/i18n';
+import { ask } from '../lib/ask';
 
 export function fieldValue(f: FieldInfo, edits: Record<string, FieldValue>): FieldValue | undefined {
   if (f.name in edits) return edits[f.name];
@@ -62,7 +63,7 @@ export function FormsPanel() {
         <div className="panel-actions">
           <span className="muted small">{pending ? tf('{n} field(s) changed — saved with the document.', { n: pending }) : t('Fill fields here or directly on the page.')}</span>
           <button disabled={!pending} onClick={resetFormEdits}>{t('Reset changes')}</button>
-          <button disabled={!canFlatten} onClick={() => confirm(t('Flatten the form? Fields will no longer be editable.')) && fillForm(true)}>{t('Flatten form')}</button>
+          <button disabled={!canFlatten} onClick={async () => (await ask({ message: t('Flatten the form? Fields will no longer be editable.'), ok: 'Flatten form' })) && fillForm(true)}>{t('Flatten form')}</button>
         </div>
       )}
     </div>

@@ -12,6 +12,7 @@ import type { SignPlacement } from './SecurityDialogs';
 import type { Annotation } from '../lib/types';
 import type { OrganizeDialogName } from './OrganizeDialogs';
 import type { BookmarkDialogName } from './BookmarkDialogs';
+import { PrefsDialog } from './PrefsDialog';
 
 // The bigger dialogs load the first time they are opened, not with the app.
 const BarcodesDialog = lazy(() => import('./ContentDialogs').then((m) => ({ default: m.BarcodesDialog })));
@@ -27,7 +28,7 @@ const CalibrateDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ def
 const BarcodeDialog = lazy(() => import('./BarcodeDialog').then((m) => ({ default: m.BarcodeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -41,7 +42,7 @@ useStore.subscribe((s, prev) => {
   if (s.activeTab !== prev.activeTab && useDialog.getState().open) useDialog.getState().close();
 });
 
-export function Modal({ title, children, onClose, footer, wide }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean }) {
+export function Modal({ title, children, onClose, footer, wide, className = '' }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean; className?: string }) {
   const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -50,7 +51,7 @@ export function Modal({ title, children, onClose, footer, wide }: { title: strin
   }, [onClose]);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title}>
+      <div className={`modal ${wide ? 'wide' : ''} ${className}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label={t('Close')} title={t('Close')}><X size={18} /></button>
@@ -414,6 +415,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'print': return <PrintDialog close={close} />;
     case 'measureScale': return <ScaleDialog close={close} />;
     case 'insertBarcode': return <BarcodeDialog close={close} />;
+    case 'preferences': return <PrefsDialog close={close} />;
     case 'calibrate': return <CalibrateDialog close={close} annotation={useDialog.getState().payload as Annotation} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':

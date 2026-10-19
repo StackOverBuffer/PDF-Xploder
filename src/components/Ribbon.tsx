@@ -7,7 +7,7 @@ import {
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
-  BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
+  Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -25,7 +25,11 @@ import { installApp, usePwa } from '../lib/pwa';
 import { CommandSearch } from './CommandSearch';
 import { exportMeasurementsCsv } from '../store/measureCommands';
 import { forgetRecent, setSessionEnabled, useSession, type RecentFile } from '../store/session';
+import { Menu, rectAnchor } from './Menu';
+import { setTheme, useTheme } from '../lib/theme';
+import { ask } from '../lib/ask';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
+import { setPrefs, usePrefs } from '../lib/prefs';
 
 export type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
 export const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility', 'Bookmarks', 'Help'];
@@ -36,9 +40,18 @@ const S = useStore.getState;
 export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleProps: () => void }) {
   const t = useT();
   const lang = useLang((l) => l.lang);
-  const [tab, setTab] = useState<TabName>('Home');
+  // The last tab used comes back at the next start (File is a place to pass through).
+  const [tab, setTabState] = useState<TabName>(() => {
+    const last = usePrefs.getState().ribbonTab as TabName;
+    return TABS.includes(last) && last !== 'File' ? last : 'Home';
+  });
+  const setTab = (n: TabName) => {
+    setTabState(n);
+    if (n !== 'File') setPrefs({ ribbonTab: n });
+  };
   // Like PDF-XChange, squeeze the ribbon when the window is too narrow: first tighter buttons,
-  // then small buttons lose their labels group by group, from the right.
+  // then small buttons lose their labels group by group, from the right, then whole groups
+  // fold up into one button each, from the right.
   const bodyRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = bodyRef.current;
@@ -47,12 +60,21 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
     const fit = () => {
       const groups = [...el.querySelectorAll<HTMLElement>(':scope > .rgroup')];
       el.dataset.compact = '0';
-      groups.forEach((g) => delete g.dataset.icons);
+      groups.forEach((g) => {
+        delete g.dataset.icons;
+        delete g.dataset.collapsed;
+      });
       if (fits()) return;
       el.dataset.compact = '1';
-      for (const g of groups.reverse()) {
+      const fromRight = groups.reverse();
+      for (const g of fromRight) {
         if (fits()) return;
         if (g.querySelector('.rbtn.size-small .rlabel')) g.dataset.icons = '';
+      }
+      for (const g of fromRight) {
+        if (fits()) return;
+        // Folding a group of one or two buttons gains nothing.
+        if (g.querySelector<HTMLElement>('.rgroup-items')!.offsetWidth > 90) g.dataset.collapsed = '';
       }
     };
     fit();
@@ -60,6 +82,23 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
     ro.observe(el);
     return () => ro.disconnect();
   }, [tab, lang]);
+  // Tabs that do not fit are reachable from a list at the end of the row.
+  const tabsRef = useRef<HTMLElement>(null);
+  const [tabsOver, setTabsOver] = useState(false);
+  const [tabList, setTabList] = useState<DOMRect | null>(null);
+  useLayoutEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const check = () => setTabsOver(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [lang]);
+  const showTab = (n: TabName) => {
+    setTab(n);
+    tabsRef.current?.querySelector(`[data-tab="${n}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
   const hasDoc = useStore((s) => !!s.pdf);
   const editable = useStore((s) => s.editable);
   const canUndo = useStore((s) => s.past.length > 0);
@@ -83,11 +122,35 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
         <div className="doc-title">{fileName ? `${fileName}${dirty ? ' •' : ''}` : ''}{hasDoc && !editable ? ' (read-only)' : ''}</div>
       </div>
       <div className="tabs-bar">
-        <nav className="tabs-row" role="tablist">
+        <nav
+          ref={tabsRef}
+          className="tabs-row"
+          role="tablist"
+          // Too narrow for all tabs: the mouse wheel scrolls them sideways.
+          onWheel={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY;
+          }}
+        >
           {TABS.map((n) => (
-            <button key={n} role="tab" aria-selected={tab === n} className={`rtab ${tab === n ? 'active' : ''} ${n === 'File' ? 'file' : ''}`} onClick={() => setTab(n)}>{t(n)}</button>
+            <button
+              key={n}
+              data-tab={n}
+              role="tab"
+              aria-selected={tab === n}
+              className={`rtab ${tab === n ? 'active' : ''} ${n === 'File' ? 'file' : ''}`}
+              onClick={() => showTab(n)}
+            >
+              {t(n)}
+            </button>
           ))}
         </nav>
+        {tabsOver && (
+          <button className="rtab-more" title={t('All tabs')} aria-label={t('All tabs')} aria-haspopup="menu" onClick={(e) => setTabList(tabList ? null : e.currentTarget.getBoundingClientRect())}>
+            <ChevronsRight size={14} />
+          </button>
+        )}
+        {tabList && <Menu anchor={rectAnchor(tabList)} items={TABS.map((n) => ({ label: n, checked: tab === n, onClick: () => showTab(n) }))} onClose={() => setTabList(null)} />}
         <CommandSearch showProps={showProps} toggleProps={toggleProps} />
       </div>
       <div className="rbody" role="tabpanel" ref={bodyRef}>
@@ -128,6 +191,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
   const show = useDialog((d) => d.show);
   const reading = extra.useExtras((x) => x.reading);
   const invert = extra.useExtras((x) => x.invert);
+  const theme = useTheme((x) => x.theme);
   const noDoc = !hasDoc;
   const installPrompt = usePwa((p) => !!p.prompt);
   const measureScale = useStore((s) => s.measureScale);
@@ -196,6 +260,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         </Group>
         <Group label="Info">
           <Btn icon={<Info size={L} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
+          <Btn icon={<Settings size={L} />} label="Preferences" title="Theme, language, zoom when opening, author name…" onClick={() => show('preferences')} />
         </Group>
         {!installed && (
           <Group label="App">
@@ -295,11 +360,17 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Btn icon={<RotateCcw size={L} />} label="Rotate view left" disabled={noDoc} onClick={() => S().rotateView(-90)} />
           <Btn icon={<RotateCw size={L} />} label="Rotate view right" disabled={noDoc} onClick={() => S().rotateView(90)} />
         </Group>
-        <Group label="Language">
+        <Group label="Interface">
+          <Btn icon={theme === 'dark' ? <Moon size={L} /> : theme === 'light' ? <Sun size={L} /> : <SunMoon size={L} />} label="Theme" title="Light or dark interface" menu={[
+            { label: 'Same as system', icon: <SunMoon size={14} />, checked: theme === 'system', onClick: () => setTheme('system') },
+            { label: 'Light', icon: <Sun size={14} />, checked: theme === 'light', onClick: () => setTheme('light') },
+            { label: 'Dark', icon: <Moon size={14} />, checked: theme === 'dark', onClick: () => setTheme('dark') },
+          ]} />
           <Btn icon={<Languages size={L} />} label={lang === 'de' ? 'Deutsch' : 'English'} searchLabel="Language" menu={[
             { label: 'Deutsch', checked: lang === 'de', onClick: () => setLang('de') },
             { label: 'English', checked: lang === 'en', onClick: () => setLang('en') },
           ]} />
+          <Btn icon={<Settings size={L} />} label="Preferences" title="Theme, language, zoom when opening, author name…" onClick={() => show('preferences')} />
         </Group>
         <Group label="Help">
           <Btn icon={<Keyboard size={L} />} label="Shortcuts" onClick={() => show('shortcuts')} />
@@ -340,7 +411,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
               ...(custom.length
                 ? custom.map((c): MenuItem => ({ label: c.name, icon: <img className="stamp-thumb" src={c.src} alt="" />, disabled: !canAnnotate, onClick: () => placeCustomStamp(c) }))
                 : [{ label: 'No custom stamps yet', disabled: true, hint: 'Right-click objects → New Stamp from Selection' } as MenuItem]),
-              ...(custom.length ? [{ label: 'Delete custom stamp', submenu: custom.map((c): MenuItem => ({ label: c.name, onClick: () => confirm(`${tr('Delete')} “${c.name}”?`) && deleteCustomStamp(c.id) })) } as MenuItem] : []),
+              ...(custom.length ? [{ label: 'Delete custom stamp', submenu: custom.map((c): MenuItem => ({ label: c.name, onClick: async () => (await ask({ message: `${tr('Delete')} “${c.name}”?`, ok: 'Delete', danger: true })) && deleteCustomStamp(c.id) })) } as MenuItem] : []),
             ];
           }} />
           <Stack>
@@ -407,7 +478,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           </Stack>
         </Group>
         <Group label="Finish">
-          <Btn icon={<Layers size={L} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
+          <Btn icon={<Layers size={L} />} label="Flatten form" disabled={!canModify} onClick={async () => (await ask({ message: tr('Flatten the form? Fields will no longer be editable.'), ok: 'Flatten form' })) && cmd.fillForm(true)} />
         </Group>
       </>
     )}
@@ -439,7 +510,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         </Group>
         <Group label="Flatten">
           <Btn icon={<Layers size={L} />} label="Flatten comments" disabled={!canModify} onClick={cmd.flattenAnnotations} />
-          <Btn icon={<FormInput size={L} />} label="Flatten form" disabled={!canModify} onClick={() => confirm('Flatten the form? Fields will no longer be editable.') && cmd.fillForm(true)} />
+          <Btn icon={<FormInput size={L} />} label="Flatten form" disabled={!canModify} onClick={async () => (await ask({ message: tr('Flatten the form? Fields will no longer be editable.'), ok: 'Flatten form' })) && cmd.fillForm(true)} />
           <Btn icon={<SaveAll size={L} />} label="Flattened copy" title="Save a copy with comments burnt into the pages" disabled={noDoc} onClick={cmd.saveFlattenedCopy} />
         </Group>
       </>

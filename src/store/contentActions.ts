@@ -15,6 +15,7 @@ import { baseName, downloadBlob } from '../lib/download';
 import { tr } from '../lib/i18n';
 import type { Rect } from '../lib/types';
 import { saveDoc } from '../lib/pdfSave';
+import { askText } from '../lib/ask';
 
 const S = () => useStore.getState();
 
@@ -266,7 +267,7 @@ export async function setObjectsLayer(page: number, ids: number[], layer: { ref:
 
 export async function addBookmarkAt(page: number, y: number | undefined, suggested: string) {
   if (!requirePermission('modify')) return;
-  const title = prompt(tr('Bookmark title:'), suggested.trim().slice(0, 120) || tr('New bookmark'));
+  const title = await askText({ title: 'Add bookmark', message: tr('Bookmark title:'), value: suggested.trim().slice(0, 120) || tr('New bookmark'), ok: 'Add' });
   if (!title?.trim()) return;
   await S().run(tr('Adding bookmark…'), async () => {
     await S().commitBytes(await addBookmark(S().bytes!, title.trim(), page, y));
@@ -278,11 +279,11 @@ export async function addLinkAt(page: number, rect: Rect, kind: 'page' | 'url') 
   if (!requirePermission('annotate')) return;
   let target: LinkTarget;
   if (kind === 'url') {
-    const url = prompt(tr('Web address:'), 'https://')?.trim();
+    const url = (await askText({ title: 'Add link', message: tr('Web address:'), value: 'https://', ok: 'Add' }))?.trim();
     if (!url || url === 'https://') return;
     target = { url: /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}` };
   } else {
-    const n = Number(prompt(`${tr('Go to page')} (1–${S().pageIds.length}):`, String(S().currentPage + 1)));
+    const n = Number(await askText({ title: 'Add link', message: `${tr('Go to page')} (1–${S().pageIds.length}):`, value: String(S().currentPage + 1), ok: 'Add' }));
     if (!Number.isInteger(n) || n < 1 || n > S().pageIds.length) return;
     target = { page: n - 1 };
   }
@@ -326,7 +327,7 @@ export function deleteCustomStamp(id: string) {
 /** Store the selected objects (or one image's own pixels) as a reusable image stamp. */
 export async function stampFromSelection(page: number, ids: number[], opts: { image?: boolean } = {}) {
   if (!requirePermission('copy')) return;
-  const name = prompt(tr('Stamp name:'), opts.image ? tr('Logo') : tr('My stamp'))?.trim();
+  const name = (await askText({ title: 'Create stamp', message: tr('Stamp name:'), value: opts.image ? tr('Logo') : tr('My stamp'), ok: 'Create' }))?.trim();
   if (!name) return;
   await S().run(tr('Creating stamp…'), async () => {
     let canvas: HTMLCanvasElement;

@@ -3,7 +3,7 @@ import type * as OpsT from '../lib/pdfOps';
 import type * as OrgT from '../lib/organize';
 import { ops } from '../lib/worker';
 import { org } from '../lib/worker';
-import { annotationsByPage, uid, useStore } from './store';
+import { annotationsByPage, reportProgress, uid, useStore } from './store';
 import { requirePermission } from './permissions';
 import { currentBytes, deletePages, normaliseImage } from './commands';
 import { baseName, downloadBlob, fileBytes, readAsDataUrl } from '../lib/download';
@@ -175,11 +175,11 @@ export async function deleteBlankPages() {
     const blank = await org.findBlankPages(S().bytes!);
     if (!blank.length) return S().notify(tr('There are no blank pages.'));
     if (blank.length >= S().pageIds.length) return S().notify(tr('A document must keep at least one page.'), 'error');
-    if (!confirm(trf('Delete {n} blank page(s): {pages}?', { n: blank.length, pages: org.rangeText(blank) }))) return;
+    // No question first: the message offers Undo.
     const ids = S().pageIds.filter((_, i) => !blank.includes(i));
     await S().commitBytes(await ops.deletePages(S().bytes!, blank), ids);
     S().setSelectedPages([]);
-    S().notify(trf('Deleted {n} blank page(s).', { n: blank.length }));
+    S().notify(trf('Deleted {n} blank page(s): {pages}.', { n: blank.length, pages: org.rangeText(blank) }), 'info', { undo: true });
   });
 }
 
@@ -336,7 +336,8 @@ export async function autoCrop(pages: number[], padding = 6) {
     const scale = 2;
     let bytes = S().bytes!;
     let cropped = 0;
-    for (const i of pages) {
+    for (const [k, i] of pages.entries()) {
+      reportProgress(k, pages.length);
       const canvas = await renderToCanvas(await pdf.getPage(i + 1), scale);
       const img = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
       const b = org.contentBounds(img.data, img.width, img.height);

@@ -24,6 +24,7 @@ import { about, rotate, scale as scaleM } from '../lib/content/matrix';
 import { toUser } from './ContentLayer';
 import type { LayerInfo, ObjectInfo } from '../lib/content/page';
 import type { PageGeom, Pt, Rect } from '../lib/types';
+import { askText } from '../lib/ask';
 
 const S = () => useStore.getState();
 const i = (C: typeof Hand) => <C size={14} />;
@@ -146,8 +147,8 @@ export function objectMenu(page: number, geom: PageGeom, chosen: ObjectInfo[], l
         { label: 'not set', checked: !layerName, onClick: () => ca.setObjectsLayer(page, ids, null) },
         ...layers.map((l): MenuItem => ({ label: l.name, checked: layerName === l.name, onClick: () => ca.setObjectsLayer(page, ids, { ref: l.ref }) })),
         null,
-        { label: 'New layer…', onClick: () => {
-          const name = prompt(tr('Layer name:'), tr('Layer') + ` ${layers.length + 1}`)?.trim();
+        { label: 'New layer…', onClick: async () => {
+          const name = (await askText({ title: 'New layer', message: tr('Layer name:'), value: tr('Layer') + ` ${layers.length + 1}` }))?.trim();
           if (name) ca.setObjectsLayer(page, ids, { name });
         } },
       ],

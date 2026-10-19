@@ -9,8 +9,9 @@ import type { FieldInfo, FieldValue } from '../lib/pdfOps';
 import type { PageGeom, Rect } from '../lib/types';
 import { fieldValue } from './FormsPanel';
 import { fillBlockers } from '../lib/forms';
-import { tf, tr, useT } from '../lib/i18n';
+import { tf, useT } from '../lib/i18n';
 import { KIND_LABEL } from './FieldProperties';
+import { openLinkAfterAsking } from '../lib/ask';
 
 /** The subset of pdf.js annotation data used here. */
 interface AnnotData {
@@ -59,8 +60,7 @@ async function followLink(a: AnnotData) {
   const s = useStore.getState();
   const url = a.url ?? a.unsafeUrl;
   if (url) {
-    if (confirm(`${tr('Open this link in a new tab?')}\n\n${url}`)) window.open(url, '_blank', 'noopener,noreferrer');
-    return;
+    return openLinkAfterAsking(url);
   }
   if (a.dest !== undefined && s.pdf) {
     const r = await resolveDest(s.pdf, a.dest);

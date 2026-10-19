@@ -38,12 +38,12 @@ const ASSETS =
  */
 export async function openPdf(
   bytes: Uint8Array,
-  askPassword: (retry: boolean) => string | null,
+  askPassword: (retry: boolean) => string | null | Promise<string | null>,
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
   const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, worker: worker(), ...ASSETS });
-  task.onPassword = (update: (pw: string) => void, reason: number) => {
-    const pw = askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
+  task.onPassword = async (update: (pw: string) => void, reason: number) => {
+    const pw = await askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {
       task.destroy();
       return;

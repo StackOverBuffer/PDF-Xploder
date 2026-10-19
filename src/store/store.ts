@@ -8,6 +8,8 @@ import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, opensWith, type 
 import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
 import { DEFAULT_SCALE, type MeasureScale } from '../lib/measure';
+import { ask, askText } from '../lib/ask';
+import { openingZoom } from '../lib/prefs';
 
 let idCounter = 0;
 export const uid = (prefix = 'id') => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -145,7 +147,10 @@ interface State {
   future: Snapshot[];
 
   busy: string | null;
-  toast: { msg: string; kind: 'info' | 'error' } | null;
+  /** How far the running command is, when it works through steps (pages). */
+  progress: { done: number; total: number } | null;
+  /** A message; `undo` offers to undo the change it reports (while it is the latest one, on that tab). */
+  toast: { msg: string; kind: 'info' | 'error'; undo?: { tab: string; depth: number } } | null;
 
   scale: number;
   fit: 'width' | 'page' | null;
@@ -201,7 +206,8 @@ interface Actions {
   newTab(): string;
   switchTab(id: string): void;
   /** Close a tab, asking first if it has unsaved changes; resolves false if the user cancelled. */
-  closeTab(id: string, opts?: { force?: boolean }): boolean;
+  /** Close a tab, asking first when it has unsaved changes; resolves to whether it was closed. */
+  closeTab(id: string, opts?: { force?: boolean }): Promise<boolean>;
   moveTab(id: string, toIndex: number): void;
   /** Reopen documents from the session backup as tabs (replacing an empty start tab). */
   restoreTabs(docs: { doc: SessionDoc; scroll?: { top: number; left: number } }[], activeIndex: number): void;
@@ -234,7 +240,7 @@ interface Actions {
   setAuthor(a: string): void;
 
   run<T>(label: string, fn: () => Promise<T>): Promise<T | undefined>;
-  notify(msg: string, kind?: 'info' | 'error'): void;
+  notify(msg: string, kind?: 'info' | 'error', opts?: { undo?: boolean }): void;
 }
 
 export type Store = State & Actions;
@@ -367,7 +373,7 @@ export const useStore = create<Store>()((set, get) => {
     let tries = 0;
     const { pdf, password } = await openPdf(bytes, (retry) => {
       if (knownPassword !== undefined && tries++ === 0) return knownPassword;
-      return window.prompt(tr(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'));
+      return askText({ title: 'Password', message: tr(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'), password: true, ok: 'Open' });
     });
     const geoms = withViewRotation(await pageGeoms(pdf), viewRotation);
     return { pdf, geoms, password };
@@ -537,7 +543,7 @@ export const useStore = create<Store>()((set, get) => {
       lock,
       docVersion: get().docVersion + 1,
       docSession: get().docSession + 1,
-      fit: 'width',
+      ...openingZoom(),
       sidebar: get().sidebar,
       // Measuring goes on at the scale of the measurements already in the file.
       measureScale: Object.values(annotations).flat().map((a) => ('measure' in a ? a.measure?.scale : undefined)).find(Boolean) ?? DEFAULT_SCALE,
@@ -614,7 +620,7 @@ export const useStore = create<Store>()((set, get) => {
     set({ tabs: [...get().tabs, { id, fileName: '', dirty: false }] });
     activate(id);
     // A new document starts fitted to the window.
-    set({ fit: 'width', formDesign: false });
+    set({ ...openingZoom(), formDesign: false });
     return id;
   }
 
@@ -647,6 +653,7 @@ export const useStore = create<Store>()((set, get) => {
     docSession: 0,
     opening: false,
     busy: null,
+    progress: null,
     toast: null,
     scale: 1,
     fit: 'width',
@@ -732,12 +739,18 @@ export const useStore = create<Store>()((set, get) => {
 
     closeTab(id, opts = {}) {
       const s = get();
-      if (s.busy) return false;
+      if (s.busy) return Promise.resolve(false);
       const dirty = id === s.activeTab ? s.dirty : !!parked.get(id)?.dirty;
       const name = id === s.activeTab ? s.fileName : s.tabs.find((t) => t.id === id)?.fileName;
-      if (dirty && !opts.force && !confirm(tr('“{name}” has unsaved changes. Close it anyway?').replace('{name}', name || tr('Untitled')))) return false;
-      removeTab(id);
-      return true;
+      if (!dirty || opts.force) {
+        removeTab(id);
+        return Promise.resolve(true);
+      }
+      return ask({ title: 'Unsaved changes', message: tr('“{name}” has unsaved changes. Close it anyway?').replace('{name}', name || tr('Untitled')), ok: 'Close without saving', danger: true }).then((yes) => {
+        if (!yes || get().busy || !get().tabs.some((t) => t.id === id)) return false;
+        removeTab(id);
+        return true;
+      });
     },
 
     restoreTabs(docs, activeIndex) {
@@ -906,16 +919,17 @@ export const useStore = create<Store>()((set, get) => {
         return undefined;
       } finally {
         running.splice(running.indexOf(entry), 1);
-        set({ busy: running.length ? running[running.length - 1].label : null });
+        set({ busy: running.length ? running[running.length - 1].label : null, ...(running.length ? {} : { progress: null }) });
       }
     },
 
-    notify(msg, kind = 'info') {
-      set({ toast: { msg: tr(msg), kind } });
+    notify(msg, kind = 'info', opts = {}) {
+      const s = get();
+      set({ toast: { msg: tr(msg), kind, undo: opts.undo && s.past.length ? { tab: s.activeTab, depth: s.past.length } : undefined } });
       const t = get().toast;
       setTimeout(() => {
         if (get().toast === t) set({ toast: null });
-      }, kind === 'error' ? 6000 : 3000);
+      }, kind === 'error' || opts.undo ? 6000 : 3000);
     },
   };
 });
@@ -940,4 +954,9 @@ export function annotationsByPage(s: Pick<State, 'pageIds' | 'annotations'>): An
 
 export function styleFor(tool: string): ToolStyle {
   return useStore.getState().styles[tool] ?? DEFAULT_STYLES.rect;
+}
+
+/** Report how far a running command is (e.g. page 3 of 10), shown in the status bar and busy bar. */
+export function reportProgress(done: number, total: number): void {
+  if (total > 1) useStore.setState({ progress: { done, total } });
 }

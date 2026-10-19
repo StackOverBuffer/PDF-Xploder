@@ -40,6 +40,12 @@ export const useLang = create<{ lang: Lang; setLang(l: Lang): void }>()((set) =>
   },
 }));
 
+// The page's language follows the interface (screen readers, hyphenation of long German labels).
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = useLang.getState().lang;
+  useLang.subscribe((l) => (document.documentElement.lang = l.lang));
+}
+
 export function translate(lang: Lang, s: string): string {
   return TABLES[lang][s] ?? s;
 }
@@ -61,8 +67,10 @@ export function useT(): (s: string) => string {
 }
 
 /** Format a zoom factor the way the language writes percentages. */
+/** A zoom level as shown: whole percents (one decimal below 10%), e.g. "138%". */
 export function formatPercent(lang: Lang, scale: number): string {
-  return `${(scale * 100).toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 2 })}%`;
+  const v = scale * 100;
+  return `${v.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: v < 10 ? 1 : 0 })}%`;
 }
 
 /** Parse a typed zoom level ("150", "158,14 %", "75.5%") into a scale; null if invalid. */

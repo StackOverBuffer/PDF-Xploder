@@ -1,5 +1,5 @@
 /** Building blocks of the PDF-XChange style ribbon. */
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { Children, createContext, isValidElement, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useStore, type SidebarTab } from '../store/store';
 import { allowed } from '../store/permissions';
@@ -28,6 +28,9 @@ export interface Harvest {
 }
 
 export const HarvestContext = createContext<Harvest | null>(null);
+
+/** Closes the folded group a button sits in (see Group), after a command from its menu. */
+const FoldContext = createContext<(() => void) | null>(null);
 
 function harvestMenu(h: Harvest, path: string[], items: MenuItem[], off = false) {
   for (const it of items) {
@@ -84,6 +87,7 @@ export function Btn(props: BtnProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const harvest = useContext(HarvestContext);
+  const closeFold = useContext(FoldContext);
   if (harvest) {
     harvestButton(harvest, props);
     return null;
@@ -115,18 +119,74 @@ export function Btn(props: BtnProps) {
           {caret}
         </button>
       )}
-      {anchor && menu && <Menu anchor={rectAnchor(anchor)} items={wrapClose(typeof menu === 'function' ? menu() : menu, () => setAnchor(null))} onClose={() => setAnchor(null)} />}
+      {anchor && menu && <Menu anchor={rectAnchor(anchor)} items={wrapClose(typeof menu === 'function' ? menu() : menu, () => {
+            setAnchor(null);
+            closeFold?.();
+          })} onClose={() => setAnchor(null)} />}
     </div>
   );
 }
 
+/** The icon of a group's first button, for the group's button when the ribbon folds it up. */
+function firstIcon(children: ReactNode): ReactNode {
+  for (const c of Children.toArray(children)) {
+    if (!isValidElement(c)) continue;
+    const p = c.props as { icon?: ReactNode; children?: ReactNode };
+    if (p.icon) return p.icon;
+    const inner = firstIcon(p.children);
+    if (inner) return inner;
+  }
+  return null;
+}
+
+/**
+ * A ribbon group. When the window is too narrow, the ribbon folds groups up from the
+ * right (data-collapsed, set by the ribbon): the group shows one button that opens its
+ * buttons below it, as in PDF-XChange and Office.
+ */
 export function Group({ label, children }: { label: string; children: ReactNode }) {
   const t = useT();
   const harvest = useContext(HarvestContext);
+  const ref = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!at) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as Element;
+      if (!ref.current?.contains(el) && !el.closest?.('.rmenu')) setAt(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setAt(null);
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', () => setAt(null), { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [at]);
   if (harvest) return <HarvestContext.Provider value={{ ...harvest, path: [...harvest.path, label] }}>{children}</HarvestContext.Provider>;
+  const open = () => {
+    if (at) return setAt(null);
+    const r = ref.current!.getBoundingClientRect();
+    setAt({ left: Math.max(4, Math.min(r.left, window.innerWidth - 320)), top: r.bottom + 2 });
+  };
   return (
-    <div className="rgroup" role="group" aria-label={t(label)}>
-      <div className="rgroup-items">{children}</div>
+    <div ref={ref} className="rgroup" role="group" aria-label={t(label)} data-open={at ? '' : undefined}>
+      <button className="rbtn size-big rgroup-fold" title={t(label)} aria-haspopup="true" aria-expanded={!!at} onClick={open}>
+        {firstIcon(children)}
+        <span className="rlabel">{t(label)}<ChevronDown className="caret" size={10} /></span>
+      </button>
+      <div
+        className="rgroup-items"
+        style={at ?? undefined}
+        // A command chosen from the folded group closes it (not a button that opens a menu).
+        onClick={(e) => {
+          const b = (e.target as Element).closest('button');
+          if (at && b && !b.disabled && !b.hasAttribute('aria-haspopup')) setAt(null);
+        }}
+      >
+        <FoldContext.Provider value={() => setAt(null)}>{children}</FoldContext.Provider>
+      </div>
       <div className="rgroup-label">{t(label)}</div>
     </div>
   );

@@ -148,15 +148,15 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Ribbon UI | ✅ PDF-XChange style tabs, groups, split buttons and menus |
 | Quick Launch / search for commands | ✅ search box beside the ribbon tabs (Ctrl+K): finds every ribbon button and menu entry in English or German, shows where it lives and its shortcut, recently used first |
 | Set the UI Language | ✅ German/English throughout, following the browser |
-| Dark Page Mode | 🟡 inverted page colours |
+| Dark Page Mode | ✅ dark interface (View → Theme: same as system, light, dark) and inverted page colours |
 | Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |
 | Right-to-Left Page Layout | ⬜ |
 | Tabbed Interface and Multiple Tab Groups | 🟡 document tabs (open several files, switch, reorder, close others/right/all, unsaved marker, per-tab undo, zoom and position; drag pages between tabs or onto "+" for a new document); ⬜ multiple tab groups |
 | Desktop application, shell integration ("Open with", default PDF app) | ✅ installable app (own window, works offline, registered for PDFs; files opened from the system arrive as tabs in the running window) |
 | Autosave/Autorecovery | ✅ open tabs and their unsaved changes are kept in browser storage and reopened at the next start (not for password-protected documents) |
 | Save Current Session | ✅ restore session (File → Session), on by default |
-| Customize Layout of Panes, Custom Toolbars/Ribbons, Quick Tools | ⬜ |
-| Export/Import/Reset Settings, Preferences | ⬜ |
+| Customize Layout of Panes, Custom Toolbars/Ribbons, Quick Tools | 🟡 resizable side panes; pane widths, open panes and the ribbon tab are remembered; the ribbon folds groups into drop-downs in narrow windows; ⬜ custom toolbars |
+| Export/Import/Reset Settings, Preferences | 🟡 Preferences dialog (theme, language, zoom when opening, author, session restore, layout reset); ⬜ export/import |
 | Specify the Default Ribbon Tab | ⬜ |
 | Touch-Optimized Layout | ⬜ |
 | Custom Fonts for Signatures/Initials | 🟡 typed signatures |

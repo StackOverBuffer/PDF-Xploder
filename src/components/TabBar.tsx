@@ -14,8 +14,8 @@ const HOVER_SWITCH_MS = 600;
 const isPageDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(PAGE_DRAG_TYPE) && draggingPages();
 
 /** Close several tabs; stops at the first one the user decides to keep. */
-function closeMany(ids: string[]) {
-  for (const id of ids) if (!S().closeTab(id)) return;
+async function closeMany(ids: string[]) {
+  for (const id of ids) if (!(await S().closeTab(id))) return;
 }
 
 export function TabBar() {

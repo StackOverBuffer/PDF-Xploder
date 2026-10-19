@@ -1,5 +1,5 @@
 /** Store glue for the Bookmarks tab. */
-import { useStore } from './store';
+import { reportProgress, useStore } from './store';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
 import { readOutline, writeOutline, flatten, findNode, type OutlineNode } from '../lib/outline';
@@ -8,6 +8,7 @@ import { insertTocPages, type TocOptions } from '../lib/tocPages';
 import { arrange, commitInserted, deletePageList } from './organizeCommands';
 import { baseName, downloadBlob } from '../lib/download';
 import { currentViewTarget } from './viewActions';
+import { ask } from '../lib/ask';
 
 const S = () => useStore.getState();
 
@@ -37,7 +38,8 @@ export async function bookmarkEveryNth(every: number, template: string, start: n
 async function textLines(pages: number[]): Promise<(bt.TextLine & { x: number })[]> {
   const pdf = S().pdf!;
   const out: (bt.TextLine & { x: number })[] = [];
-  for (const p of pages) {
+  for (const [k, p] of pages.entries()) {
+    reportProgress(k, pages.length);
     const tc = await (await pdf.getPage(p + 1)).getTextContent();
     let cur: (bt.TextLine & { x: number }) | null = null;
     for (const it of tc.items) {
@@ -114,7 +116,7 @@ export async function removeActions() {
 }
 
 export async function deleteAllBookmarks() {
-  if (!confirm(tr('Delete all bookmarks?'))) return;
+  if (!(await ask({ message: tr('Delete all bookmarks?'), ok: 'Delete', danger: true }))) return;
   await editOutline('Deleting bookmarks…', () => []);
 }
 
@@ -143,7 +145,7 @@ export async function deleteBookmarkPages(id: string) {
   const starts = [...new Set(flatten(tree, () => true).map((r) => r.node.page).filter((p): p is number => p !== undefined))].sort((a, b) => a - b);
   const end = starts.find((p) => p > node.page!) ?? S().pageIds.length;
   const pages = Array.from({ length: end - node.page }, (_, i) => node.page! + i);
-  if (!confirm(tf('Delete page(s) {from}–{to} that “{title}” points to?', { from: node.page + 1, to: end, title: node.title }))) return;
+  if (!(await ask({ message: tf('Delete page(s) {from}–{to} that “{title}” points to?', { from: node.page + 1, to: end, title: node.title }), ok: 'Delete', danger: true }))) return;
   await deletePageList(pages);
 }
 

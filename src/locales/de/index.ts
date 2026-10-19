@@ -3,6 +3,7 @@ import DE_ORGANIZE from './organize';
 import DE_CONTEXT from './context';
 import DE_UI from './ui';
 import DE_OCR from './ocr';
+import DE_POLISH from './polish';
 import DE_BOOKMARKS from './bookmarks';
 
 const DE_MAIN: Record<string, string> = {
@@ -64,5 +65,5 @@ const DE_MAIN: Record<string, string> = {
   'Stop reading': 'Vorlesen beenden', Display: 'Anzeige', 'Invert colours': 'Farben umkehren',
 };
 
-const DE: Record<string, string> = { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE_OCR, ...DE_BOOKMARKS, ...DE_MAIN };
+const DE: Record<string, string> = { ...DE_UI, ...DE_ORGANIZE, ...DE_CONTEXT, ...DE_OCR, ...DE_BOOKMARKS, ...DE_POLISH, ...DE_MAIN };
 export default DE;

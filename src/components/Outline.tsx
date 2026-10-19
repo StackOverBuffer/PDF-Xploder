@@ -19,6 +19,7 @@ import { currentViewTarget } from '../store/viewActions';
 import { deleteBookmarkPages } from '../store/bookmarkCommands';
 import { useTextBox } from './TextBoxSelect';
 import { useContextMenu, type MenuItem } from './Menu';
+import { ask, openLinkAfterAsking } from '../lib/ask';
 
 const S = () => useStore.getState();
 const COLORS = ['#000000', '#c62828', '#ef6c00', '#2e7d32', '#1565c0', '#6a1b9a', '#757575'];
@@ -33,7 +34,7 @@ function go(n: OutlineNode) {
   if (n.page !== undefined) S().goToPage(n.page, n.y);
   else if (n.action?.startsWith('URI: ')) {
     const url = n.action.slice(5);
-    if (confirm(`${tr('Open this link in a new tab?')}\n\n${url}`)) window.open(url, '_blank', 'noopener,noreferrer');
+    void openLinkAfterAsking(url);
   }
 }
 
@@ -96,9 +97,9 @@ export function Outline() {
     if (where === 'inside' && selected) setCollapsed((c) => new Set([...c].filter((x) => x !== selected)));
     commit(next, 'Adding bookmark…');
   };
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const n = findNode(tree, id);
-    if (n?.children.length && !confirm(tf('Delete “{title}” and its {count} sub-bookmark(s)?', { title: n.title, count: n.children.length }))) return;
+    if (n?.children.length && !(await ask({ message: tf('Delete “{title}” and its {count} sub-bookmark(s)?', { title: n.title, count: n.children.length }), ok: 'Delete', danger: true }))) return;
     const i = rows.findIndex((r) => r.node.id === id);
     const nextSel = rows[i + 1]?.node.id ?? rows[i - 1]?.node.id ?? null;
     change(removeNode(tree, id).tree, nextSel === id ? null : nextSel);

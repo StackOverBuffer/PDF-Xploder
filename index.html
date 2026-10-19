@@ -9,6 +9,10 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>PDF-Xploder</title>
+    <script>
+      // The chosen colour theme, before the first paint (see src/lib/theme.ts).
+      try { var t = localStorage.getItem('pdf-xploder.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
