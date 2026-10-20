@@ -38,7 +38,7 @@ setupPwa({
   onReady: () => useStore.getState().notify('PDF-Xploder is ready to work offline.'),
 });
 
-if (import.meta.env.DEV) {
-  // Handy for debugging and end-to-end tests.
+if (import.meta.env.DEV || import.meta.env.VITE_EXPOSE_STORE === '1') {
+  // Handy for debugging and end-to-end tests (also of production bundles, built with VITE_EXPOSE_STORE=1).
   import('./store/store').then(({ useStore }) => ((window as unknown as { __store: unknown }).__store = useStore));
 }

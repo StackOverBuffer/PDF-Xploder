@@ -68,19 +68,24 @@ function call(mod: WorkerModule, fn: string, args: unknown[], local: (...a: unkn
   }).catch((e: Error) => (e.message === 'retry-local' ? local(...args) : Promise.reject(e)));
 }
 
-function proxy<T extends object>(mod: WorkerModule, real: T): T {
-  return new Proxy(real, {
-    get(target, name: string) {
-      const f = (target as Record<string, unknown>)[name];
-      if (typeof f !== 'function' || !IN_WORKER[mod].has(name)) return f;
-      return (...args: unknown[]) => call(mod, name, args, f as (...a: unknown[]) => unknown);
-    },
-  });
+/**
+ * A plain copy of the module with the worker functions swapped in. (Not a Proxy over
+ * the module: bundled module namespaces are frozen, and a Proxy may not return
+ * anything but a frozen property's own value.) Exported for tests.
+ */
+export function routed<T extends object>(mod: WorkerModule, real: T): T {
+  const out: Record<string, unknown> = { ...(real as Record<string, unknown>) };
+  for (const name of IN_WORKER[mod]) {
+    const f = out[name];
+    if (typeof f !== 'function') throw new Error(`${mod}.${name} is not a function`);
+    out[name] = (...args: unknown[]) => call(mod, name, args, f as (...a: unknown[]) => unknown);
+  }
+  return out as unknown as T;
 }
 
-export const ops = proxy('ops', realOps);
-export const org = proxy('org', realOrg);
-export const sec = proxy('sec', realSec);
+export const ops = routed('ops', realOps);
+export const org = routed('org', realOrg);
+export const sec = routed('sec', realSec);
 
 /** Start the worker ahead of time (when the browser is idle), so the first operation does not wait for it to load. */
 export function warmUpWorker() {
