@@ -27,6 +27,18 @@ const DE: Record<string, string> = {
   'PDF-Xploder is free software (GNU AGPL 3.0): get the source code': 'PDF-Xploder ist freie Software (GNU AGPL 3.0): zum Quellcode',
   'Free software under the GNU AGPL 3.0.': 'Freie Software unter der GNU AGPL 3.0.',
   Licence: 'Lizenz',
+  // replies
+  Replies: 'Antworten',
+  Reply: 'Antworten',
+  'Write a reply…': 'Antwort schreiben…',
+  'Delete reply': 'Antwort löschen',
+  Unknown: 'Unbekannt',
+  // signatures
+  'Type your name first.': 'Bitte zuerst den Namen eingeben.',
+  'Draw your signature first.': 'Bitte zuerst unterschreiben.',
+  'Choose an image first.': 'Bitte zuerst ein Bild auswählen.',
+  'Could not place the signature': 'Die Unterschrift konnte nicht platziert werden',
+  'This places an image of your signature. For a certificate-based digital signature use Protect → Sign.': 'Hiermit wird ein Bild Ihrer Unterschrift platziert. Für eine digitale Signatur mit Zertifikat: Schützen → Signieren.',
   // in-app questions
   'Please confirm': 'Bitte bestätigen',
   Enter: 'Eingabe',

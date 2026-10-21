@@ -427,7 +427,7 @@ export async function importForEditing(
 ): Promise<{ bytes: Uint8Array; annotations: Annotation[][]; count: number }> {
   const doc = await load(bytes);
   const geoms = doc.getPages().map(geomOf);
-  const res = importAnnotations(doc, geoms, newId);
+  const res = await importAnnotations(doc, geoms, newId);
   if (!res.count) return { bytes, annotations: res.annotations, count: 0 };
   return { bytes: await save(doc), annotations: res.annotations, count: res.count };
 }

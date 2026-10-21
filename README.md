@@ -130,9 +130,11 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Pencil (freehand), rectangle, ellipse, line, arrow (Shift to constrain)
 - Polygon, polyline and cloud (click the vertices, double-click to finish); clouds have scallops all along their edges, like revision clouds
 - Text box (typewriter) with inline editing, sticky notes
-- Stamps (Approved, Draft, Confidential, … or custom text)
+- Stamps (Approved, Draft, Confidential, … or custom text); stamps made in other programs (e.g. PDF-XChange custom stamps) keep their own drawing and can be moved, resized and commented
+- Pictures and signatures hang on the pointer like stamps and are placed with a click; they keep their proportions when resized (Shift: freely). Typed signatures in four bundled handwriting fonts
 - Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
 - Comment text and author on every annotation; comments list
+- Reply threads: replies made in PDF-XChange or Acrobat show under their comment (Comments pane, properties); add and delete replies; saved as standard replies (/IRT) that those programs show in the thread
 - Saved as native, editable PDF annotations with appearance streams (or flattened on request)
 - Import and edit annotations already present in a PDF (Highlight, Underline, Squiggly, StrikeOut, Ink, Square, Circle, Line, FreeText, Text, Redact), with lossless round trips of our own
 - Measure tools (Comment → Measure): distance (M), perimeter and area with live values while drawing; drawing scale 1:n in mm/cm/m/km/in/ft/yd/mi, or calibrated from a measured line of known length; values shown on the page and in the properties; export as CSV; saved as standard PDF measurement annotations (/Measure, LineDimension / PolyLineDimension / PolygonDimension) that other viewers recognise
@@ -154,7 +156,7 @@ The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page com
 
 ### Edit content
 - **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several
-- Move (drag, arrow keys; Shift = 10 pt / constrain), resize with handles (Shift keeps proportions), rotate with the green handle (Shift snaps to 15°), rotate ±90°, flip, numeric position/size/rotation
+- Move (drag, arrow keys; Shift = 10 pt / constrain), resize with handles (pictures keep their proportions, Shift resizes them freely; other objects keep them with Shift), rotate with the green handle (Shift snaps to 15°), rotate ±90°, flip, numeric position/size/rotation
 - Arrange: bring to front/forward, send backward/to back; align left/centre/right/top/middle/bottom (to the selection, or to the page for one object); distribute; same width/height
 - Edit existing text in place (double-click a line): the original font is kept when it has the characters, otherwise Noto Sans is used; change font, size, colour, character and word spacing, horizontal scale, baseline shift
 - Shapes: fill and stroke colour (or none), line width; images: replace (scaled to the original's size), export any selection as a 300 dpi PNG; remove clipping paths; duplicate (Ctrl+D) and delete

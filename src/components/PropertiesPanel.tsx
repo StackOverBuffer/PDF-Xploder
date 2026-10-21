@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { formatMeasure, measuredValue } from '../lib/measure';
 import { setMeasureScale } from '../store/measureCommands';
 import { useDialog } from './Dialogs';
 import { Trash2 } from 'lucide-react';
-import { useStore, type ToolStyle } from '../store/store';
+import { uid, useStore, type ToolStyle } from '../store/store';
 import { useCan } from '../store/permissions';
 import { ANNOT_LABELS } from '../lib/annotGeom';
 import { FieldProperties } from './FieldProperties';
@@ -206,10 +206,11 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   return (
     <fieldset disabled={!editable} className="props-body">
       <div className="props-head">
-        <b>{t(measureOf(a) ? MEASURE_LABELS[measureOf(a)!.kind] : ANNOT_LABELS[a.type])}</b>
+        <b>{a.subject ?? t(measureOf(a) ? MEASURE_LABELS[measureOf(a)!.kind] : ANNOT_LABELS[a.type])}</b>
         <span className="muted small">{a.author} · {new Date(a.createdAt).toLocaleString()}</span>
       </div>
-      <StyleEditor type={a.type} style={style} onChange={onStyle} />
+      {/* Another program's stamp keeps its own drawing: no colour or label to choose. */}
+      {!(a.type === 'stamp' && a.appearance) && <StyleEditor type={a.type} style={style} onChange={onStyle} />}
       {measureOf(a) && <MeasureInfo a={a} />}
       {a.type === 'text' && (
         <>
@@ -232,9 +233,46 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
           <textarea rows={3} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
         </label>
       )}
+      <Replies a={a} pageId={pageId} />
       {a.type === 'redact' && <p className="muted small">{t('Redaction marks are only previews. Use')} <b>{t('Protect → Apply redactions')}</b> {t('to permanently remove the content underneath.')}</p>}
       <button className="danger" onClick={() => useStore.getState().deleteAnnotation(pageId, a.id)}><Trash2 size={14} /> {t('Delete')}</button>
     </fieldset>
+  );
+}
+
+/** The thread of answers to a comment, and a box to add one. */
+function Replies({ a, pageId }: { a: Annotation; pageId: string }) {
+  const t = useT();
+  const author = useStore((s) => s.author);
+  const [text, setText] = useState('');
+  const replies = a.replies ?? [];
+  const send = () => {
+    const body = text.trim();
+    if (!body) return;
+    useStore.getState().updateAnnotation(pageId, a.id, { replies: [...replies, { id: uid('reply'), author, text: body, createdAt: Date.now() }] });
+    setText('');
+  };
+  return (
+    <div className="prop replies">
+      <span className="prop-label">{t('Replies')}{replies.length ? ` (${replies.length})` : ''}</span>
+      {replies.map((r) => (
+        <div key={r.id} className="reply-item">
+          <div className="reply-head">
+            <b>{r.author || t('Unknown')}</b>
+            <span className="muted small">{new Date(r.createdAt).toLocaleString()}</span>
+            <button className="icon-btn" title={t('Delete reply')} aria-label={t('Delete reply')} onClick={() => useStore.getState().updateAnnotation(pageId, a.id, { replies: replies.filter((x) => x.id !== r.id) })}><Trash2 size={12} /></button>
+          </div>
+          <div className="reply-text">{r.text}</div>
+        </div>
+      ))}
+      <textarea rows={2} value={text} placeholder={t('Write a reply…')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          send();
+        }
+      }} />
+      <button disabled={!text.trim()} onClick={send} title="Ctrl+Enter">{t('Reply')}</button>
+    </div>
   );
 }
 

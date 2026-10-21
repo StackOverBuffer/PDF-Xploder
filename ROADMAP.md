@@ -11,7 +11,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
 2. **Compare documents**: side by side, with changed text and changed areas marked.
 3. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
-4. **Comment workflow**: replies and status, comment summary, FDF/XFDF import and export.
+4. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
 5. **Page layouts**: single page, two pages, facing pages; split view.
 6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
 
@@ -54,7 +54,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Link Annotations | ✅ to pages and web addresses, from objects or selected text |
 | Oval and Rectangle Annotations | ✅ |
 | Polygon and Polyline Annotations | ✅ click vertices, double-click to finish; also exported as standard /Polygon and /PolyLine |
-| Stamps | ✅ standard stamps and custom image stamps that hang on the pointer |
+| Stamps | ✅ standard stamps and custom image stamps that hang on the pointer; stamps from other programs keep their own drawing |
 | Sticky Note Annotations | ✅ |
 | Text Box Annotations | ✅ |
 | Typewriter Annotations | 🟡 borderless text boxes |
@@ -70,6 +70,8 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Flatten Comments | ✅ |
 | Summarize Comments (with font customization) | ⬜ |
 | Open All Comment Popups that Contain Text | ⬜ |
+| Comment Replies (threads) | ✅ shown, added and saved as standard /IRT replies |
+| Comment Review Status | ⬜ |
 | Support for Existing Screen Annotations | ⬜ |
 | Inline Captions for Line/Dimension Annotations | ⬜ |
 | Eraser Tool for Freehand Annotations | ⬜ |

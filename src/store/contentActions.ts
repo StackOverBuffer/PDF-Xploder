@@ -299,6 +299,8 @@ export interface CustomStamp {
   /** Size in points. */
   width: number;
   height: number;
+  /** Placed as a signature (labelled so in the comments). */
+  signature?: boolean;
 }
 
 const STAMP_KEY = 'awesome-pdf.customStamps';

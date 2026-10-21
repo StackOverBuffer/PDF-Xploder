@@ -187,7 +187,9 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       const h0 = handlePos(box, h);
       let sx = h === 'n' || h === 's' ? 1 : (p.x - a.x) / (h0.x - a.x || 1);
       let sy = h === 'e' || h === 'w' ? 1 : (p.y - a.y) / (h0.y - a.y || 1);
-      if (e.shiftKey && h.length === 2) sx = sy = Math.max(Math.abs(sx), Math.abs(sy)) * Math.sign(sx || 1);
+      // Corner handles: pictures keep their proportions (Shift: freely), other objects with Shift.
+      const pictures = selected.length > 0 && selected.every((o) => o.kind === 'image');
+      if (h.length === 2 && pictures !== e.shiftKey) sx = sy = Math.max(Math.abs(sx), Math.abs(sy)) * Math.sign(sx || 1);
       if (Math.abs(sx) < 0.02) sx = 0.02 * Math.sign(sx || 1);
       if (Math.abs(sy) < 0.02) sy = 0.02 * Math.sign(sy || 1);
       t = about(scaleM(sx, sy), a.x, a.y);

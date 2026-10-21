@@ -86,15 +86,17 @@ export async function pageTextRuns(page: PDFPageProxy): Promise<TextRun[]> {
 }
 
 /** Render a page to a canvas at the given scale (rotation as the page specifies). */
-export async function renderToCanvas(page: PDFPageProxy, scale: number): Promise<HTMLCanvasElement> {
+export async function renderToCanvas(page: PDFPageProxy, scale: number, opts: { transparent?: boolean } = {}): Promise<HTMLCanvasElement> {
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  if (!opts.transparent) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  await page.render({ canvasContext: ctx, viewport, ...(opts.transparent ? { background: 'rgba(0,0,0,0)' } : {}) }).promise;
   return canvas;
 }
 

@@ -436,7 +436,11 @@ export async function insertImageFromFile() {
   if (!f) return;
   await S().run('Loading image…', async () => {
     const img = await normaliseImage(await readAsDataUrl(f));
-    placeImage(img.src, img.width * 0.75, img.height * 0.75);
+    // Like a stamp: it hangs on the pointer until a click places it (at most 60% of the page).
+    const vs = viewSizeOf(S().currentPage);
+    const k = Math.min(0.75, (vs.width * 0.6) / img.width, (vs.height * 0.6) / img.height);
+    const { placeCustomStamp } = await import('./contentActions');
+    placeCustomStamp({ id: uid('image'), name: f.name, src: img.src, width: img.width * k, height: img.height * k });
   });
 }
 

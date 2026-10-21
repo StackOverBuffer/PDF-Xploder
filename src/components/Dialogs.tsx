@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { X } from 'lucide-react';
-import { useStore } from '../store/store';
+import { uid, useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
@@ -13,6 +13,8 @@ import type { Annotation } from '../lib/types';
 import type { OrganizeDialogName } from './OrganizeDialogs';
 import type { BookmarkDialogName } from './BookmarkDialogs';
 import { PrefsDialog } from './PrefsDialog';
+import '../signatureFonts.css';
+import { placeCustomStamp } from '../store/contentActions';
 
 // The bigger dialogs load the first time they are opened, not with the app.
 const BarcodesDialog = lazy(() => import('./ContentDialogs').then((m) => ({ default: m.BarcodesDialog })));
@@ -225,7 +227,15 @@ function GotoDialog({ close }: { close: () => void }) {
   );
 }
 
-const SIG_FONTS = ['"Brush Script MT", cursive', '"Segoe Script", cursive', '"Snell Roundhand", cursive', 'cursive'];
+/** Bundled handwriting fonts (signatureFonts.css): the same choice on every system, also offline. */
+const SIG_FONTS = ["'Dancing Script', cursive", "'Great Vibes', cursive", "'Caveat', cursive", "'Allura', cursive"];
+
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
 
 function SignatureDialog({ close }: { close: () => void }) {
   const [mode, setMode] = useState<'draw' | 'type' | 'upload'>('draw');
@@ -235,6 +245,8 @@ function SignatureDialog({ close }: { close: () => void }) {
   const [upload, setUpload] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  /** The box the strokes cover, kept while drawing (canvas pixels). */
+  const inkBox = useRef<Box | null>(null);
   const [hasInk, setHasInk] = useState(false);
   const t = useT();
 
@@ -251,45 +263,71 @@ function SignatureDialog({ close }: { close: () => void }) {
     return [((e.clientX - r.left) * canvas.current!.width) / r.width, ((e.clientY - r.top) * canvas.current!.height) / r.height] as const;
   };
 
-  /** Crop a canvas to its non-transparent pixels and return a PNG data URL. */
-  const trimmed = (c: HTMLCanvasElement) => {
-    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
-    let [x0, y0, x1, y1] = [c.width, c.height, 0, 0];
-    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
-      if (d[(y * c.width + x) * 4 + 3] > 0) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-    }
-    if (x1 <= x0 || y1 <= y0) return null;
+  const grow = (x: number, y: number) => {
+    const b = inkBox.current;
+    inkBox.current = b ? { x0: Math.min(b.x0, x), y0: Math.min(b.y0, y), x1: Math.max(b.x1, x), y1: Math.max(b.y1, y) } : { x0: x, y0: y, x1: x, y1: y };
+  };
+
+  /**
+   * Crop a canvas to `box` (plus a margin) and return a PNG data URL. The box comes from
+   * the strokes or the measured text, not from reading pixels back: Firefox's
+   * fingerprinting protection alters what a page reads from a canvas.
+   */
+  const cropped = (c: HTMLCanvasElement, box: Box | null) => {
+    if (!box) return null;
     const pad = 6;
+    const x0 = Math.max(0, Math.floor(box.x0 - pad));
+    const y0 = Math.max(0, Math.floor(box.y0 - pad));
+    const x1 = Math.min(c.width, Math.ceil(box.x1 + pad));
+    const y1 = Math.min(c.height, Math.ceil(box.y1 + pad));
+    if (x1 <= x0 || y1 <= y0) return null;
     const out = document.createElement('canvas');
-    out.width = x1 - x0 + pad * 2;
-    out.height = y1 - y0 + pad * 2;
-    out.getContext('2d')!.drawImage(c, x0 - pad, y0 - pad, out.width, out.height, 0, 0, out.width, out.height);
+    out.width = x1 - x0;
+    out.height = y1 - y0;
+    out.getContext('2d')!.drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
     return { src: out.toDataURL('image/png'), width: out.width, height: out.height };
   };
 
   const place = async () => {
-    let img: { src: string; width: number; height: number } | null = null;
-    if (mode === 'draw' && canvas.current) img = trimmed(canvas.current);
-    if (mode === 'type' && typed.trim()) {
-      const c = document.createElement('canvas');
-      c.width = 900;
-      c.height = 220;
-      const g = c.getContext('2d')!;
-      g.font = `110px ${font}`;
-      g.fillStyle = color;
-      g.textBaseline = 'middle';
-      g.fillText(typed, 20, 110, 860);
-      img = trimmed(c);
+    try {
+      let img: { src: string; width: number; height: number } | null = null;
+      if (mode === 'draw' && canvas.current) {
+        const b = inkBox.current;
+        // Half the line width around the stroke centres.
+        img = cropped(canvas.current, b && { x0: b.x0 - 2, y0: b.y0 - 2, x1: b.x1 + 2, y1: b.y1 + 2 });
+      }
+      if (mode === 'type' && typed.trim()) {
+        // The canvas does not wait for a web font: load it first.
+        await document.fonts.load(`110px ${font}`, typed).catch(() => undefined);
+        const c = document.createElement('canvas');
+        const g = c.getContext('2d')!;
+        g.font = `110px ${font}`;
+        const m = g.measureText(typed);
+        // Room for swashes that reach beyond the advance width.
+        const left = Math.max(m.actualBoundingBoxLeft, 0) + 20;
+        c.width = Math.ceil(left + Math.max(m.actualBoundingBoxRight, m.width) + 20);
+        c.height = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent + 40);
+        const baseline = m.actualBoundingBoxAscent + 20;
+        g.font = `110px ${font}`;
+        g.fillStyle = color;
+        g.fillText(typed, left, baseline);
+        img = cropped(c, { x0: left - m.actualBoundingBoxLeft, y0: baseline - m.actualBoundingBoxAscent, x1: left + Math.max(m.actualBoundingBoxRight, m.width), y1: baseline + m.actualBoundingBoxDescent });
+      }
+      if (mode === 'upload' && upload) img = await cmd.normaliseImage(upload);
+      if (!img) return useStore.getState().notify(t(mode === 'type' ? 'Type your name first.' : mode === 'draw' ? 'Draw your signature first.' : 'Choose an image first.'), 'error');
+      close();
+      // About 1/4 of the canvas pixels (a typed name is ~150 pt wide), at most 220 × 90 pt.
+      const k = Math.min(1, 220 / (img.width / 4), 90 / (img.height / 4)) / 4;
+      // It hangs on the pointer like a stamp until a click places it.
+      placeCustomStamp({ id: uid('sig'), name: t('Signature'), src: img.src, width: img.width * k, height: img.height * k, signature: true });
+    } catch (e) {
+      console.error(e);
+      useStore.getState().notify(`${t('Could not place the signature')}: ${(e as Error).message}`, 'error');
     }
-    if (mode === 'upload' && upload) img = await cmd.normaliseImage(upload);
-    if (!img) return;
-    close();
-    // Render at roughly 1/4 of canvas pixels so a signature is ~150pt wide.
-    cmd.placeImage(img.src, img.width / 4, img.height / 4, { signature: true, maxW: 220, maxH: 90 });
   };
 
   return (
-    <Modal title={t('Add signature')} wide onClose={close} footer={<><button onClick={close}>{t('Cancel')}</button><button className="primary" onClick={place}>{t('Place signature')}</button></>}>
+    <Modal title={t('Add signature')} wide onClose={close} footer={<><span className="muted small print-hint">{t('Then click on the page to place it.')}</span><button onClick={close}>{t('Cancel')}</button><button className="primary" onClick={place}>{t('Place signature')}</button></>}>
       <div className="tabs">
         {(['draw', 'type', 'upload'] as const).map((m) => <button key={m} className={mode === m ? 'active' : ''} onClick={() => setMode(m)}>{t(m[0].toUpperCase() + m.slice(1))}</button>)}
         <span className="spacer" />
@@ -302,17 +340,17 @@ function SignatureDialog({ close }: { close: () => void }) {
             className="sig-pad"
             width={900}
             height={260}
-            onPointerDown={(e) => { drawing.current = true; canvas.current!.setPointerCapture(e.pointerId); const c = ctx(); c.beginPath(); c.moveTo(...pos(e)); }}
-            onPointerMove={(e) => { if (!drawing.current) return; const c = ctx(); c.lineTo(...pos(e)); c.stroke(); setHasInk(true); }}
+            onPointerDown={(e) => { drawing.current = true; canvas.current!.setPointerCapture(e.pointerId); const c = ctx(); c.beginPath(); c.moveTo(...pos(e)); grow(...pos(e)); }}
+            onPointerMove={(e) => { if (!drawing.current) return; const c = ctx(); c.lineTo(...pos(e)); c.stroke(); grow(...pos(e)); setHasInk(true); }}
             onPointerUp={() => (drawing.current = false)}
           />
-          <div className="row"><span className="muted small">{t('Sign above with your mouse, pen or finger.')}</span><span className="spacer" /><button disabled={!hasInk} onClick={() => { const c = canvas.current!; c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setHasInk(false); }}>{t('Clear')}</button></div>
+          <div className="row"><span className="muted small">{t('Sign above with your mouse, pen or finger.')}</span><span className="spacer" /><button disabled={!hasInk} onClick={() => { const c = canvas.current!; c.getContext('2d')!.clearRect(0, 0, c.width, c.height); inkBox.current = null; setHasInk(false); }}>{t('Clear')}</button></div>
         </>
       )}
       {mode === 'type' && (
         <>
           <input className="sig-typed" value={typed} placeholder={t('Your name')} onChange={(e) => setTyped(e.target.value)} style={{ fontFamily: font, color }} />
-          <div className="chips">{SIG_FONTS.map((f) => <button key={f} className={font === f ? 'active' : ''} style={{ fontFamily: f }} onClick={() => setFont(f)}>{typed || t('Signature')}</button>)}</div>
+          <div className="chips sig-fonts">{SIG_FONTS.map((f) => <button key={f} className={font === f ? 'active' : ''} style={{ fontFamily: f }} onClick={() => setFont(f)}>{typed || t('Signature')}</button>)}</div>
         </>
       )}
       {mode === 'upload' && (
@@ -321,7 +359,7 @@ function SignatureDialog({ close }: { close: () => void }) {
           {upload && <img src={upload} alt={t('Signature preview')} />}
         </div>
       )}
-      <p className="muted small">{t('This places a visual signature image. Cryptographic (certificate-based) digital signatures are on the roadmap.')}</p>
+      <p className="muted small">{t('This places an image of your signature. For a certificate-based digital signature use Protect → Sign.')}</p>
     </Modal>
   );
 }

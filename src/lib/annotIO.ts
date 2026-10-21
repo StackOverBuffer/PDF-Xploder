@@ -23,10 +23,14 @@ import {
 import { hexToRgbTuple } from './color';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
-import type { Annotation, PageGeom, Pt, Rect } from './types';
+import { appearanceToPdf, fromBase64, normalAppearance, toBase64 } from './foreignAppearance';
+import type { Annotation, PageGeom, Pt, Rect, Reply } from './types';
 
 const PRIVATE = PDFName.of('AwesomePDF');
 const PRIVATE_SRC = PDFName.of('AwesomePDFSrc');
+/** A stamp's own drawing (see StampAnnot.appearance), as a one-page PDF. */
+const PRIVATE_AP = PDFName.of('AwesomePDFAppearance');
+const IRT = PDFName.of('IRT');
 
 // ---------------------------------------------------------------- helpers
 
@@ -175,6 +179,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const label = measureLabel(a, g);
   const contents = a.type === 'text' || a.type === 'note' ? a.text : label ? [label.text, a.comment].filter(Boolean).join('\n') : a.comment;
   if (contents) dict.set(PDFName.of('Contents'), PDFHexString.fromText(contents));
+  if (a.subject) dict.set(PDFName.of('Subj'), PDFHexString.fromText(a.subject));
   if ('measure' in a && a.measure) writeMeasure(dict, a.measure, pdf);
 
   switch (a.type) {
@@ -220,8 +225,9 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('F', 4 | 8 | 16); // Print, NoZoom, NoRotate
       break;
     case 'stamp':
-      set('Name', a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp');
+      set('Name', a.name ?? (a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp'));
       set('Rotate', a.rot ?? 0);
+      if (a.appearance) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'image': {
       set('Name', a.signature ? 'Signature' : 'Image');
@@ -236,10 +242,36 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       break;
   }
 
-  const model: Record<string, unknown> = { ...a, rect0: rect };
+  // Replies are separate annotations (below), read back from there.
+  const { replies, ...rest } = a;
+  const model: Record<string, unknown> = { ...rest, rect0: rect };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
+  if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
   dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
-  page.node.addAnnot(pdf.register(dict));
+  const annotRef = pdf.register(dict);
+  page.node.addAnnot(annotRef);
+  for (const r of replies ?? []) page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, rect)));
+}
+
+/** A reply as other editors write it: a note "in reply to" its comment, at the comment's corner. */
+function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, rect: Rect): PDFDict {
+  const top = rect.y + rect.h;
+  return pdf.obj({
+    Type: 'Annot',
+    Subtype: 'Text',
+    Rect: [rect.x, top - 18, rect.x + 20, top],
+    IRT: parent,
+    RT: 'R',
+    NM: PDFHexString.fromText(r.id),
+    T: PDFHexString.fromText(r.author),
+    Contents: PDFHexString.fromText(r.text),
+    CreationDate: PDFString.fromDate(new Date(r.createdAt)),
+    M: PDFString.fromDate(new Date(r.createdAt)),
+    Name: 'Comment',
+    F: 4 | 8 | 16, // Print, NoZoom, NoRotate
+    C: [1, 0.93, 0.35],
+    Open: false,
+  }) as PDFDict;
 }
 
 // ---------------------------------------------------------------- reading
@@ -259,6 +291,7 @@ function base(dict: PDFDict, env: ParseEnv) {
     author: text(dict.lookup(PDFName.of('T'))) ?? '',
     createdAt: parsePdfDate(text(dict.lookup(PDFName.of('CreationDate'))) ?? text(dict.lookup(PDFName.of('M')))) ?? Date.now(),
     comment: text(dict.lookup(PDFName.of('Contents'))) || undefined,
+    subject: text(dict.lookup(PDFName.of('Subj'))) || undefined,
   };
 }
 
@@ -296,6 +329,20 @@ function fromPrivate(dict: PDFDict): Annotation | null {
     }
     a.src = bytesToDataUrl(data, (a.src as string) || 'image/png');
   }
+  if (a.type === 'stamp' && a.appearance) {
+    const ap = dict.lookup(PRIVATE_AP);
+    if (!(ap instanceof PDFRawStream)) return null;
+    let data = ap.getContents();
+    try {
+      if (ap.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(ap).decode();
+    } catch {
+      /* keep the raw bytes */
+    }
+    a.appearance = toBase64(data);
+  }
+  const subject = text(dict.lookup(PDFName.of('Subj')));
+  if (subject) a.subject = subject;
+  delete a.replies;
   return a;
 }
 
@@ -400,6 +447,12 @@ function fromStandard(dict: PDFDict, env: ParseEnv): Annotation | null {
       const rects = quadRects(dict);
       return { ...b, type: 'redact', rect: rects.length ? rects.reduce(unionRect) : rect };
     }
+    case 'Stamp': {
+      // Drawn in user space like page content: upright in the unrotated page (rot 0).
+      const name = (dict.lookup(PDFName.of('Name')) as PDFName | undefined)?.decodeText();
+      const label = b.subject || (name && /^[A-Za-z][A-Za-z0-9 ]*$/.test(name) ? name : '') || 'Stamp';
+      return { ...b, type: 'stamp', rect, rot: 0, label, name };
+    }
     default:
       return null;
   }
@@ -418,39 +471,89 @@ export interface ImportResult {
   count: number;
 }
 
+/** A note that answers another annotation (not a /Group member, which is part of it). */
+function isReply(dict: PDFDict): boolean {
+  if (!dict.get(IRT)) return false;
+  const rt = dict.lookup(PDFName.of('RT'));
+  return !(rt instanceof PDFName && rt.decodeText() === 'Group');
+}
+
 /**
  * Move every supported annotation out of the document and into the model,
  * so it can be edited. Unsupported annotations (links, widgets, …) stay put.
- * Mutates `doc`.
+ * Replies join the thread of the comment they answer. Mutates `doc`.
  */
-export function importAnnotations(doc: PDFDocument, geoms: PageGeom[], newId: () => string): ImportResult {
+export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], newId: () => string): Promise<ImportResult> {
   const annotations: Annotation[][] = [];
   let count = 0;
-  doc.getPages().forEach((page, i) => {
+  for (const [i, page] of doc.getPages().entries()) {
     const out: Annotation[] = [];
     annotations.push(out);
     const annots = page.node.Annots();
-    if (!annots) return;
+    if (!annots) continue;
     const env: ParseEnv = { doc, g: geoms[i], newId };
     const remove = new Set<PDFRef | PDFDict>();
+    /** Imported annotations by their reference, for replies to find their comment. */
+    const byRef = new Map<string, Annotation>();
+    const replies: { dict: PDFDict; entry: unknown }[] = [];
     for (let k = 0; k < annots.size(); k++) {
       const entry = annots.get(k);
       const dict = doc.context.lookup(entry);
       if (!(dict instanceof PDFDict)) continue;
       // Hidden annotations stay hidden.
       if ((n(dict.lookup(PDFName.of('F'))) ?? 0) & 2) continue;
-      const a = fromPrivate(dict) ?? fromStandard(dict, env);
+      if (isReply(dict)) {
+        replies.push({ dict, entry });
+        continue;
+      }
+      const own = fromPrivate(dict);
+      const a = own ?? fromStandard(dict, env);
       if (!a) continue;
+      // Another program's stamp: keep its own drawing (and leave it in the file if that fails).
+      if (!own && a.type === 'stamp' && dict.lookup(PDFName.of('AP'))) {
+        const ap = normalAppearance(dict);
+        const pdf = ap ? await appearanceToPdf(doc, ap).catch(() => undefined) : undefined;
+        if (!pdf) continue;
+        a.appearance = pdf;
+      }
       out.push(a);
       count++;
+      remove.add(entry as PDFRef);
+      if (entry instanceof PDFRef) byRef.set(entry.toString(), a);
+      const popup = dict.get(PDFName.of('Popup'));
+      if (popup instanceof PDFRef) remove.add(popup);
+    }
+    // Replies, also replies to replies, go to the thread of the comment at the root.
+    const replyDicts = new Map(replies.flatMap((r) => (r.entry instanceof PDFRef ? [[r.entry.toString(), r.dict] as const] : [])));
+    const rootOf = (d: PDFDict): Annotation | undefined => {
+      const seen = new Set<string>();
+      let cur = d;
+      for (;;) {
+        const parent = cur.get(IRT);
+        if (!(parent instanceof PDFRef) || seen.has(parent.toString())) return undefined;
+        seen.add(parent.toString());
+        const hit = byRef.get(parent.toString());
+        if (hit) return hit;
+        const next = replyDicts.get(parent.toString());
+        if (!next) return undefined;
+        cur = next;
+      }
+    };
+    for (const { dict, entry } of replies) {
+      const root = rootOf(dict);
+      // A reply to something we do not import stays in the file with it.
+      if (!root) continue;
+      const b = base(dict, env);
+      (root.replies ??= []).push({ id: b.id, author: b.author, text: b.comment ?? '', createdAt: b.createdAt });
       remove.add(entry as PDFRef);
       const popup = dict.get(PDFName.of('Popup'));
       if (popup instanceof PDFRef) remove.add(popup);
     }
-    if (!remove.size) return;
+    for (const a of out) a.replies?.sort((x, y) => x.createdAt - y.createdAt);
+    if (!remove.size) continue;
     const kept = annots.asArray().filter((e) => !remove.has(e as PDFRef));
     if (kept.length) page.node.set(PDFName.of('Annots'), doc.context.obj(kept));
     else page.node.delete(PDFName.of('Annots'));
-  });
+  }
   return { annotations, count };
 }

@@ -47,11 +47,17 @@ export function CommentsPanel() {
                     <span className="swatch" style={{ background: a.type === 'redact' ? '#000' : a.color }} />
                     <div className="comment-body">
                       <div className="comment-head">
-                        <b>{t(ANNOT_LABELS[a.type])}</b>
+                        <b>{a.subject ?? t(ANNOT_LABELS[a.type])}</b>
                         <span className="muted small">{a.author} · {new Date(a.createdAt).toLocaleString()}</span>
                       </div>
                       {summary && <div className="comment-text">{a.type === 'image' ? t(summary) : summary}</div>}
                       {a.comment && <div className="comment-text reply">{a.comment}</div>}
+                      {a.replies?.map((r) => (
+                        <div key={r.id} className="comment-reply">
+                          <span className="muted small">{r.author} · {new Date(r.createdAt).toLocaleString()}</span>
+                          <div className="comment-text">{r.text}</div>
+                        </div>
+                      ))}
                     </div>
                     {editable && (
                       <button className="icon-btn" title={t('Delete')} onClick={(e) => { e.stopPropagation(); useStore.getState().deleteAnnotation(pid, a.id); }}>

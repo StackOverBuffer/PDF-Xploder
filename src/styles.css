@@ -489,10 +489,13 @@ select.widget { padding: 0; }
 .modal .row input:not([type=color]):not([type=range]), .modal .row select { flex: 1; }
 .modal p { margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sig-fonts button { font-size: 22px; padding: 4px 14px; }
 .chips button.active, .tabs button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .tabs { display: flex; gap: 6px; align-items: center; }
 .sig-pad { width: 100%; height: 190px; border: 1px dashed #9aa4b5; border-radius: 8px; background: #fbfcfe; touch-action: none; cursor: crosshair; }
 .sig-typed { font-size: 40px; padding: 10px 14px !important; }
+/* Signatures are made on paper: the pad and the typing field stay light in the dark theme. */
+.sig-typed, .sig-pad { background: #fbfcfe !important; color-scheme: light; }
 .sig-upload img { max-width: 100%; max-height: 160px; margin-top: 10px; border: 1px solid var(--border); }
 .shortcuts { border-collapse: collapse; width: 100%; }
 .shortcuts td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
@@ -506,6 +509,13 @@ select.widget { padding: 0; }
 .toast-action:hover:not(:disabled) { background: rgba(127,127,127,0.25); border-color: transparent; opacity: 1; }
 /* In-app questions (instead of the browser's confirm and prompt) */
 .ask-message { margin: 0; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.comment-reply { margin: 4px 0 0 10px; padding-left: 8px; border-left: 2px solid var(--border); }
+.replies { display: flex; flex-direction: column; gap: 6px; }
+.replies > button { align-self: flex-end; }
+.reply-item { border-left: 2px solid var(--border); padding: 2px 0 2px 8px; }
+.reply-head { display: flex; align-items: center; gap: 6px; }
+.reply-head .icon-btn { margin-left: auto; padding: 2px; }
+.reply-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .prefs-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 14px 0 4px; font-weight: 600; }
 .prefs-heading:first-child { margin-top: 0; }
 .ask-field { display: flex; flex-direction: column; gap: 8px; }

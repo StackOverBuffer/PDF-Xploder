@@ -14,6 +14,7 @@ import { viewSize } from '../lib/geometry';
 import type { NewFieldKind } from '../lib/forms';
 import { useLang, useT } from '../lib/i18n';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
+import { useAppearanceImage } from '../lib/appearanceImage';
 
 interface Props {
   index: number;
@@ -158,7 +159,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     const store = useStore.getState();
     const { width: w, height: h } = stampViewSize(s, viewSize(geom));
     const rect = viewRectToPdf(geom, { left: p.x - w / 2, top: p.y - h / 2, width: w, height: h });
-    const a: Annotation = { id: uid('annot'), type: 'image', rect, rot: geom.rotation, src: s.src, color: '#000000', opacity: 1, author: store.author, createdAt: Date.now() };
+    const a: Annotation = { id: uid('annot'), type: 'image', rect, rot: geom.rotation, src: s.src, signature: s.signature, color: '#000000', opacity: 1, author: store.author, createdAt: Date.now() };
     store.addAnnotation(index, a);
     usePendingStamp.setState({ stamp: null });
     store.setTool('select');
@@ -278,11 +279,11 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   };
 
   // Pointer moves can come faster than frames: apply the latest one once per frame.
-  const pendingMove = useRef<{ clientX: number; clientY: number } | null>(null);
+  const pendingMove = useRef<{ clientX: number; clientY: number; shiftKey: boolean } | null>(null);
   const moveFrame = useRef(0);
   useEffect(() => () => cancelAnimationFrame(moveFrame.current), []);
   function onDragMove(e: RPointerEvent) {
-    pendingMove.current = { clientX: e.clientX, clientY: e.clientY };
+    pendingMove.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey };
     if (moveFrame.current) return;
     moveFrame.current = requestAnimationFrame(() => {
       moveFrame.current = 0;
@@ -291,7 +292,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     });
   }
 
-  function applyDragMove(e: { clientX: number; clientY: number }) {
+  function applyDragMove(e: { clientX: number; clientY: number; shiftKey: boolean }) {
     const d = drag.current!;
     const p = viewPt(e);
     if (!d.moved) {
@@ -306,6 +307,14 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       store.updateAnnotation(pageId, d.id, translatePatch(d.orig, a1.x - a0.x, a1.y - a0.y), { history: false });
     } else {
       const v = { ...d.orig, width: d.orig.width + p.x - d.start.x, height: d.orig.height + p.y - d.start.y };
+      // Pictures, signatures and stamps keep their proportions (Shift: freely); shapes and
+      // text boxes the other way round, as usual.
+      const keepRatio = KEEP_RATIO.has(d.annot.type) !== e.shiftKey;
+      if (keepRatio && d.orig.width > 0 && d.orig.height > 0) {
+        const k = Math.max(v.width / d.orig.width, v.height / d.orig.height, 4 / Math.min(d.orig.width, d.orig.height));
+        v.width = d.orig.width * k;
+        v.height = d.orig.height * k;
+      }
       store.updateAnnotation(pageId, d.id, resizePatch(geom, v), { history: false });
     }
   }
@@ -388,7 +397,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
           onDoubleClick={() => onDoubleClick(a)}
         >
           <AnnotShape a={a} pageId={pageId} geom={geom} scale={S} editing={editing === a.id} />
-          {a.comment || a.type === 'note' ? <title>{`${a.author}: ${a.type === 'note' ? a.text : a.comment}`}</title> : null}
+          {a.comment || a.type === 'note' || a.replies?.length ? (
+            <title>{[`${a.author}: ${a.type === 'note' ? a.text : a.comment ?? ''}`, ...(a.replies ?? []).map((r) => `↳ ${r.author}: ${r.text}`)].join('\n')}</title>
+          ) : null}
         </g>
       ))}
       {selected && <Selection a={annots.find((a) => a.id === selected)} geom={geom} scale={S} onResize={startDrag} />}
@@ -542,6 +553,9 @@ function DraftShape({ draft, tool, scale: S }: { draft: NonNullable<Draft>; tool
   return <rect className="draft draft-box" {...props} fill={tool === 'rect' ? st.fill ?? 'none' : 'rgba(30,136,229,0.08)'} stroke={tool === 'rect' ? st.color : '#1e88e5'} strokeWidth={tool === 'rect' ? st.width * S : 1} strokeDasharray={tool === 'rect' ? undefined : '4 3'} />;
 }
 
+/** Annotations whose proportions resizing keeps unless Shift is held. */
+const KEEP_RATIO = new Set<Annotation['type']>(['image', 'stamp']);
+
 function Selection({ a, geom, scale: S, onResize }: { a?: Annotation; geom: PageGeom; scale: number; onResize: (e: RPointerEvent, a: Annotation, mode: 'move' | 'resize') => void }) {
   if (!a) return null;
   const v = viewBounds(a, geom);
@@ -686,6 +700,7 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
       );
     }
     case 'stamp': {
+      if (a.appearance) return <ForeignStamp a={a} geom={geom} scale={S} />;
       const fg = frameGeom(geom, a.rot);
       const v = pdfRectToView(fg, a.rect);
       const label = a.label.toUpperCase();
@@ -707,6 +722,20 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
     }
   }
 });
+
+/** A stamp made by another program: its own drawing (rendered once), placed in the rect. */
+function ForeignStamp({ a, geom, scale }: { a: Extract<Annotation, { type: 'stamp' }>; geom: PageGeom; scale: number }) {
+  const url = useAppearanceImage(a.appearance);
+  const fg = frameGeom(geom, a.rot);
+  const v = pdfRectToView(fg, a.rect);
+  return (
+    <g opacity={a.opacity} transform={`matrix(${frameMatrix(geom, fg, scale).join(' ')})`}>
+      {/* Transparent while rendering, so it can already be picked up. */}
+      <rect x={v.left} y={v.top} width={v.width} height={v.height} fill="transparent" />
+      {url && <image href={url} x={v.left} y={v.top} width={v.width} height={v.height} preserveAspectRatio="none" />}
+    </g>
+  );
+}
 
 function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type: 'text' }>; pageId: string; scale: number; editing: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);

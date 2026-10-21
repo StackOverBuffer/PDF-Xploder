@@ -114,7 +114,8 @@ export function annotSummary(a: Annotation): string {
     case 'note':
       return a.text;
     case 'stamp':
-      return a.label;
+      // Another program's stamp: its name is the subject, shown as the heading.
+      return a.appearance ? '' : a.label;
     case 'highlight':
     case 'underline':
     case 'strikeout':

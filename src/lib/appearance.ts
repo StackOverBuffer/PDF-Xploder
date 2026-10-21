@@ -7,6 +7,7 @@ import {
   LineCapStyle,
   LineJoinStyle,
   PDFDocument,
+  PDFEmbeddedPage,
   PDFFont,
   PDFImage,
   PDFName,
@@ -17,6 +18,7 @@ import {
   degrees,
   drawEllipse,
   drawImage,
+  drawPage,
   drawRectangle,
   drawText,
   fill,
@@ -41,6 +43,7 @@ import { useLang } from './i18n';
 import { cloudEdges, cloudRadius } from './annotGeom';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { NOTE_SIZE } from './types';
+import { fromBase64 } from './foreignAppearance';
 
 /** Text shaping: how a string is split over fonts and how wide it is. */
 export interface TextEngine {
@@ -81,7 +84,7 @@ export function wrapLines(engine: TextEngine, text: string, size: number, maxWid
 export class Canvas {
   readonly ops: PDFOperator[] = [];
   private fonts = new Map<PDFFont, string>();
-  private images = new Map<PDFImage, string>();
+  private images = new Map<PDFImage | PDFEmbeddedPage, string>();
   private gstates = new Map<string, { name: string; ca: number; CA: number; BM?: string }>();
 
   private gs(opacity: number, blend?: 'Multiply'): string | undefined {
@@ -223,6 +226,18 @@ export class Canvas {
     );
   }
 
+  /** Draw an embedded page (another program's appearance) into `r`, unrotated. */
+  page(p: PDFEmbeddedPage, r: Rect, opacity: number) {
+    if (!this.images.has(p)) this.images.set(p, `Ap${this.images.size}`);
+    this.ops.push(
+      ...drawPage(this.images.get(p)!, {
+        x: r.x, y: r.y, xScale: r.w / p.width, yScale: r.h / p.height,
+        rotate: degrees(0), xSkew: degrees(0), ySkew: degrees(0),
+        graphicsState: this.gs(opacity),
+      }),
+    );
+  }
+
   /** Register the collected drawing as a Form XObject with the given bounding box. */
   toXObject(doc: PDFDocument, bbox: Rect): PDFRef {
     const ctx = doc.context;
@@ -314,7 +329,8 @@ function annotationShapeRect(a: Annotation, g: PageGeom): Rect {
     case 'ellipse':
       return pad(a.rect, a.width / 2);
     case 'stamp':
-      return pad(a.rect, 1.5);
+      // Our stamps' 3 pt frame reaches over the rect; another program's drawing fits it.
+      return a.appearance ? a.rect : pad(a.rect, 1.5);
     case 'note': {
       const v = pdfToView(g, a.at);
       return boundsOf([a.at, viewToPdf(g, { x: v.x + NOTE_SIZE, y: v.y + NOTE_SIZE })]);
@@ -332,6 +348,8 @@ export interface DrawContext {
   bold: TextEngine;
   /** Embedded images, cached by data URL. */
   images: Map<string, PDFImage>;
+  /** Embedded stamp appearances (see StampAnnot.appearance), cached by their data. */
+  pages?: Map<string, PDFEmbeddedPage>;
 }
 
 function dataUrlBytes(src: string): { bytes: Uint8Array; png: boolean } {
@@ -430,6 +448,16 @@ export async function buildAppearance(
       break;
     }
     case 'stamp': {
+      if (a.appearance) {
+        ctx.pages ??= new Map();
+        let p = ctx.pages.get(a.appearance);
+        if (!p) {
+          [p] = await ctx.doc.embedPdf(fromBase64(a.appearance), [0]);
+          ctx.pages.set(a.appearance, p);
+        }
+        c.page(p, a.rect, op);
+        break;
+      }
       const fg = frameGeom(g, a.rot);
       const v = pdfRectToView(fg, a.rect);
       c.rect(a.rect, { stroke: a.color, width: 3, opacity: op });

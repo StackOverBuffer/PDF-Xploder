@@ -24,6 +24,14 @@ export interface PageGeom {
   pageRotation?: number;
 }
 
+/** An answer to a comment, in its thread (a /Text annotation with /IRT in the file). */
+export interface Reply {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: number;
+}
+
 interface AnnotBase {
   id: string;
   color: string;
@@ -32,6 +40,10 @@ interface AnnotBase {
   createdAt: number;
   /** Optional comment attached to any annotation. */
   comment?: string;
+  /** The title other editors give a comment (/Subj, e.g. a stamp's name), kept as is. */
+  subject?: string;
+  /** Answers to the comment, oldest first. */
+  replies?: Reply[];
 }
 
 /**
@@ -112,6 +124,13 @@ export interface StampAnnot extends AnnotBase, Oriented {
   type: 'stamp';
   rect: Rect;
   label: string;
+  /**
+   * A stamp made by another program: its own drawing, as a one-page PDF (base64)
+   * that is drawn into the rect, on screen and when saving. Without it the label is drawn.
+   */
+  appearance?: string;
+  /** The stamp's /Name in that program (kept for round trips). */
+  name?: string;
 }
 
 export interface RedactAnnot extends AnnotBase {
