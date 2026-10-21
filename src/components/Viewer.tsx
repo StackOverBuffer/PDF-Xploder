@@ -291,18 +291,23 @@ export function Viewer() {
     sel.removeAllRanges();
   };
 
-  // Hand tool: drag to pan.
-  const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  // Hand tool: drag to pan. The pointer is captured only once it moves, so a plain click
+  // still reaches links and form fields under it (capture would send the click to the viewer).
+  const pan = useRef<{ x: number; y: number; left: number; top: number; captured: boolean } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
     if (tool !== 'hand' && e.button !== 1) return;
     const el = ref.current!;
-    pan.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
-    el.setPointerCapture(e.pointerId);
+    pan.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, captured: false };
     e.preventDefault();
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!pan.current) return;
     const el = ref.current!;
+    if (!pan.current.captured) {
+      if (Math.abs(e.clientX - pan.current.x) + Math.abs(e.clientY - pan.current.y) < 4) return;
+      el.setPointerCapture(e.pointerId);
+      pan.current.captured = true;
+    }
     el.scrollLeft = pan.current.left - (e.clientX - pan.current.x);
     el.scrollTop = pan.current.top - (e.clientY - pan.current.y);
   };
