@@ -140,6 +140,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Import/Export Form Data (FDF/XFDF/XML/CSV), Use CSV Files to Populate Forms | ⬜ |
 | Email Form Data | ⬜ |
 | Calculate / Validate Values (JavaScript) | ⬜ |
+| Field Tab Order | ⬜ |
 
 ## 8. User interface
 
@@ -185,6 +186,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Font Replacement | 🟡 change the font of text objects |
 | Enhanced Colour Options for Objects | 🟡 fill/stroke colours |
 | Text List Formatting, Tab Stops, Overtype | ⬜ |
+| Paragraph editing with reflow across lines, editing inside form XObjects, editing path points, convert text to curves | ⬜ |
 | Paste Copied Text as Plain Text / Paste Options | 🟡 paste objects, paste in place |
 | Crop Pages, Partial Cropping, Crop to White Margins | ✅ |
 | Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ (also copy pages between open documents by dragging thumbnails onto another tab) |
@@ -252,7 +254,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Open Documents from a URL | ⬜ (works for servers that allow CORS) |
 | Optimize Documents | ⬜ |
 | Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
-| Autoscroll, Playback, Page Transitions | ⬜ |
+| Autoscroll, Playback, Page Transitions, Full-Screen Mode | ⬜ |
 | Split the Page View, Spreadsheet Split | ⬜ |
 | Loupe Tool, Pan and Zoom Pane | ⬜ |
 | Zoom Features | ✅ zoom box, presets, fit width/page, Zoom tool, rotate view |
@@ -298,7 +300,8 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 
 | Feature | Status |
 |---|---|
-| Add Digital Signatures | ✅ |
+| Add Digital Signatures | ✅ certificates from .p12/.pfx, visible or invisible, as incremental updates; ⬜ signing password-protected files |
+| Validate Signatures | 🟡 integrity, signature and coverage are checked; ⬜ signer identity against trusted certificates (trust list, revocation) |
 | Password Protection (AES-256/128) and Permissions | ✅ |
 | Customize Security Options | ✅ |
 | Certify Documents (with or without a visible signature) | ⬜ |
