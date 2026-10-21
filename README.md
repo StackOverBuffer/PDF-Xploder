@@ -84,6 +84,7 @@ instead. These files are left out of the offline cache.
 | Layer | Where | What |
 | --- | --- | --- |
 | Rendering | `src/lib/pdfjs.ts`, `src/components/PageView.tsx` | [pdf.js](https://mozilla.github.io/pdf.js/) renders pages to canvas plus a selectable text layer. Pages are rendered lazily as they scroll into view. |
+| Background drawing | `src/lib/render/` | Documents whose pages are slow to draw (plans, maps) get a second pdf.js instance in a worker that paints into an `OffscreenCanvas`; pictures come back as `ImageBitmap`s. Pages that need SVG filters (luminosity soft masks, transfer functions) are drawn on the main thread. Experimental, can be turned off in Preferences. |
 | Editing | `src/lib/pdfOps.ts` | [@cantoo/pdf-lib](https://github.com/cantoo-scribe/pdf-lib) (a maintained pdf-lib fork with encryption and incremental saving) implements every document change as `bytes → bytes`: page operations, watermarks, headers/footers, metadata, forms and annotation export. DOM-free and unit-tested. |
 | Annotations I/O | `src/lib/appearance.ts`, `src/lib/annotIO.ts` | Every annotation gets an appearance stream. Saving writes native PDF annotations (`/Highlight`, `/Ink`, `/FreeText`, …); flattening paints the same appearance into the page. On open, supported annotations from any producer are imported for editing. |
 | Fonts | `src/lib/fonts.ts`, `src/lib/subset.ts` | Added text uses a Noto fallback stack (Noto Sans and Symbols 2 bundled; CJK fetched on demand), subset with HarfBuzz `hb-subset` (WebAssembly). |
@@ -112,6 +113,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 
 ### View & navigate
 - Continuous scrolling, lazy page rendering, HiDPI canvases
+- Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth while they draw (experimental; File → Preferences; uses more memory)
 - Zoom in/out, presets, fit width, fit page, Ctrl+wheel zoom
 - Hand (pan), Select Text and Edit Comments tools, text selection & copy
 - Snapshot tool: drag a box to copy that part of the page (with comments) to the clipboard as an image; copy/save a whole page as an image

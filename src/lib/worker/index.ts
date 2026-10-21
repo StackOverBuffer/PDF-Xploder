@@ -10,7 +10,8 @@ import * as realSec from '../security';
 import * as realContent from '../content/ops';
 import * as realDb from '../sessionDb';
 import { useLang } from '../i18n';
-import { MISSING_REF, REF, type Reply, type WorkerModule } from './protocol';
+import { MISSING_REF, REF, type Reply, type ShareRequest, type WorkerModule } from './protocol';
+import { setDocumentSharer } from '../render/offscreen';
 
 /** Functions that take and return plain data (bytes, numbers, plain objects) and do real work. */
 const IN_WORKER: Record<WorkerModule, Set<string>> = {
@@ -125,6 +126,36 @@ export const org = routed('org', realOrg);
 export const sec = routed('sec', realSec);
 export const content = routed('content', realContent);
 export const db = routed('db', realDb);
+
+/**
+ * Send a document the worker holds to `port` (another thread), copied there instead of
+ * here. False when the worker does not hold it.
+ */
+function shareDocument(bytes: Uint8Array, port: MessagePort): boolean {
+  const k = keyOf.get(bytes);
+  if (!worker || !k || !workerHas.has(k)) return false;
+  const req: ShareRequest = { share: k };
+  worker.postMessage(req, [port]);
+  return true;
+}
+setDocumentSharer(shareDocument);
+
+/**
+ * A copy of a big document the worker holds, made there: pdf.js takes the bytes it is
+ * given (see openPdf), and copying a big file here blocks this thread for a moment.
+ * Null when the worker does not hold it, or for small files (not worth the hop).
+ */
+export function copyFromWorker(bytes: Uint8Array): Promise<Uint8Array | null> {
+  if (bytes.byteLength < 8_000_000) return Promise.resolve(null);
+  const channel = new MessageChannel();
+  if (!shareDocument(bytes, channel.port1)) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    channel.port2.onmessage = (e: MessageEvent<Uint8Array | null>) => {
+      channel.port2.close();
+      resolve(e.data);
+    };
+  });
+}
 
 /** Start the worker ahead of time (when the browser is idle), so the first operation does not wait for it to load. */
 export function warmUpWorker() {

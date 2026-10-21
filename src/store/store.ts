@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
+import { inheritOffscreen } from '../lib/render/offscreen';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
-import { ops as opsW, sec as secW } from '../lib/worker';
+import { copyFromWorker, ops as opsW, sec as secW } from '../lib/worker';
 import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
@@ -373,10 +374,16 @@ const running: { label: string }[] = [];
 export const useStore = create<Store>()((set, get) => {
   async function loadPdfJs(bytes: Uint8Array, knownPassword?: string, viewRotation = get().viewRotation) {
     let tries = 0;
-    const { pdf, password } = await openPdf(bytes, (retry) => {
-      if (knownPassword !== undefined && tries++ === 0) return knownPassword;
-      return askText({ title: 'Password', message: tr(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'), password: true, ok: 'Open' });
-    });
+    // A big file is usually held by the editing worker too: it makes pdf.js's copy.
+    const copy = await copyFromWorker(bytes);
+    const { pdf, password } = await openPdf(
+      bytes,
+      (retry) => {
+        if (knownPassword !== undefined && tries++ === 0) return knownPassword;
+        return askText({ title: 'Password', message: tr(retry ? 'Incorrect password. Try again:' : 'This document is password protected. Enter password:'), password: true, ok: 'Open' });
+      },
+      { copy },
+    );
     const geoms = withViewRotation(await pageGeoms(pdf), viewRotation);
     return { pdf, geoms, password };
   }
@@ -419,6 +426,7 @@ export const useStore = create<Store>()((set, get) => {
       const { pdf, geoms } = await loadPdfJs(snap.bytes);
       // Read the state after loading: it may have changed meanwhile.
       const cur = get();
+      inheritOffscreen(cur.pdf, pdf);
       if (cur.pdf !== pdf) cur.pdf?.destroy();
       doc = { pdf, geoms, bytes: snap.bytes, docVersion: cur.docVersion + 1 };
     }
@@ -802,6 +810,7 @@ export const useStore = create<Store>()((set, get) => {
       const { pdf, geoms } = await loadPdfJs(bytes);
       // Read the state after loading, so changes made meanwhile are kept.
       const s = get();
+      inheritOffscreen(s.pdf, pdf);
       const ids = pageIds ?? s.pageIds;
       if (ids.length !== geoms.length) {
         pdf.destroy();

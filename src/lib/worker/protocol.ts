@@ -5,6 +5,11 @@ export const REF = '__workerRef';
 /** The error when the worker no longer holds a referenced document. */
 export const MISSING_REF = 'missing-ref';
 
+/** Send the document held as `share` to the port passed along (the bytes, or null if no longer held). */
+export interface ShareRequest {
+  share: string;
+}
+
 export interface Reply {
   id: number;
   ok: boolean;

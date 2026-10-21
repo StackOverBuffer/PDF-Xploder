@@ -8,7 +8,7 @@ import * as sec from '../security';
 import * as content from '../content/ops';
 import * as db from '../sessionDb';
 import { useLang, type Lang } from '../i18n';
-import { MISSING_REF, REF, transferables, type Reply, type WorkerModule } from './protocol';
+import { MISSING_REF, REF, transferables, type Reply, type ShareRequest, type WorkerModule } from './protocol';
 
 const modules: Record<WorkerModule, Record<string, unknown>> = { ops, org, sec, content, db };
 
@@ -29,7 +29,16 @@ function hold(key: string, bytes: Uint8Array) {
 
 const post = (r: Reply, transfer: ArrayBuffer[] = []) => (self as unknown as Worker).postMessage(r, transfer);
 
-self.onmessage = async (e: MessageEvent<{ id: number; mod: WorkerModule; fn: string; args: unknown[]; keys: Record<number, string>; lang: Lang }>) => {
+self.onmessage = async (e: MessageEvent<{ id: number; mod: WorkerModule; fn: string; args: unknown[]; keys: Record<number, string>; lang: Lang } | ShareRequest>) => {
+  if ('share' in e.data) {
+    // Another thread wants a copy of a document held here: made on this thread and handed
+    // over (a plain postMessage would copy it again where it arrives).
+    const [port] = e.ports;
+    const copy = held.get(e.data.share)?.slice() ?? null;
+    port.postMessage(copy, copy ? [copy.buffer] : []);
+    port.close();
+    return;
+  }
   const { id, mod, fn, keys, lang } = e.data;
   try {
     const args = e.data.args.map((a, i) => {

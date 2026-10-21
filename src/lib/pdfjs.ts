@@ -3,6 +3,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import type { PageGeom, Rect } from './types';
 import { normRot } from './geometry';
+import { rememberSource } from './render/offscreen';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 /**
@@ -39,11 +40,15 @@ const ASSETS =
 export async function openPdf(
   bytes: Uint8Array,
   askPassword: (retry: boolean) => string | null | Promise<string | null>,
-  /** The caller no longer needs `bytes` (a throwaway document): hand them over without copying. */
-  opts: { handOver?: boolean } = {},
+  /**
+   * handOver: the caller no longer needs `bytes` (a throwaway document): hand them over
+   * without copying. copy: a copy of `bytes` made elsewhere, for pdf.js to take.
+   */
+  opts: { handOver?: boolean; copy?: Uint8Array | null } = {},
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
-  const task = pdfjs.getDocument({ data: opts.handOver ? bytes : bytes.slice(), isEvalSupported: false, worker: worker(), ...ASSETS });
+  const data = opts.handOver ? bytes : opts.copy ?? bytes.slice();
+  const task = pdfjs.getDocument({ data, isEvalSupported: false, worker: worker(), ...ASSETS });
   task.onPassword = async (update: (pw: string) => void, reason: number) => {
     const pw = await askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {
@@ -55,6 +60,8 @@ export async function openPdf(
   };
   try {
     const pdf = await task.promise;
+    // Kept for drawing slow pages in the background (render/offscreen.ts); not copied.
+    if (!opts.handOver) rememberSource(pdf, bytes, password);
     return { pdf, password };
   } catch (e) {
     if (password === undefined && (e as Error)?.name === 'PasswordException') throw new PasswordCancelled();

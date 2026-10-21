@@ -16,6 +16,7 @@ export function PrefsDialog({ close }: { close: () => void }) {
   const author = useStore((s) => s.author);
   const zoom = usePrefs((p) => p.defaultZoom);
   const session = useSession((x) => x.enabled);
+  const background = usePrefs((p) => p.backgroundDrawing);
   return (
     <Modal title={t('Preferences')} onClose={close} footer={<button className="primary" onClick={close}>{t('Close')}</button>}>
       <h3 className="prefs-heading">{t('Appearance')}</h3>
@@ -44,6 +45,9 @@ export function PrefsDialog({ close }: { close: () => void }) {
         <input value={author} onChange={(e) => useStore.getState().setAuthor(e.target.value)} />
       </label>
       <label className="row"><input type="checkbox" style={NOFLEX} checked={session} onChange={(e) => void setSessionEnabled(e.target.checked)} /> {t('Restore open documents at the next start')}</label>
+      <label className="row" title={t('Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth. Uses more memory.')}>
+        <input type="checkbox" style={NOFLEX} checked={background !== 'off'} onChange={(e) => setPrefs({ backgroundDrawing: e.target.checked ? 'auto' : 'off' })} /> {t('Draw complex pages in the background (experimental)')}
+      </label>
       <h3 className="prefs-heading">{t('Window')}</h3>
       <div className="row">
         <span className="muted small" style={{ flex: 1 }}>{t('Pane widths, open panes and the ribbon tab are remembered.')}</span>

@@ -14,10 +14,15 @@ export interface Prefs {
   propsWidth: number;
   /** The ribbon tab shown last (File is never remembered). */
   ribbonTab: string;
+  /**
+   * Draw pages in a background thread (render/offscreen.ts): 'auto' for documents slow to
+   * draw, 'off', or 'always' (every document; for testing, not offered in the interface).
+   */
+  backgroundDrawing: 'auto' | 'off' | 'always';
 }
 
 const KEY = 'pdf-xploder.prefs';
-export const DEFAULT_PREFS: Prefs = { defaultZoom: 'width', showProps: true, sidebarWidth: 240, propsWidth: 250, ribbonTab: 'Home' };
+export const DEFAULT_PREFS: Prefs = { defaultZoom: 'width', showProps: true, sidebarWidth: 240, propsWidth: 250, ribbonTab: 'Home', backgroundDrawing: 'auto' };
 
 export const PANE_MIN = 180;
 export const PANE_MAX = 520;

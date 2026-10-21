@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { PRIORITY, renderSlot } from '../lib/renderQueue';
+import { PRIORITY } from '../lib/renderQueue';
 import { docKey, keepCanvas, takeCanvas } from '../lib/pageCache';
+import { drawPage } from '../lib/render/draw';
 import { RotateCcw, RotateCw, Trash2, FilePlus2, Copy, FileOutput } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -75,33 +76,25 @@ const Thumb = memo(function Thumb({ index, root }: { index: number; root: HTMLEl
     if (kept) return swap(kept);
     let cancelled = false;
     let task: { cancel(): void } | null = null;
-    // The pages in the main view come first.
-    const slot = renderSlot(PRIORITY.thumbnail);
     (async () => {
       try {
-        await slot.ready;
-        if (cancelled) return;
         const page = await pdf.getPage(index + 1);
         if (cancelled) return;
-        const viewport = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 1.5), rotation: geom.rotation });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        const t = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport });
-        task = t;
-        await t.promise;
-        if (cancelled) return;
+        const at = { scale: scale * Math.min(window.devicePixelRatio || 1, 1.5), rotation: geom.rotation };
+        const viewport = page.getViewport(at);
+        // The pages in the main view come first.
+        const draw = drawPage(pdf, page, at, { width: Math.floor(viewport.width), height: Math.floor(viewport.height) }, { priority: PRIORITY.thumbnail });
+        task = draw;
+        const canvas = await draw.promise;
+        if (cancelled || !canvas) return;
         swap(canvas);
       } catch {
         /* cancelled */
-      } finally {
-        slot.done();
       }
     })();
     return () => {
       cancelled = true;
       task?.cancel();
-      slot.done();
     };
   }, [inView, pdf, docVersion, index, scale, geom.rotation, opening]);
 

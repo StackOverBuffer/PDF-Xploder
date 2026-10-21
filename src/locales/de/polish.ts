@@ -59,6 +59,10 @@ const DE: Record<string, string> = {
   Undo: 'Rückgängig',
   'Deleted {n} page(s).': '{n} Seite(n) gelöscht.',
   'Deleted {n} blank page(s): {pages}.': '{n} leere Seite(n) gelöscht: {pages}.',
+  // preferences: background drawing
+  'Draw complex pages in the background (experimental)': 'Aufwendige Seiten im Hintergrund zeichnen (experimentell)',
+  'Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth. Uses more memory.':
+    'Aufwendige Seiten (Pläne, Karten) werden in einem Hintergrund-Thread gezeichnet, damit Blättern und Zoomen flüssig bleiben. Braucht mehr Speicher.',
 };
 
 export default DE;

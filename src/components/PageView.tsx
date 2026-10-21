@@ -1,16 +1,17 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AnnotationMode, TextLayer } from 'pdfjs-dist';
+import { TextLayer } from 'pdfjs-dist';
 import { useStore } from '../store/store';
 import { viewSize } from '../lib/geometry';
 import { AnnotationLayer } from './AnnotationLayer';
 import { WidgetLayer } from './WidgetLayer';
 import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
-import { PRIORITY, renderSlot } from '../lib/renderQueue';
+import { PRIORITY } from '../lib/renderQueue';
 import { docKey, keepCanvas, takeCanvas } from '../lib/pageCache';
 import { TextBoxLayer } from './TextBoxSelect';
 import { useContextMenu } from './Menu';
 import { pageMenu } from './contextMenus';
+import { drawPage } from '../lib/render/draw';
 
 /** Upper bound for a page canvas, as in pdf.js's viewer (2^24 pixels). */
 const MAX_CANVAS_PIXELS = 16777216;
@@ -121,7 +122,6 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
     let cancelled = false;
     let renderTask: { cancel(): void } | null = null;
     let building: TextLayer | null = null;
-    let endMain = () => {};
     (async () => {
       try {
         // Re-rendering an already drawn page (zoom, edits): wait until the zoom settles;
@@ -133,30 +133,20 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
         const page = await pdf.getPage(index + 1);
         if (cancelled) return;
         if (drawCanvas) {
-          const slot = renderSlot(PRIORITY.page);
-          endMain = slot.done;
-          await slot.ready;
-          if (cancelled) return;
           // Like pdf.js's viewer, limit the canvas size: huge canvases (high zoom on a
           // high-density screen) are slow to draw and can exhaust the browser's memory.
           const css = page.getViewport({ scale, rotation: geom.rotation });
           const outScale = Math.min(dpr, Math.sqrt(MAX_CANVAS_PIXELS / (css.width * css.height)));
           const viewport = page.getViewport({ scale: scale * outScale, rotation: geom.rotation });
           // Render into a fresh canvas and swap it in when done, so zooming does not flash white.
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          canvas.className = 'page-canvas';
           // Form fields are drawn as live HTML controls by WidgetLayer, so leave them off the canvas.
-          const task = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
-          renderTask = task;
-          await task.promise;
-          if (cancelled) {
-            canvas.width = canvas.height = 0;
-            return;
-          }
+          const size = { width: Math.floor(viewport.width), height: Math.floor(viewport.height) };
+          const draw = drawPage(pdf, page, { scale: scale * outScale, rotation: geom.rotation }, size, { priority: PRIORITY.page, noForms: true });
+          renderTask = draw;
+          const canvas = await draw.promise;
+          if (cancelled || !canvas) return;
+          canvas.className = 'page-canvas';
           swap(canvas);
-          endMain();
         }
         const textDiv = textRef.current;
         if (!textDiv) return;
@@ -187,15 +177,12 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
         renderedText.current = textKey;
       } catch (e) {
         if ((e as Error)?.name !== 'RenderingCancelledException' && !cancelled) console.error(e);
-      } finally {
-        endMain();
       }
     })();
     return () => {
       cancelled = true;
       renderTask?.cancel();
       building?.cancel();
-      endMain();
     };
   }, [pdf, docVersion, index, scale, visible, geom.rotation, opening, dpr]);
 
@@ -228,29 +215,24 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
       return clip({ left: v.left - v.width * k, top: v.top - v.height * k, width: v.width * (1 + 2 * k), height: v.height * (1 + 2 * k) }, w, h) ?? v;
     };
     const render = async (box: Box) => {
-      const slot = renderSlot(PRIORITY.page);
       let task: { cancel(): void } | null = null;
       let given = false;
-      inFlight = { box, cancel: () => { given = true; task?.cancel(); slot.done(); } };
-      const canvas = document.createElement('canvas');
+      inFlight = { box, cancel: () => { given = true; task?.cancel(); } };
+      let canvas: HTMLCanvasElement | null = null;
       try {
-        await slot.ready;
-        if (disposed || given) return;
         const page = await pdf.getPage(index + 1);
         if (disposed || given) return;
         const k = dpr;
-        const viewport = page.getViewport({ scale: scale * k, rotation: geom.rotation, offsetX: -box.left * k, offsetY: -box.top * k });
-        canvas.width = Math.ceil(box.width * k);
-        canvas.height = Math.ceil(box.height * k);
-        canvas.className = 'page-detail';
-        Object.assign(canvas.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
-        const t = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
-        task = t;
-        await t.promise;
-        if (disposed || given) {
-          canvas.width = canvas.height = 0;
+        const at = { scale: scale * k, rotation: geom.rotation, offsetX: -box.left * k, offsetY: -box.top * k };
+        const draw = drawPage(pdf, page, at, { width: Math.ceil(box.width * k), height: Math.ceil(box.height * k) }, { priority: PRIORITY.page, noForms: true });
+        task = draw;
+        canvas = await draw.promise;
+        if (disposed || given || !canvas) {
+          if (canvas) canvas.width = canvas.height = 0;
           return;
         }
+        canvas.className = 'page-detail';
+        Object.assign(canvas.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
         host.appendChild(canvas);
         pieces.push({ box, canvas });
         while (pieces.length > DETAIL_PIECES) {
@@ -259,10 +241,9 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
           old.canvas.width = old.canvas.height = 0;
         }
       } catch (e) {
-        canvas.width = canvas.height = 0;
+        if (canvas) canvas.width = canvas.height = 0;
         if ((e as Error)?.name !== 'RenderingCancelledException' && !disposed && !given) console.error(e);
       } finally {
-        slot.done();
         if (inFlight?.box === box) inFlight = null;
       }
       // The view may have moved on meanwhile.
