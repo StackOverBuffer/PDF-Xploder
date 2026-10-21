@@ -34,8 +34,10 @@ interface Box {
   width: number;
   height: number;
 }
-/** Extra area drawn around the visible part, so small scrolls need no new detail render. */
-const DETAIL_MARGIN = 300;
+/** Pixel budget of one sharp piece of a zoomed-in page, and how many pieces are kept. */
+const DETAIL_PIXELS = 12_000_000;
+const DETAIL_PIECES = 3;
+const overlaps = (a: Box, b: Box) => a.left < b.left + b.width && b.left < a.left + a.width && a.top < b.top + b.height && b.top < a.top + a.height;
 const contains = (a: Box, b: Box) => b.left >= a.left - 1 && b.top >= a.top - 1 && b.left + b.width <= a.left + a.width + 1 && b.top + b.height <= a.top + a.height + 1;
 function clip(b: Box, w: number, h: number): Box | null {
   const left = Math.max(0, Math.floor(b.left));
@@ -198,81 +200,104 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   }, [pdf, docVersion, index, scale, visible, geom.rotation, opening, dpr]);
 
   // Zoomed far into a big page (plans, maps): the page canvas is capped (see MAX_CANVAS_PIXELS),
-  // so the visible part gets a second, full-resolution canvas, as in pdf.js's viewer.
+  // so the area around the view gets sharp pieces of its own, as in pdf.js's viewer. Each
+  // piece costs about a whole-page render for complex drawings, so pieces are large, a
+  // render in progress is not given up while panning nearby, and the last few are kept.
   const capped = w * h * dpr * dpr > MAX_CANVAS_PIXELS;
-  const [region, setRegion] = useState<Box | null>(null);
-  const drawn = useRef<Box | null>(null);
-  useLayoutEffect(() => {
-    // A detail drawn for another zoom level no longer fits.
-    detailHost.current?.replaceChildren();
-    drawn.current = null;
-    setRegion(null);
-  }, [scale, docVersion, geom.rotation]);
   useEffect(() => {
-    if (!visible || !capped) return;
+    const host = detailHost.current;
+    host?.replaceChildren();
+    if (!visible || !capped || !pdf || opening || !host) return;
     const el = pageRef.current;
     const viewer = el?.closest<HTMLElement>('.viewer');
     if (!el || !viewer) return;
-    let timer = 0;
-    const update = () => {
-      clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const pr = el.getBoundingClientRect();
-        const vr = viewer.getBoundingClientRect();
-        const seen = clip({ left: vr.left - pr.left, top: vr.top - pr.top, width: vr.width, height: vr.height }, w, h);
-        if (!seen) return;
-        // Still inside what was drawn: nothing to do.
-        if (drawn.current && contains(drawn.current, seen)) return;
-        setRegion(clip({ left: seen.left - DETAIL_MARGIN, top: seen.top - DETAIL_MARGIN, width: seen.width + 2 * DETAIL_MARGIN, height: seen.height + 2 * DETAIL_MARGIN }, w, h));
-      }, 150);
+    let disposed = false;
+    const pieces: { box: Box; canvas: HTMLCanvasElement }[] = [];
+    let inFlight: { box: Box; cancel(): void } | null = null;
+
+    const seen = () => {
+      const pr = el.getBoundingClientRect();
+      const vr = viewer.getBoundingClientRect();
+      return clip({ left: vr.left - pr.left, top: vr.top - pr.top, width: vr.width, height: vr.height }, w, h);
     };
-    update();
-    viewer.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      clearTimeout(timer);
-      viewer.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
+    /** The view plus up to half a view on every side, as far as the pixel budget allows. */
+    const around = (v: Box): Box => {
+      const budget = DETAIL_PIXELS / (dpr * dpr);
+      let k = 0.5;
+      while (k > 0.05 && (v.width * (1 + 2 * k)) * (v.height * (1 + 2 * k)) > budget) k *= 0.8;
+      return clip({ left: v.left - v.width * k, top: v.top - v.height * k, width: v.width * (1 + 2 * k), height: v.height * (1 + 2 * k) }, w, h) ?? v;
     };
-  }, [visible, capped, scale, w, h, docVersion]);
-  useEffect(() => {
-    if (!region || !pdf || opening || !visible) return;
-    let cancelled = false;
-    let task: { cancel(): void } | null = null;
-    const slot = renderSlot(PRIORITY.page);
-    (async () => {
+    const render = async (box: Box) => {
+      const slot = renderSlot(PRIORITY.page);
+      let task: { cancel(): void } | null = null;
+      let given = false;
+      inFlight = { box, cancel: () => { given = true; task?.cancel(); slot.done(); } };
+      const canvas = document.createElement('canvas');
       try {
         await slot.ready;
-        if (cancelled) return;
+        if (disposed || given) return;
         const page = await pdf.getPage(index + 1);
-        if (cancelled) return;
+        if (disposed || given) return;
         const k = dpr;
-        const viewport = page.getViewport({ scale: scale * k, rotation: geom.rotation, offsetX: -region.left * k, offsetY: -region.top * k });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(region.width * k);
-        canvas.height = Math.ceil(region.height * k);
+        const viewport = page.getViewport({ scale: scale * k, rotation: geom.rotation, offsetX: -box.left * k, offsetY: -box.top * k });
+        canvas.width = Math.ceil(box.width * k);
+        canvas.height = Math.ceil(box.height * k);
         canvas.className = 'page-detail';
-        Object.assign(canvas.style, { left: `${region.left}px`, top: `${region.top}px`, width: `${region.width}px`, height: `${region.height}px` });
+        Object.assign(canvas.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
         const t = page.render({ canvasContext: canvas.getContext('2d', { alpha: false })!, viewport, annotationMode: AnnotationMode.ENABLE_FORMS });
         task = t;
         await t.promise;
-        if (cancelled) return;
-        const old = detailHost.current?.firstChild;
-        detailHost.current?.replaceChildren(canvas);
-        if (old instanceof HTMLCanvasElement) old.width = old.height = 0;
-        drawn.current = region;
+        if (disposed || given) {
+          canvas.width = canvas.height = 0;
+          return;
+        }
+        host.appendChild(canvas);
+        pieces.push({ box, canvas });
+        while (pieces.length > DETAIL_PIECES) {
+          const old = pieces.shift()!;
+          old.canvas.remove();
+          old.canvas.width = old.canvas.height = 0;
+        }
       } catch (e) {
-        if ((e as Error)?.name !== 'RenderingCancelledException' && !cancelled) console.error(e);
+        canvas.width = canvas.height = 0;
+        if ((e as Error)?.name !== 'RenderingCancelledException' && !disposed && !given) console.error(e);
       } finally {
         slot.done();
+        if (inFlight?.box === box) inFlight = null;
       }
-    })();
-    return () => {
-      cancelled = true;
-      task?.cancel();
-      slot.done();
+      // The view may have moved on meanwhile.
+      if (!disposed) check();
     };
-  }, [region, pdf, opening, visible, index, scale, geom.rotation, dpr]);
+    const check = () => {
+      if (disposed) return;
+      const v = seen();
+      if (!v || pieces.some((p) => contains(p.box, v))) return;
+      if (inFlight) {
+        // Keep a render that still covers part of the view; give up one the view has left.
+        if (overlaps(inFlight.box, v)) return;
+        inFlight.cancel();
+        inFlight = null;
+      }
+      void render(around(v));
+    };
+    let timer = 0;
+    // Checked while panning (not only once it stops): sharp areas fill in as you move.
+    const onScroll = () => {
+      if (!timer) timer = window.setTimeout(() => ((timer = 0), check()), 80);
+    };
+    check();
+    viewer.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      viewer.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      inFlight?.cancel();
+      for (const p of pieces) p.canvas.width = p.canvas.height = 0;
+      host.replaceChildren();
+    };
+  }, [visible, capped, pdf, opening, index, scale, geom.rotation, dpr, w, h, docVersion]);
 
   return (
     <div
