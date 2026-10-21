@@ -19,6 +19,9 @@ export function loadLanguage(lang: Lang): Promise<void> {
 }
 
 function initialLang(): Lang {
+  // A link can ask for a language (?lang=de): search engines index each language that way.
+  const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('lang') : null;
+  if (asked === 'en' || asked === 'de') return asked;
   try {
     const saved = localStorage.getItem('awesome-pdf.lang');
     if (saved === 'en' || saved === 'de') return saved;

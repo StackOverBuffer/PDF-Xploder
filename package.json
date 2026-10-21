@@ -3,7 +3,37 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "A browser-based PDF editor inspired by PDF-XChange Editor",
+  "description": "Free PDF editor that runs in the browser: annotate, organise, fill, sign, OCR, redact and protect PDFs without uploading them. Inspired by PDF-XChange Editor.",
+  "keywords": [
+    "pdf",
+    "pdf-editor",
+    "pdf-viewer",
+    "online-pdf-editor",
+    "pdf-annotation",
+    "pdf-forms",
+    "pdf-signature",
+    "digital-signature",
+    "ocr",
+    "redaction",
+    "pdf-merge",
+    "pdf-split",
+    "offline",
+    "pwa",
+    "browser",
+    "react",
+    "pdfjs",
+    "pdf-lib",
+    "pdf-xchange",
+    "acrobat-alternative"
+  ],
+  "homepage": "https://stackoverbuffer.github.io/PDF-Xploder/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StackOverBuffer/PDF-Xploder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/StackOverBuffer/PDF-Xploder/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -p . && vite build",

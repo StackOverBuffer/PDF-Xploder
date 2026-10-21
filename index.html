@@ -4,18 +4,79 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1a5fb4" />
-    <meta name="description" content="View, annotate, organise, fill and sign PDFs in your browser. Files never leave your device." />
+    <meta name="description" content="Edit, annotate, organise, fill, sign, OCR and protect PDFs for free, right in your browser. No upload, no account: files never leave your device. Works offline." />
+    <link rel="canonical" href="https://stackoverbuffer.github.io/PDF-Xploder/" />
+    <link rel="alternate" hreflang="en" href="https://stackoverbuffer.github.io/PDF-Xploder/" />
+    <link rel="alternate" hreflang="de" href="https://stackoverbuffer.github.io/PDF-Xploder/?lang=de" />
+    <link rel="alternate" hreflang="x-default" href="https://stackoverbuffer.github.io/PDF-Xploder/" />
+    <!-- Link previews (chat apps, social networks) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PDF-Xploder" />
+    <meta property="og:title" content="PDF-Xploder – Free PDF Editor in Your Browser" />
+    <meta property="og:description" content="Annotate, organise, fill, sign, OCR, redact and password-protect PDFs. No upload, no account, works offline." />
+    <meta property="og:url" content="https://stackoverbuffer.github.io/PDF-Xploder/" />
+    <meta property="og:image" content="https://stackoverbuffer.github.io/PDF-Xploder/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="PDF-Xploder: a PDF with a highlight, a stamp and drawn comments in the browser-based editor" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="de_DE" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Search engines: a free web application -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PDF-Xploder",
+        "url": "https://stackoverbuffer.github.io/PDF-Xploder/",
+        "description": "Free PDF editor that runs entirely in the browser: annotate, organise pages, fill and design forms, sign, OCR, redact and password-protect PDFs. Files are never uploaded.",
+        "applicationCategory": "BusinessApplication",
+        "applicationSubCategory": "PDF editor",
+        "operatingSystem": "Any (web browser: Chrome, Edge, Firefox, Safari)",
+        "browserRequirements": "Requires JavaScript",
+        "inLanguage": ["en", "de"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+        "image": "https://stackoverbuffer.github.io/PDF-Xploder/og-image.jpg",
+        "screenshot": "https://stackoverbuffer.github.io/PDF-Xploder/og-image.jpg",
+        "featureList": [
+          "Highlight, underline, strikeout, drawings, text boxes, sticky notes and stamps",
+          "Insert, delete, extract, split, merge, rotate, crop and reorder pages",
+          "Fill and create PDF forms",
+          "Digital signatures with certificates and signature validation",
+          "OCR for scanned documents (searchable or editable text)",
+          "Edit existing text and images",
+          "Secure redaction",
+          "Password protection and permissions (AES-256)",
+          "Measure distances, perimeters and areas on drawings",
+          "QR codes and barcodes",
+          "Works offline and installs as an app"
+        ],
+        "codeRepository": "https://github.com/StackOverBuffer/PDF-Xploder"
+      }
+    </script>
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>PDF-Xploder</title>
+    <title>PDF-Xploder – Free PDF Editor in Your Browser</title>
     <script>
       // The chosen colour theme, before the first paint (see src/lib/theme.ts).
       try { var t = localStorage.getItem('pdf-xploder.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+      // The German version (?lang=de) is its own page for search engines.
+      if (/[?&]lang=de\b/.test(location.search)) {
+        document.querySelector('link[rel=canonical]').href = 'https://stackoverbuffer.github.io/PDF-Xploder/?lang=de';
+        document.documentElement.lang = 'de';
+      }
     </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>PDF-Xploder – free PDF editor in your browser</h1>
+      <p>PDF-Xploder edits PDFs entirely in your browser: annotate and highlight, organise pages, fill and create forms,
+        sign, run OCR on scans, redact and password-protect documents. Files are never uploaded. It needs JavaScript to run.</p>
+      <p><a href="https://github.com/StackOverBuffer/PDF-Xploder">Source code and documentation on GitHub</a></p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

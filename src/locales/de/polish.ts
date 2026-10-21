@@ -19,6 +19,9 @@ const DE: Record<string, string> = {
   'Reset layout': 'Layout zurücksetzen',
   'Resize pane': 'Bereichsbreite ändern',
   'Drag to resize; double-click for the standard width': 'Ziehen ändert die Breite, Doppelklick stellt die Standardbreite her',
+  // search engines
+  'Free PDF Editor in Your Browser': 'Kostenloser PDF-Editor im Browser',
+  'Edit, annotate, organise, fill, sign, OCR and protect PDFs for free, right in your browser. No upload, no account: files never leave your device. Works offline.': 'PDFs kostenlos direkt im Browser bearbeiten, kommentieren, organisieren, ausfüllen, signieren, per OCR durchsuchbar machen und schützen. Kein Upload, kein Konto: Ihre Dateien verlassen nie Ihr Gerät. Funktioniert auch offline.',
   // in-app questions
   'Please confirm': 'Bitte bestätigen',
   Enter: 'Eingabe',

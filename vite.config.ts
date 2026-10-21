@@ -50,7 +50,8 @@ function pwa(): Plugin {
     closeBundle() {
       const files = list(outDir)
         .map((f) => relative(outDir, f).split(sep).join('/'))
-        .filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)(LICENSE|OFL)[^/]*$/.test(f))
+        // Files for search engines, link previews and the install dialog are not needed offline.
+        .filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)(LICENSE|OFL)[^/]*$/.test(f) && !/^(og-image\.jpg|screenshot-wide\.jpg|sitemap\.xml|robots\.txt)$/.test(f))
         .sort();
       const hash = createHash('sha256');
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f)));

@@ -1,20 +1,60 @@
-# PDF-Xploder
+# PDF-Xploder – free PDF editor in your browser
 
-**▶ Open the app: <https://stackoverbuffer.github.io/PDF-Xploder/>**
+[![Open the app](https://img.shields.io/badge/open%20the%20app-stackoverbuffer.github.io%2FPDF--Xploder-1a5fb4)](https://stackoverbuffer.github.io/PDF-Xploder/)
+[![CI](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/ci.yml/badge.svg)](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/ci.yml)
+[![Deploy](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/pages.yml/badge.svg)](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/pages.yml)
 
-A browser-based PDF editor aiming for feature parity with **PDF-XChange Editor**.
-Everything runs client-side: documents are never uploaded anywhere.
+**PDF-Xploder** is a free PDF editor that runs entirely in your web browser. Annotate and highlight,
+organise pages, fill and create forms, sign digitally, make scans searchable with OCR, redact and
+password-protect PDFs – **without uploading your files anywhere**. No account, no installation, and
+it keeps working offline. Its interface follows **PDF-XChange Editor** (ribbon, tools, dialogs), so it
+feels familiar if you know desktop PDF editors like PDF-XChange or Adobe Acrobat.
+
+**▶ [Open PDF-Xploder](https://stackoverbuffer.github.io/PDF-Xploder/)** · [auf Deutsch](https://stackoverbuffer.github.io/PDF-Xploder/?lang=de) · [Roadmap](ROADMAP.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.jpg">
+  <img alt="PDF-Xploder in the browser: a PDF with a highlight, an Approved stamp and drawn comments, page thumbnails on the left, the PDF-XChange style ribbon on top" src="public/screenshot-wide.jpg">
+</picture>
+
+## Features at a glance
+
+- **Annotate PDFs**: highlight, underline, strikeout, pencil, shapes, arrows, clouds, text boxes, sticky notes, stamps, images and signatures – saved as standard PDF annotations that Acrobat and other viewers show and edit
+- **Organise pages**: merge PDFs, split, insert, delete, extract, rotate, crop, reorder by drag and drop, drag pages between documents; watermarks, headers/footers, Bates numbering, page labels
+- **Edit PDF content**: change existing text and images, add text, images and shapes, find and replace
+- **Forms**: fill any PDF form, create and edit form fields
+- **Sign and protect**: digital signatures with certificates (.p12/.pfx) and validation, AES-256 passwords and permissions, secure redaction (also search & redact)
+- **OCR**: make scanned PDFs searchable or editable (German, English, French, Italian, Spanish, Dutch, Polish), with table and style recognition
+- **Measure** distances, perimeters and areas on plans and drawings; add **QR codes and barcodes**
+- **Comfortable**: tabs for several documents, command search (Ctrl+K), print dialog with N-up, dark theme, English and German, session restore, installable as an app that opens PDFs from your desktop
+
+The full feature list, compared with PDF-XChange Editor, is in [ROADMAP.md](ROADMAP.md).
+
+## Private by design
+
+PDF-Xploder is a static web app: your PDFs are opened, edited and saved on your own device and are
+never sent to a server. After the first visit the app works offline; installed (Chrome, Edge) it
+gets its own window and appears under “Open with…” for PDF files.
+
+## Auf Deutsch
+
+PDF-Xploder ist ein **kostenloser PDF-Editor im Browser**: PDFs kommentieren und markieren, Seiten
+zusammenführen, teilen, drehen und sortieren, Formulare ausfüllen und erstellen, digital signieren,
+Scans per OCR durchsuchbar machen, schwärzen und mit Passwort schützen – ohne Upload, ohne Konto,
+auch offline. Die Oberfläche ist vollständig auf Deutsch: [PDF-Xploder auf Deutsch öffnen](https://stackoverbuffer.github.io/PDF-Xploder/?lang=de).
+
+## Development
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # unit tests (geometry + PDF operations)
+npm test           # unit tests (geometry, PDF operations, …)
 npm run build      # production build in dist/
 ```
 
 Click **Try a sample** on the start screen for a document with text, a form and bookmarks.
 
-### Offline and installation
+### Offline and installation (service worker)
 
 The production build includes a service worker (`pwa/sw.js`, filled in by the `pwa` plugin in
 `vite.config.ts`) that caches every built file on the first visit, plus fonts and OCR data from
@@ -29,6 +69,14 @@ repository's default branch is pushed (or when run manually from the Actions tab
 setup: in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**. The site
 is then served at `https://<owner>.github.io/<repo>/`; the build picks up that sub-path through
 the `BASE_PATH` environment variable (`BASE_PATH=/PDF-Xploder/ npm run build` reproduces it locally).
+
+### Search engines and link previews
+
+`index.html` carries the title, description, canonical URL (with an English and a German version,
+`?lang=de`), Open Graph / Twitter card tags with `public/og-image.jpg` (1200×630) and schema.org
+`WebApplication` data. `public/sitemap.xml` lists both language versions; GitHub Pages cannot serve a
+`robots.txt` for a project page, so submit the sitemap in Google Search Console / Bing Webmaster Tools
+instead. These files are left out of the offline cache.
 
 ## Architecture
 
@@ -59,7 +107,8 @@ The full list of PDF-XChange Editor features and their status is in [ROADMAP.md]
 - ✅ Command search (Ctrl+K) beside the ribbon tabs: type part of a command name in English or German ("rotate", "Wasserzeichen") and press Enter; lists every ribbon button and menu entry with its location, recently used commands first
 - ✅ Home tab laid out like PDF-XChange: Tools (Hand, Select Text, Edit Comments, Snapshot/Clipboard/Find menus), View (zoom box with presets, 1:1, fit page/width, rotate view, pane toggles), Objects (Edit Text, Edit Objects, Add, Select)
 - ✅ Big, small and icon buttons, split buttons with drop-down menus
-- ✅ German and English interface for the ribbon (follows the browser language; switch under View → Language)
+- ✅ German and English interface (follows the browser language; switch under View → Interface, or open the app with `?lang=de` / `?lang=en`)
+- ✅ Light and dark theme (View → Theme: same as system, light, dark); Preferences dialog; resizable side panes; the ribbon folds groups into drop-downs in narrow windows
 
 ### View & navigate
 - ✅ Continuous scrolling, lazy page rendering, HiDPI canvases

@@ -257,13 +257,20 @@ function Toast() {
 
 /** The window title follows the document (own component: the rest of the app need not re-render). */
 function TitleSync() {
+  const t = useT();
   const dirty = useStore((s) => s.dirty);
   const fileName = useStore((s) => s.fileName);
   useEffect(() => {
-    document.title = fileName ? `${dirty ? '• ' : ''}${fileName} — PDF-Xploder` : 'PDF-Xploder';
-  }, [dirty, fileName]);
+    // Without a document: the descriptive title (and description) in the interface language, as search results show them.
+    document.title = fileName ? `${dirty ? '• ' : ''}${fileName} — PDF-Xploder` : `PDF-Xploder – ${t(SITE_TITLE)}`;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', t(SITE_DESCRIPTION));
+  }, [dirty, fileName, t]);
   return null;
 }
+
+// Kept in step with index.html, which has them for the first paint and for crawlers.
+const SITE_TITLE = 'Free PDF Editor in Your Browser';
+const SITE_DESCRIPTION = 'Edit, annotate, organise, fill, sign, OCR and protect PDFs for free, right in your browser. No upload, no account: files never leave your device. Works offline.';
 
 export function App() {
   const t = useT();
