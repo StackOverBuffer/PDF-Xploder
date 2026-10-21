@@ -7,7 +7,7 @@ import {
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
-  Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
+  Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -30,6 +30,7 @@ import { setTheme, useTheme } from '../lib/theme';
 import { ask } from '../lib/ask';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 import { setPrefs, usePrefs } from '../lib/prefs';
+import { SOURCE_URL } from '../lib/project';
 
 export type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
 export const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility', 'Bookmarks', 'Help'];
@@ -488,8 +489,9 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
       <>
         <Group label="Help">
           <Btn icon={<Keyboard size={L} />} label="Shortcuts" onClick={() => show('shortcuts')} />
-          <Btn icon={<ListChecks size={L} />} label="Feature roadmap" title="Which PDF-XChange features are available" onClick={() => window.open('https://github.com/StackOverBuffer/PDF-Xploder/blob/HEAD/ROADMAP.md', '_blank', 'noopener')} />
-          <Btn icon={<MessageSquare size={L} />} label="Report a problem" onClick={() => window.open('https://github.com/StackOverBuffer/PDF-Xploder/issues/new', '_blank', 'noopener')} />
+          <Btn icon={<ListChecks size={L} />} label="Feature roadmap" title="Which PDF-XChange features are available" onClick={() => window.open(`${SOURCE_URL}/blob/HEAD/ROADMAP.md`, '_blank', 'noopener')} />
+          <Btn icon={<MessageSquare size={L} />} label="Report a problem" onClick={() => window.open(`${SOURCE_URL}/issues/new`, '_blank', 'noopener')} />
+          <Btn icon={<Code size={L} />} label="Source code" title="PDF-Xploder is free software (GNU AGPL 3.0): get the source code" onClick={() => window.open(SOURCE_URL, '_blank', 'noopener')} />
         </Group>
         <Group label="Language">
           <Btn icon={<Languages size={L} />} label={lang === 'de' ? 'Deutsch' : 'English'} searchLabel="Language" menu={[

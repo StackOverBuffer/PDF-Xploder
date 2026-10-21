@@ -472,6 +472,8 @@ select.widget { padding: 0; }
 .welcome.drag-over { outline: 3px dashed var(--accent); outline-offset: -16px; }
 .welcome-card { background: var(--panel); border-radius: 14px; padding: 36px 40px; box-shadow: 0 10px 40px rgba(29,53,87,0.15); max-width: 560px; text-align: center; }
 .welcome-card h1 { margin: 0 0 8px; color: var(--heading); }
+.welcome-legal { margin: 14px 0 0; }
+.welcome-legal a { color: var(--accent); }
 .welcome-actions { display: flex; gap: 10px; justify-content: center; margin: 22px 0 12px; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------- dialogs */

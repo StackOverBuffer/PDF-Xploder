@@ -3,8 +3,9 @@
 [![Open the app](https://img.shields.io/badge/open%20the%20app-stackoverbuffer.github.io%2FPDF--Xploder-1a5fb4)](https://stackoverbuffer.github.io/PDF-Xploder/)
 [![CI](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/ci.yml/badge.svg)](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/ci.yml)
 [![Deploy](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/pages.yml/badge.svg)](https://github.com/StackOverBuffer/PDF-Xploder/actions/workflows/pages.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-**PDF-Xploder** is a free PDF editor that runs entirely in your web browser. Annotate and highlight,
+**PDF-Xploder** is a free, open-source PDF editor that runs entirely in your web browser. Annotate and highlight,
 organise pages, fill and create forms, sign digitally, make scans searchable with OCR, redact and
 password-protect PDFs – **without uploading your files anywhere**. No account, no installation, and
 it keeps working offline. Its interface follows **PDF-XChange Editor** (ribbon, tools, dialogs), so it
@@ -38,7 +39,7 @@ gets its own window and appears under “Open with…” for PDF files.
 
 ## Auf Deutsch
 
-PDF-Xploder ist ein **kostenloser PDF-Editor im Browser**: PDFs kommentieren und markieren, Seiten
+PDF-Xploder ist ein **kostenloser Open-Source-PDF-Editor im Browser**: PDFs kommentieren und markieren, Seiten
 zusammenführen, teilen, drehen und sortieren, Formulare ausfüllen und erstellen, digital signieren,
 Scans per OCR durchsuchbar machen, schwärzen und mit Passwort schützen – ohne Upload, ohne Konto,
 auch offline. Die Oberfläche ist vollständig auf Deutsch: [PDF-Xploder auf Deutsch öffnen](https://stackoverbuffer.github.io/PDF-Xploder/?lang=de).
@@ -230,3 +231,21 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
 
 Edit objects tool: arrow keys nudge (Shift ×10) · `Del` delete · `Ctrl+D` duplicate · `Ctrl+A` select all on the page · double-click text to edit · `Esc` deselect
+
+## License
+
+PDF-Xploder is free software: you can redistribute it and/or modify it under the terms of the
+[GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. It is distributed in the hope that
+it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the license for details.
+
+Copyright (C) 2026 the PDF-Xploder contributors.
+
+**Running a modified version as a website?** The AGPL asks you to offer its users the source code of
+your version: point `SOURCE_URL` in `src/lib/project.ts` (shown on the start screen and under
+Help → Source code) to your modified source.
+
+Bundled and loaded third-party components keep their own licenses: pdf.js and tesseract.js
+(Apache-2.0), pdf-lib, fontkit, HarfBuzz.js, qrcode-generator, React and zustand (MIT), Lucide (ISC),
+node-forge (used under BSD-3-Clause) and the Noto fonts (SIL Open Font License, `public/fonts/OFL.txt`).

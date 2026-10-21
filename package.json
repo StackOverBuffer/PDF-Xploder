@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Free PDF editor that runs in the browser: annotate, organise, fill, sign, OCR, redact and protect PDFs without uploading them. Inspired by PDF-XChange Editor.",
+  "description": "Free, open-source PDF editor that runs in the browser: annotate, organise, fill, sign, OCR, redact and protect PDFs without uploading them. Inspired by PDF-XChange Editor.",
   "keywords": [
     "pdf",
     "pdf-editor",
@@ -34,6 +34,7 @@
   "bugs": {
     "url": "https://github.com/StackOverBuffer/PDF-Xploder/issues"
   },
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p . && vite build",

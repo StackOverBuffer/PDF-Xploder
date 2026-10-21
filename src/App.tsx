@@ -29,6 +29,7 @@ import type { Tool } from './lib/types';
 import { useT } from './lib/i18n';
 import { setPrefs, usePrefs } from './lib/prefs';
 import { PaneResizer } from './components/PaneResizer';
+import { LICENSE_URL, SOURCE_URL } from './lib/project';
 
 const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'pages', icon: LayoutGrid, label: 'Pages' },
@@ -148,6 +149,9 @@ function Welcome() {
           <button className="big" onClick={openSample}><Sparkles size={18} /> {t('Try a sample')}</button>
         </div>
         <p className="muted small">{t('…or drop PDF files here. Dropping several combines them into one document.')}</p>
+        <p className="welcome-legal small muted">
+          {t('Free software under the GNU AGPL 3.0.')} <a href={SOURCE_URL} target="_blank" rel="noopener">{t('Source code')}</a> · <a href={LICENSE_URL} target="_blank" rel="noopener">{t('Licence')}</a>
+        </p>
         {recent.length > 0 && (
           <div className="welcome-recent">
             <h2>{t('Recent files')}</h2>

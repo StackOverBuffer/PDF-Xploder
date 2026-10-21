@@ -22,6 +22,11 @@ const DE: Record<string, string> = {
   // search engines
   'Free PDF Editor in Your Browser': 'Kostenloser PDF-Editor im Browser',
   'Edit, annotate, organise, fill, sign, OCR and protect PDFs for free, right in your browser. No upload, no account: files never leave your device. Works offline.': 'PDFs kostenlos direkt im Browser bearbeiten, kommentieren, organisieren, ausfüllen, signieren, per OCR durchsuchbar machen und schützen. Kein Upload, kein Konto: Ihre Dateien verlassen nie Ihr Gerät. Funktioniert auch offline.',
+  // licence
+  'Source code': 'Quellcode',
+  'PDF-Xploder is free software (GNU AGPL 3.0): get the source code': 'PDF-Xploder ist freie Software (GNU AGPL 3.0): zum Quellcode',
+  'Free software under the GNU AGPL 3.0.': 'Freie Software unter der GNU AGPL 3.0.',
+  Licence: 'Lizenz',
   // in-app questions
   'Please confirm': 'Bitte bestätigen',
   Enter: 'Eingabe',
