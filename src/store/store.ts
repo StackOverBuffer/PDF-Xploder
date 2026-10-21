@@ -4,7 +4,7 @@ import { withViewRotation, normRot } from '../lib/geometry';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 import { ops as opsW, sec as secW } from '../lib/worker';
-import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
+import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
 import type { SignatureInfo } from '../lib/signature';
 import { tr } from '../lib/i18n';
 import { DEFAULT_SCALE, type MeasureScale } from '../lib/measure';
@@ -451,19 +451,36 @@ export const useStore = create<Store>()((set, get) => {
       throw e;
     }
     let encryption: EncryptionInfo = { encrypted: false, permissions: ALL_PERMISSIONS };
+    // A failed check must not count as "not encrypted": the file would be edited still
+    // encrypted, with its restrictions ignored. Try again here; failing that, ask pdf.js.
+    let checked = true;
     try {
       encryption = await secW.inspectEncryption(bytes);
-    } catch {
-      /* damaged: handled below */
+    } catch (e) {
+      console.warn('Encryption check failed in the worker', e);
+      try {
+        encryption = await inspectEncryption(bytes);
+      } catch (e2) {
+        console.warn('Encryption check failed', e2);
+        checked = false;
+      }
     }
+    // pdf.js reports permissions only for encrypted files.
+    const encryptedForViewer = !!(await loaded.pdf.getPermissions().catch(() => null)) || loaded.password !== undefined;
     let editable = true;
+    // Without a check, a file that is (or may be) encrypted opens read-only; others as usual.
+    const unsure = !checked && (encryptedForViewer || containsAscii(bytes, '/Encrypt'));
+    if (unsure || (!encryption.encrypted && encryptedForViewer)) {
+      encryption = { encrypted: true, permissions: ALL_PERMISSIONS };
+      editable = false;
+    }
     let security: SecuritySettings | null = null;
     let lock: State['lock'] = null;
     let permissions: Permissions = ALL_PERMISSIONS;
     let ownerAccess = true;
     let keepEncryption: State['keepEncryption'] = null;
     const userPassword = loaded.password ?? '';
-    if (encryption.encrypted) {
+    if (encryption.encrypted && editable) {
       const owner = opts.ownerPassword;
       const restricted = !allPermissionsGranted(encryption.permissions);
       // Without the owner password the author's restrictions apply, action by action.
