@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp, EraserIcon, Highlighter } from 'lucide-react';
 import { styleFor, uid, useStore, type SearchHit } from '../store/store';
 import { useCan } from '../store/permissions';
-import { pageTextRuns, type TextRun } from '../lib/pdfjs';
+import { pageTextRuns, type PDFDocumentProxy, type TextRun } from '../lib/pdfjs';
 import { tf, useT } from '../lib/i18n';
 import { markMatchesForRedaction, replaceAll, replaceHit } from '../store/findReplace';
 
@@ -14,6 +14,8 @@ export function openSearch(mode: 'find' | 'replace' | 'redact' = 'find') {
   // Picked up when the pane mounts, or by the event when it is already open.
   pendingMode = mode;
   s.setSidebar('search');
+  // Start reading the text while the query is typed.
+  void allRuns().catch(() => undefined);
   requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('awesome-pdf:focus-search', { detail: mode })));
 }
 
@@ -29,16 +31,28 @@ function measure(text: string): number {
 
 const isWordChar = (c: string | undefined) => !!c && /[\p{L}\p{N}_]/u.test(c);
 
-let cache: { version: number; runs: TextRun[][] } | null = null;
+/** The text of each loaded document (a changed document is a new one): kept across tab switches. */
+const texts = new WeakMap<PDFDocumentProxy, Promise<TextRun[][]>>();
 
-async function allRuns(): Promise<TextRun[][]> {
-  const { pdf, docVersion } = useStore.getState();
-  if (!pdf) return [];
-  if (cache?.version === docVersion) return cache.runs;
-  const runs: TextRun[][] = [];
-  for (let i = 1; i <= pdf.numPages; i++) runs.push(await pageTextRuns(await pdf.getPage(i)));
-  cache = { version: docVersion, runs };
-  return runs;
+/** All pages' text runs, fetched in parallel batches (one page at a time took seconds for long documents). */
+function allRuns(): Promise<TextRun[][]> {
+  const { pdf } = useStore.getState();
+  if (!pdf) return Promise.resolve([]);
+  let p = texts.get(pdf);
+  if (!p) {
+    p = (async () => {
+      const runs: TextRun[][] = new Array(pdf.numPages);
+      const BATCH = 16;
+      for (let i = 0; i < pdf.numPages; i += BATCH) {
+        const pages = Array.from({ length: Math.min(BATCH, pdf.numPages - i) }, (_, k) => i + k);
+        await Promise.all(pages.map(async (k) => (runs[k] = await pageTextRuns(await pdf.getPage(k + 1)))));
+      }
+      return runs;
+    })();
+    texts.set(pdf, p);
+    p.catch(() => texts.get(pdf) === p && texts.delete(pdf));
+  }
+  return p;
 }
 
 export async function runSearch(query: string, matchCase: boolean, wholeWord = false): Promise<SearchHit[]> {
@@ -93,6 +107,9 @@ export function SearchPanel() {
   const wholeWord = !!search.wholeWord;
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pdf = useStore((s) => s.pdf);
+  // Read the text in the background as soon as the pane is open.
+  useEffect(() => void allRuns().catch(() => undefined), [pdf]);
 
   useEffect(() => {
     inputRef.current?.focus();
