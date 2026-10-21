@@ -39,9 +39,11 @@ const ASSETS =
 export async function openPdf(
   bytes: Uint8Array,
   askPassword: (retry: boolean) => string | null | Promise<string | null>,
+  /** The caller no longer needs `bytes` (a throwaway document): hand them over without copying. */
+  opts: { handOver?: boolean } = {},
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
-  const task = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, worker: worker(), ...ASSETS });
+  const task = pdfjs.getDocument({ data: opts.handOver ? bytes : bytes.slice(), isEvalSupported: false, worker: worker(), ...ASSETS });
   task.onPassword = async (update: (pw: string) => void, reason: number) => {
     const pw = await askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {

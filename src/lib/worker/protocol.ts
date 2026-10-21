@@ -1,4 +1,20 @@
-export type WorkerModule = 'ops' | 'org' | 'sec';
+export type WorkerModule = 'ops' | 'org' | 'sec' | 'content' | 'db';
+
+/** An argument the worker already holds: `{ [REF]: key }` instead of the bytes. */
+export const REF = '__workerRef';
+/** The error when the worker no longer holds a referenced document. */
+export const MISSING_REF = 'missing-ref';
+
+export interface Reply {
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+  /** Keys of the documents the worker holds now. */
+  has: string[];
+  /** Keys of documents in the result ('' for the result itself, else the property). */
+  resultKeys?: Record<string, string>;
+}
 
 /** Buffers of the byte arrays in a result (top level, in arrays, or one level into objects), to hand over without copying. */
 export function transferables(v: unknown): ArrayBuffer[] {

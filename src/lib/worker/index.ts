@@ -7,8 +7,10 @@
 import * as realOps from '../pdfOps';
 import * as realOrg from '../organize';
 import * as realSec from '../security';
+import * as realContent from '../content/ops';
+import * as realDb from '../sessionDb';
 import { useLang } from '../i18n';
-import type { WorkerModule } from './protocol';
+import { MISSING_REF, REF, type Reply, type WorkerModule } from './protocol';
 
 /** Functions that take and return plain data (bytes, numbers, plain objects) and do real work. */
 const IN_WORKER: Record<WorkerModule, Set<string>> = {
@@ -23,6 +25,9 @@ const IN_WORKER: Record<WorkerModule, Set<string>> = {
     'addMargins', 'addHeadersFooters', 'addBates', 'addBackground',
   ]),
   sec: new Set(['encrypt', 'reencryptLike', 'decrypt', 'inspectEncryption']),
+  content: new Set(['objectsOnPage', 'findMatches', 'rewriteForCheck', 'editPageContent', 'replaceInPages']),
+  // The session backup: the worker usually holds the document already, so writing it there copies nothing here.
+  db: new Set(['putBlob']),
 };
 
 let worker: Worker | null = null;
@@ -38,7 +43,14 @@ function getWorker(): Worker | null {
     failed = true;
     return null;
   }
-  worker.onmessage = (e: MessageEvent<{ id: number; ok: boolean; result?: unknown; error?: string }>) => {
+  worker.onmessage = (e: MessageEvent<Reply>) => {
+    const { has, resultKeys, result } = e.data;
+    workerHas = new Set(has);
+    // Documents produced by the worker: it keeps a copy, known by these keys.
+    for (const [path, k] of Object.entries(resultKeys ?? {})) {
+      const bytes = path ? (result as Record<string, unknown>)[path] : result;
+      if (bytes instanceof Uint8Array) keyOf.set(bytes, k);
+    }
     const p = pending.get(e.data.id);
     pending.delete(e.data.id);
     if (!p) return;
@@ -57,15 +69,40 @@ function getWorker(): Worker | null {
   return worker;
 }
 
-function call(mod: WorkerModule, fn: string, args: unknown[], local: (...a: unknown[]) => unknown): Promise<unknown> {
-  const w = getWorker();
-  if (!w) return Promise.resolve(local(...args));
+/**
+ * Documents the worker already holds: copying a big file into the worker takes the main
+ * thread a second or more, so a document it has (one it was sent, or one it produced)
+ * goes by reference. Keys follow the byte arrays; the worker reports what it keeps.
+ */
+const keyOf = new WeakMap<Uint8Array, string>();
+let keySeq = 0;
+let workerHas = new Set<string>();
+
+function send(w: Worker, mod: WorkerModule, fn: string, args: unknown[], byRef: boolean): Promise<unknown> {
   const id = ++seq;
+  const keys: Record<number, string> = {};
+  const sent = args.map((a, i) => {
+    if (!(a instanceof Uint8Array)) return a;
+    let k = keyOf.get(a);
+    if (k && byRef && workerHas.has(k)) return { [REF]: k };
+    if (!k) keyOf.set(a, (k = `m${++keySeq}`));
+    keys[i] = k;
+    return a;
+  });
   return new Promise<unknown>((resolve, reject) => {
     pending.set(id, { resolve, reject });
     // Arguments are copied: the caller keeps its bytes (undo history, the open document).
-    w.postMessage({ id, mod, fn, args, lang: useLang.getState().lang });
-  }).catch((e: Error) => (e.message === 'retry-local' ? local(...args) : Promise.reject(e)));
+    w.postMessage({ id, mod, fn, args: sent, keys, lang: useLang.getState().lang });
+  });
+}
+
+function call(mod: WorkerModule, fn: string, args: unknown[], local: (...a: unknown[]) => unknown): Promise<unknown> {
+  const w = getWorker();
+  if (!w) return Promise.resolve(local(...args));
+  return send(w, mod, fn, args, true)
+    // The worker let go of a document meanwhile: send it in full.
+    .catch((e: Error) => (e.message === MISSING_REF ? send(w, mod, fn, args, false) : Promise.reject(e)))
+    .catch((e: Error) => (e.message === 'retry-local' ? local(...args) : Promise.reject(e)));
 }
 
 /**
@@ -86,6 +123,8 @@ export function routed<T extends object>(mod: WorkerModule, real: T): T {
 export const ops = routed('ops', realOps);
 export const org = routed('org', realOrg);
 export const sec = routed('sec', realSec);
+export const content = routed('content', realContent);
+export const db = routed('db', realDb);
 
 /** Start the worker ahead of time (when the browser is idle), so the first operation does not wait for it to load. */
 export function warmUpWorker() {

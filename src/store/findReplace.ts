@@ -1,24 +1,18 @@
 /** Find and replace text, and find and redact (Home → Find, Protect → Redaction). */
-import { findInContent, replaceOnPage, type FindOptions, type TextMatch } from '../lib/content/findText';
-import { loadForEditing, readPage } from '../lib/content/page';
+import type { FindOptions, TextMatch } from '../lib/content/findText';
+import { content as contentW } from '../lib/worker';
 import { tf, tr } from '../lib/i18n';
 import type { Annotation, Rect } from '../lib/types';
-import { confirmPagesEditable, markPagesVerified } from './content';
+import { bytesKey, confirmPagesEditable, markPagesVerified } from './content';
 import { requirePermission } from './permissions';
 import { styleFor, uid, useStore, type SearchHit } from './store';
-import { saveDoc } from '../lib/pdfSave';
 
 const S = () => useStore.getState();
 
 /** Matches in the page content, per page. */
-async function contentMatches(query: string, o: FindOptions): Promise<Map<number, TextMatch[]>> {
-  const doc = await loadForEditing(S().bytes!);
-  const out = new Map<number, TextMatch[]>();
-  doc.getPages().forEach((page, i) => {
-    const m = findInContent(readPage(page), query, o);
-    if (m.length) out.set(i, m);
-  });
-  return out;
+async function contentMatches(query: string, o: FindOptions, pages?: number[]): Promise<Map<number, TextMatch[]>> {
+  const bytes = S().bytes!;
+  return new Map(await contentW.findMatches(bytes, query, o, pages, bytesKey(bytes)));
 }
 
 const centre = (r: Rect) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
@@ -33,10 +27,8 @@ export async function replaceAll(query: string, replacement: string, o: FindOpti
     if (!found.size) return S().notify(noEditableMatches());
     const pages = await confirmPagesEditable([...found.keys()]);
     if (!pages.length) return;
-    const doc = await loadForEditing(S().bytes!);
-    let n = 0;
-    for (const p of pages) n += await replaceOnPage(doc.getPage(p), query, replacement, o);
-    await S().commitBytes(await saveDoc(doc));
+    const { bytes, n } = await contentW.replaceInPages(S().bytes!, pages, query, replacement, o);
+    await S().commitBytes(bytes);
     markPagesVerified(pages);
     S().notify(tf('Replaced {n} occurrence(s) on {pages} page(s).', { n, pages: pages.length }));
   });
@@ -47,17 +39,15 @@ export async function replaceHit(hit: SearchHit, query: string, replacement: str
   if (!query || !requirePermission('modify')) return false;
   let done = false;
   await S().run('Replacing…', async () => {
-    const doc = await loadForEditing(S().bytes!);
-    const page = doc.getPage(hit.page);
-    const matches = findInContent(readPage(page), query, o);
+    const matches = (await contentMatches(query, o, [hit.page])).get(hit.page) ?? [];
     // The match whose box holds the hit's centre, or the nearest one.
     const c = centre(hit.rect);
     const dist = (m: TextMatch) => Math.min(...m.rects.map((r) => (inside(c, r, 2) ? 0 : Math.hypot(centre(r).x - c.x, centre(r).y - c.y))));
     const target = [...matches].sort((a, b) => dist(a) - dist(b))[0];
     if (!target || dist(target) > Math.max(hit.rect.h, 12) * 2) return S().notify(noEditableMatches());
     if (!(await confirmPagesEditable([hit.page])).length) return;
-    await replaceOnPage(page, query, replacement, o, { object: target.object, start: target.start });
-    await S().commitBytes(await saveDoc(doc));
+    const { bytes } = await contentW.replaceInPages(S().bytes!, [hit.page], query, replacement, o, { object: target.object, start: target.start });
+    await S().commitBytes(bytes);
     markPagesVerified([hit.page]);
     done = true;
   });

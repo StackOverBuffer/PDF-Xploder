@@ -5,12 +5,12 @@
 import { useStore } from './store';
 import { requirePermission } from './permissions';
 import { tf } from '../lib/i18n';
-import { describeObjects, editPage, loadForEditing, readPage, writePage, type ContentEdit, type ObjectInfo } from '../lib/content/page';
-import { openPdf, renderToCanvas } from '../lib/pdfjs';
+import { loadForEditing, type ContentEdit, type ObjectInfo } from '../lib/content/page';
+import { content as contentW } from '../lib/worker';
+import { openPdf, renderToCanvas, type PDFPageProxy } from '../lib/pdfjs';
 import { downloadBlob, baseName } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import type { Rect } from '../lib/types';
-import { saveDoc } from '../lib/pdfSave';
 import { ask } from '../lib/ask';
 
 const S = () => useStore.getState();
@@ -22,39 +22,49 @@ export const matchesFilter = (o: ObjectInfo, f: ContentFilter) =>
 
 // ---------------------------------------------------------------- reading
 
-let docCache: { bytes: Uint8Array; doc: ReturnType<typeof loadForEditing> } | null = null;
-const objectCache = new Map<string, Promise<ObjectInfo[]>>();
-
-function currentDoc() {
-  const bytes = S().bytes!;
-  if (docCache?.bytes !== bytes) {
-    docCache = { bytes, doc: loadForEditing(bytes) };
-    objectCache.clear();
-  }
-  return docCache.doc;
+/** A key per document version, so the worker parses a version once for all its reads. */
+const keys = new WeakMap<Uint8Array, string>();
+let nextKey = 1;
+export function bytesKey(bytes: Uint8Array): string {
+  let k = keys.get(bytes);
+  if (!k) keys.set(bytes, (k = `doc${nextKey++}`));
+  return k;
 }
 
-/** The objects on a page of the current document. */
+let objectCache: { bytes: Uint8Array; pages: Map<number, Promise<ObjectInfo[]>> } | null = null;
+
+/** The objects on a page of the current document (parsed in the worker). */
 export function pageObjects(page: number): Promise<ObjectInfo[]> {
-  currentDoc();
-  const key = String(page);
-  let p = objectCache.get(key);
+  const bytes = S().bytes!;
+  if (objectCache?.bytes !== bytes) objectCache = { bytes, pages: new Map() };
+  const cache = objectCache.pages;
+  let p = cache.get(page);
   if (!p) {
-    p = currentDoc().then((doc) => describeObjects(readPage(doc.getPage(page))));
-    objectCache.set(key, p);
+    p = contentW.objectsOnPage(bytes, page, bytesKey(bytes));
+    cache.set(page, p);
     // A failure must not stick: try again next time.
-    p.catch(() => objectCache.get(key) === p && objectCache.delete(key));
+    p.catch(() => cache.get(page) === p && cache.delete(page));
   }
   return p;
 }
 
+let layerDoc: { bytes: Uint8Array; doc: ReturnType<typeof loadForEditing> } | null = null;
+
 /** The layers of the current document (cached with the parsed document). */
 export async function currentLayers() {
   const { listLayers } = await import('../lib/content/page');
-  return listLayers(await currentDoc());
+  const bytes = S().bytes!;
+  if (layerDoc?.bytes !== bytes) layerDoc = { bytes, doc: loadForEditing(bytes) };
+  return listLayers(await layerDoc.doc);
 }
 
 // ---------------------------------------------------------------- safety check
+
+/** A rendering for comparing a page before and after rewriting: small, at most 1500 px on the longer side (big sheets). */
+function checkRender(page: PDFPageProxy) {
+  const [x0, y0, x1, y1] = page.view;
+  return renderToCanvas(page, Math.min(0.75, 1500 / Math.max(x1 - x0, y1 - y0)));
+}
 
 /** Pages (by page id) known to survive being rewritten. */
 const verified = new Set<string>();
@@ -78,13 +88,12 @@ async function confirmPageIsEditable(page: number): Promise<boolean> {
   const s = S();
   const id = s.pageIds[page];
   if (verified.has(id)) return true;
-  const doc = await loadForEditing(s.bytes!);
-  const pc = readPage(doc.getPage(page));
-  writePage(doc.getPage(page), pc.objects);
-  const { pdf } = await openPdf(await doc.save(), () => null);
+  const rewritten = await contentW.rewriteForCheck(s.bytes!, [page]);
+  const pc = { unknown: rewritten.unknown[0]?.[1] ?? [] };
+  const { pdf } = await openPdf(rewritten.bytes, () => null, { handOver: true });
   try {
-    const before = await renderToCanvas(await s.pdf!.getPage(page + 1), 0.75);
-    const after = await renderToCanvas(await pdf.getPage(page + 1), 0.75);
+    const before = await checkRender(await s.pdf!.getPage(page + 1));
+    const after = await checkRender(await pdf.getPage(page + 1));
     const diff = diffFraction(before, after);
     if (diff > 0.002 || pc.unknown.length) {
       const pct = (diff * 100).toFixed(1);
@@ -106,19 +115,14 @@ export async function confirmPagesEditable(pages: number[]): Promise<number[]> {
   const s = S();
   const todo = pages.filter((p) => !verified.has(s.pageIds[p]));
   if (!todo.length) return pages;
-  const doc = await loadForEditing(s.bytes!);
-  const unknown = new Set<number>();
-  for (const p of todo) {
-    const pc = readPage(doc.getPage(p));
-    if (pc.unknown.length) unknown.add(p);
-    writePage(doc.getPage(p), pc.objects);
-  }
-  const { pdf } = await openPdf(await doc.save(), () => null);
+  const rewritten = await contentW.rewriteForCheck(s.bytes!, todo);
+  const unknown = new Set(rewritten.unknown.map(([p]) => p));
+  const { pdf } = await openPdf(rewritten.bytes, () => null, { handOver: true });
   const risky: number[] = [];
   try {
     for (const p of todo) {
-      const before = await renderToCanvas(await s.pdf!.getPage(p + 1), 0.75);
-      const after = await renderToCanvas(await pdf.getPage(p + 1), 0.75);
+      const before = await checkRender(await s.pdf!.getPage(p + 1));
+      const after = await checkRender(await pdf.getPage(p + 1));
       if (unknown.has(p) || diffFraction(before, after) > 0.002) risky.push(p);
       else verified.add(s.pageIds[p]);
     }
@@ -155,9 +159,8 @@ async function applyNow(page: number, edits: ContentEdit[]) {
   if (!edits.length || !requirePermission('modify')) return;
   await S().run('Editing page…', async () => {
     if (!(await confirmPageIsEditable(page))) return;
-    const doc = await loadForEditing(S().bytes!);
-    const ids = await editPage(doc.getPage(page), edits);
-    await S().commitBytes(await saveDoc(doc));
+    const { bytes, ids } = await contentW.editPageContent(S().bytes!, page, edits);
+    await S().commitBytes(bytes);
     // The rewritten page is in normalised form: no need to check it again.
     verified.add(S().pageIds[page]);
     useStore.setState({ contentSelection: ids.length ? { page, ids } : null });

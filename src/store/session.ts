@@ -7,7 +7,8 @@
  * passwords would end up in browser storage); they appear only in the recent list.
  */
 import { create } from 'zustand';
-import { getBlob, getValue, putBlob, pruneBlobs, setValue, clearAll } from '../lib/sessionDb';
+import { getBlob, getValue, pruneBlobs, setValue, clearAll } from '../lib/sessionDb';
+import { db } from '../lib/worker';
 import { tf, tr } from '../lib/i18n';
 import { sessionTabs, useStore, type SessionDoc } from './store';
 
@@ -93,7 +94,7 @@ export async function saveSession(): Promise<void> {
           if (!bid || !b) continue;
           keep.add(bid);
           if (!written.has(bid)) {
-            await putBlob(bid, b);
+            await db.putBlob(bid, b);
             written.add(bid);
           }
         }
