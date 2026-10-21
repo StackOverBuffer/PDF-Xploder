@@ -250,6 +250,17 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
+  // A (closed) popup for the text: some viewers (Preview, mobile apps) show comments only through it.
+  if (contents && a.type !== 'redact') {
+    const [vx0, vy0, vx1, vy1] = g.view;
+    const pw = 200;
+    const ph = 100;
+    const top = Math.min(rect.y + rect.h, vy1);
+    const x = Math.min(rect.x + rect.w + 4, vx1 - pw);
+    const popup = pdf.register(pdf.obj({ Type: 'Annot', Subtype: 'Popup', Parent: annotRef, Rect: [Math.max(vx0, x), Math.max(vy0, top - ph), Math.max(vx0, x) + pw, Math.max(vy0, top - ph) + ph], Open: false, F: 28 }));
+    dict.set(PDFName.of('Popup'), popup);
+    page.node.addAnnot(popup);
+  }
   for (const r of replies ?? []) {
     // The reply's icon: a note at the comment's top-left corner (in the page's view), as PDF-XChange draws it.
     const corner = pdfToView(g, { x: rect.x, y: rect.y + rect.h });

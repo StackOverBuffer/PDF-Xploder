@@ -84,7 +84,7 @@ describe('measurements in the PDF', () => {
     const area: Annotation = { id: 'm2', type: 'polygon', color: '#1565c0', opacity: 0.6, author: 'Ann', createdAt: 0, width: 1, fill: '#90caf9', vertices: [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }], measure: { kind: 'area', scale } };
     const out = await ops.exportWithAnnotations(bytes, [[a, area]]);
     const saved = await PDFDocument.load(out);
-    const annots = saved.getPage(0).node.Annots()!.asArray().map((r) => saved.context.lookup(r) as PDFDict);
+    const annots = saved.getPage(0).node.Annots()!.asArray().map((r) => saved.context.lookup(r) as PDFDict).filter((d) => d.lookup(PDFName.of('Subtype'))?.toString() !== '/Popup');
     expect(annots.map((d) => d.lookup(PDFName.of('IT'))?.toString())).toEqual(['/LineDimension', '/PolygonDimension']);
     const measure = annots[0].lookup(PDFName.of('Measure')) as PDFDict;
     expect(measure.lookup(PDFName.of('Subtype'))?.toString()).toBe('/RL');

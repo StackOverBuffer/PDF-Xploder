@@ -134,7 +134,8 @@ describe('export', () => {
   const subtypes = async (bytes: Uint8Array) => {
     const doc = await PDFDocument.load(bytes);
     const annots = doc.getPage(0).node.Annots();
-    return (annots?.asArray() ?? []).map((r) => (doc.context.lookup(r) as PDFDict).get(PDFName.of('Subtype'))!.toString());
+    // Popups go with their comment (see the popup test).
+    return (annots?.asArray() ?? []).map((r) => (doc.context.lookup(r) as PDFDict).get(PDFName.of('Subtype'))!.toString()).filter((t) => t !== '/Popup');
   };
 
   for (const rotation of [0, 90, 180, 270]) {
@@ -157,6 +158,21 @@ describe('export', () => {
       expect(await subtypes(back.bytes)).toEqual([]);
     });
   }
+
+  it('gives comments a popup that goes away with them on import', async () => {
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [withImage]);
+    const doc = await PDFDocument.load(out);
+    const dicts = doc.getPage(0).node.Annots()!.asArray().map((r) => doc.context.lookup(r) as PDFDict);
+    const popups = dicts.filter((d) => d.get(PDFName.of('Subtype'))?.toString() === '/Popup');
+    const commented = dicts.filter((d) => d.get(PDFName.of('Popup')));
+    expect(popups.length).toBeGreaterThan(0);
+    expect(popups.length).toBe(commented.length);
+    for (const d of commented) expect(doc.context.lookup(d.get(PDFName.of('Popup'))) as PDFDict).toBeDefined();
+    for (const p of popups) expect(p.get(PDFName.of('Parent'))).toBeDefined();
+    const back = await ops.importForEditing(out, () => 'new');
+    const left = (await PDFDocument.load(back.bytes)).getPage(0).node.Annots();
+    expect(left?.size() ?? 0).toBe(0);
+  });
 
   it('follows a move made by another editor', async () => {
     const out = await ops.exportWithAnnotations(await makeDoc(1), [[all[3]]]);

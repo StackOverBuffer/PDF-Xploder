@@ -190,6 +190,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - Save writes back to the opened file in Chrome and Edge (File System Access API; the browser asks once for write access), Save As shows a save dialog there; other browsers download the file
 - Install as an app (File → Install app, in Chrome and Edge): own window, works fully offline, and appears under "Open with…" for PDF files; files opened that way arrive as tabs in the running window
 - Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
+- Saved files are made to open the same way in other readers: the XMP metadata follows the document properties, comments carry their own appearance and a popup for their text, and AES-256 files declare the extension level Acrobat expects (checked against Poppler and PDFium)
 - Document properties (title, author, subject, keywords, creator, producer)
 - Export the current page as PNG
 - OCR for scanned documents (see below)

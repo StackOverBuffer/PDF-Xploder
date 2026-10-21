@@ -1,5 +1,5 @@
 /** Password protection (encryption) helpers, built on @cantoo/pdf-lib. */
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFSecurity, PDFString } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHeader, PDFHexString, PDFName, PDFNumber, PDFRef, PDFSecurity, PDFString } from '@cantoo/pdf-lib';
 import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
 import { saveDoc } from './pdfSave';
 
@@ -155,7 +155,18 @@ export async function encrypt(bytes: Uint8Array, s: SecuritySettings): Promise<U
     permissions: { ...s.permissions, printing: s.permissions.printing ? (s.permissions.highResPrinting ? 'highResolution' : 'lowResolution') : false },
     algorithm: s.algorithm,
   });
+  if (s.algorithm === 'AES-256') markAes256(doc);
   return saveDoc(doc);
+}
+
+/**
+ * AES-256 (security handler revision 6) is a PDF 2.0 / Adobe extension level 8 feature:
+ * declare it, as Acrobat does, so readers that check the version know what to expect.
+ */
+function markAes256(doc: PDFDocument) {
+  doc.catalog.set(PDFName.of('Extensions'), doc.context.obj({ ADBE: { BaseVersion: PDFName.of('1.7'), ExtensionLevel: 8 } }));
+  const v = doc.context.header.toString().match(/%PDF-(\d+)\.(\d+)/);
+  if (!v || Number(v[1]) * 10 + Number(v[2]) < 17) doc.context.header = PDFHeader.forVersion(1, 7);
 }
 
 /**
@@ -183,6 +194,7 @@ export async function reencryptLike(plain: Uint8Array, original: Uint8Array, pas
   const security = Object.create(PDFSecurity.prototype) as PDFSecurity;
   Object.assign(security, { context: ctx, encryption: { V }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40 });
   ctx.security = security;
+  if (V >= 5) markAes256(doc);
   // Object streams are required: strings are only encrypted as part of them.
   return saveDoc(doc);
 }
