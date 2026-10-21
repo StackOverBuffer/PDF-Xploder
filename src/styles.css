@@ -501,9 +501,10 @@ select.widget { padding: 0; }
 .shortcuts td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
 
 /* ---------------------------------------------------------- feedback */
-.toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--toast-bg); color: var(--toast-text); padding: 10px 16px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.3); z-index: 60; max-width: 80vw; }
+.toasts { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 80vw; pointer-events: none; }
+.toast { background: var(--toast-bg); color: var(--toast-text); padding: 10px 16px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.3); pointer-events: auto; }
 .toast { display: flex; align-items: center; gap: 14px; animation: toast-in 0.18s ease-out; }
-@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 .toast.error { background: var(--danger); color: #fff; }
 .toast-action { border: none; background: none; color: inherit; font-weight: 600; padding: 2px 6px; margin: -2px -6px -2px 0; text-transform: uppercase; font-size: 12px; letter-spacing: 0.03em; opacity: 0.9; }
 .toast-action:hover:not(:disabled) { background: rgba(127,127,127,0.25); border-color: transparent; opacity: 1; }

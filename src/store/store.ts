@@ -150,7 +150,9 @@ interface State {
   /** How far the running command is, when it works through steps (pages). */
   progress: { done: number; total: number } | null;
   /** A message; `undo` offers to undo the change it reports (while it is the latest one, on that tab). */
-  toast: { msg: string; kind: 'info' | 'error'; undo?: { tab: string; depth: number } } | null;
+  toast: Toast | null;
+  /** The messages shown (newest last, at most three): a new one never hides an older one's Undo. */
+  toasts: Toast[];
 
   scale: number;
   fit: 'width' | 'page' | null;
@@ -672,6 +674,7 @@ export const useStore = create<Store>()((set, get) => {
     busy: null,
     progress: null,
     toast: null,
+    toasts: [],
     scale: 1,
     fit: 'width',
     tool: 'select',
@@ -942,11 +945,11 @@ export const useStore = create<Store>()((set, get) => {
 
     notify(msg, kind = 'info', opts = {}) {
       const s = get();
-      set({ toast: { msg: tr(msg), kind, undo: opts.undo && s.past.length ? { tab: s.activeTab, depth: s.past.length } : undefined } });
-      const t = get().toast;
-      setTimeout(() => {
-        if (get().toast === t) set({ toast: null });
-      }, kind === 'error' || opts.undo ? 6000 : 3000);
+      const t: Toast = { id: ++toastSeq, msg: tr(msg), kind, undo: opts.undo && s.past.length ? { tab: s.activeTab, depth: s.past.length } : undefined };
+      // The same message twice (e.g. a repeated action) shows once, with a fresh timer.
+      const toasts = [...s.toasts.filter((x) => x.msg !== t.msg), t].slice(-3);
+      set({ toasts, toast: t });
+      setTimeout(() => dismissToast(t.id), kind === 'error' || opts.undo ? 6000 : 3000);
     },
   };
 });
@@ -976,4 +979,21 @@ export function styleFor(tool: string): ToolStyle {
 /** Report how far a running command is (e.g. page 3 of 10), shown in the status bar and busy bar. */
 export function reportProgress(done: number, total: number): void {
   if (total > 1) useStore.setState({ progress: { done, total } });
+}
+
+/** A message at the bottom of the window; `undo` offers to undo the change it reports (while it is the latest one, on that tab). */
+export interface Toast {
+  id: number;
+  msg: string;
+  kind: 'info' | 'error';
+  undo?: { tab: string; depth: number };
+}
+let toastSeq = 0;
+
+/** Take a message away (timer, Undo, or a click on it). */
+export function dismissToast(id: number): void {
+  const s = useStore.getState();
+  if (!s.toasts.some((t) => t.id === id)) return;
+  const toasts = s.toasts.filter((t) => t.id !== id);
+  useStore.setState({ toasts, toast: toasts[toasts.length - 1] ?? null });
 }

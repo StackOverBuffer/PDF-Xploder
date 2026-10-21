@@ -30,6 +30,7 @@ import { useT } from './lib/i18n';
 import { setPrefs, usePrefs } from './lib/prefs';
 import { PaneResizer } from './components/PaneResizer';
 import { LICENSE_URL, SOURCE_URL } from './lib/project';
+import { dismissToast, type Toast as StoreToast } from './store/store';
 
 const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'pages', icon: LayoutGrid, label: 'Pages' },
@@ -236,19 +237,27 @@ function BusyShield() {
   );
 }
 
-function Toast() {
-  const t = useT();
-  const toast = useStore((s) => s.toast);
-  const canUndo = useStore((s) => !!toast?.undo && s.activeTab === toast.undo.tab && s.past.length === toast.undo.depth);
-  if (!toast) return null;
+function Toasts() {
+  const toasts = useStore((s) => s.toasts);
+  if (!toasts.length) return null;
   return (
-    <div key={toast.msg} className={`toast ${toast.kind}`} role="status">
+    <div className="toasts" role="status" aria-live="polite">
+      {toasts.map((x) => <ToastItem key={x.id} toast={x} />)}
+    </div>
+  );
+}
+
+function ToastItem({ toast }: { toast: StoreToast }) {
+  const t = useT();
+  const canUndo = useStore((s) => !!toast.undo && s.activeTab === toast.undo.tab && s.past.length === toast.undo.depth);
+  return (
+    <div className={`toast ${toast.kind}`}>
       <span>{toast.msg}</span>
       {canUndo && (
         <button
           className="toast-action"
           onClick={() => {
-            useStore.setState({ toast: null });
+            dismissToast(toast.id);
             void useStore.getState().run('Undoing…', () => useStore.getState().undo());
           }}
         >
@@ -338,7 +347,7 @@ export function App() {
       {hasDoc && <StatusBar />}
       <Dialogs />
       <BusyShield />
-      <Toast />
+      <Toasts />
       <AskHost />
       <TitleSync />
     </div>

@@ -41,4 +41,13 @@ setupPwa({
 if (import.meta.env.DEV || import.meta.env.VITE_EXPOSE_STORE === '1') {
   // Handy for debugging and end-to-end tests (also of production bundles, built with VITE_EXPOSE_STORE=1).
   import('./store/store').then(({ useStore }) => ((window as unknown as { __store: unknown }).__store = useStore));
+  // The command modules, for test scripts that start commands directly (a production
+  // bundle has no /src/… modules to import).
+  void Promise.all([
+    import('./store/commands'), import('./store/contentActions'), import('./store/bookmarkCommands'), import('./store/extras'),
+    import('./store/content'), import('./store/organizeCommands'), import('./components/TextBoxSelect'), import('./lib/ask'),
+    import('./lib/security'), import('./lib/pdfjs'), import('./lib/pdfOps'), import('./lib/organize'),
+  ]).then(([commands, contentActions, bookmarkCommands, extras, content, organizeCommands, textBoxSelect, ask, security, pdfjs, pdfOps, organize]) => {
+    (window as unknown as { __app: unknown }).__app = { commands, contentActions, bookmarkCommands, extras, content, organizeCommands, textBoxSelect, ask, security, pdfjs, pdfOps, organize };
+  });
 }
