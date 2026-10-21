@@ -15,6 +15,7 @@ import type { NewFieldKind } from '../lib/forms';
 import { useLang, useT } from '../lib/i18n';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 import { useAppearanceImage } from '../lib/appearanceImage';
+import { annotationsAt } from '../lib/annotHit';
 
 interface Props {
   index: number;
@@ -125,14 +126,23 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     else setDraft({ ...draft, end: e.shiftKey ? constrain(draft.start, p, tool) : p });
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: RPointerEvent) => {
     if (drag.current) {
       // Apply the last position before letting go.
       cancelAnimationFrame(moveFrame.current);
       moveFrame.current = 0;
       if (pendingMove.current) applyDragMove(pendingMove.current);
       pendingMove.current = null;
+      const d = drag.current;
       drag.current = null;
+      // A click (no drag) on the spot of the previous one: the next annotation underneath.
+      const p = pick.current;
+      if (!d.moved && d.mode === 'move' && p?.cycle) {
+        const i = (p.ids.indexOf(d.id) + 1) % p.ids.length;
+        useStore.getState().select({ pageId, id: p.ids[i] });
+        showHint(e, i, p.ids.length);
+        p.cycle = false;
+      }
       return;
     }
     if (!draft) return;
@@ -263,8 +273,63 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     }
   }
 
+  // ------------------------------------------------------------ picking
+  /** The last pick: where it was, what was under the pointer, and whether a click there goes to the next one. */
+  const pick = useRef<{ client: Pt; ids: string[]; cycle: boolean } | null>(null);
+  const [hint, setHint] = useState<{ at: Pt; text: string } | null>(null);
+  const hintTimer = useRef(0);
+  const showHint = (e: { clientX: number; clientY: number }, i: number, n: number) => {
+    window.clearTimeout(hintTimer.current);
+    setHint({ at: viewPt(e), text: `${i + 1} / ${n}` });
+    hintTimer.current = window.setTimeout(() => setHint(null), 1400);
+  };
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+
+  /**
+   * Select (and start moving) the annotation under the pointer. Overlapping ones: the
+   * selected one stays picked where it is hit (to drag it), a click on the same spot
+   * without moving goes to the next one underneath, Alt+click straight to the next.
+   */
+  function pickAndDrag(e: RPointerEvent | PointerEvent, hit?: Annotation): boolean {
+    if (tool !== 'select' || e.button !== 0) return false;
+    let cands = annotationsAt(annots, geom, viewPt(e), 5 / scale);
+    if (hit && !cands.some((c) => c.id === hit.id)) cands = [hit, ...cands];
+    if (!cands.length) return false;
+    const sel = useStore.getState().selected;
+    const cur = sel?.pageId === pageId ? cands.findIndex((c) => c.id === sel.id) : -1;
+    const prev = pick.current;
+    const same = !!prev && Math.hypot(e.clientX - prev.client.x, e.clientY - prev.client.y) <= 4;
+    let target = cur >= 0 ? cands[cur] : cands[0];
+    if (e.altKey && cands.length > 1) {
+      const i = cur >= 0 ? (cur + 1) % cands.length : 1;
+      target = cands[i];
+      showHint(e, i, cands.length);
+    }
+    pick.current = { client: { x: e.clientX, y: e.clientY }, ids: cands.map((c) => c.id), cycle: !e.altKey && same && cur >= 0 && cands.length > 1 };
+    startDrag(e, target, 'move');
+    return true;
+  }
+
+  // Tab / Shift+Tab: the next / previous comment on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+      const s = useStore.getState();
+      if (s.tool !== 'select' || !annots.length) return;
+      if ((e.target as Element)?.closest?.('input, textarea, select, [contenteditable="true"], .modal, .rmenu')) return;
+      const mine = s.selected?.pageId === pageId;
+      if (!mine && (s.selected || s.currentPage !== index)) return;
+      e.preventDefault();
+      const i = mine ? annots.findIndex((a) => a.id === s.selected!.id) : -1;
+      const next = annots[(i + (e.shiftKey ? -1 : 1) + annots.length + (i < 0 && e.shiftKey ? 1 : 0)) % annots.length];
+      s.select({ pageId, id: next.id });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [annots, pageId, index]);
+
   // ------------------------------------------------------------ selecting / moving
-  const startDrag = (e: RPointerEvent, a: Annotation, mode: 'move' | 'resize') => {
+  const startDrag = (e: RPointerEvent | PointerEvent, a: Annotation, mode: 'move' | 'resize') => {
     if (tool !== 'select' || e.button !== 0) return;
     e.stopPropagation();
     useStore.getState().select({ pageId, id: a.id });
@@ -329,12 +394,18 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     }
   };
 
+  const pickAndDragRef = useRef(pickAndDrag);
+  pickAndDragRef.current = pickAndDrag;
+
   // Clicking empty page space in select mode clears the selection.
   useEffect(() => {
     if (!svgRef.current) return;
     const page = svgRef.current.parentElement!;
     const onDown = (e: PointerEvent) => {
-      if (useStore.getState().tool === 'select' && !(e.target as Element).closest('.annot')) {
+      const target = e.target as Element;
+      // Near a thin line or an unfilled shape's outline (the browser only counts its exact pixels).
+      if (useStore.getState().tool === 'select' && !target.closest('.annot, .selection, .widget, .pdf-link, input, textarea, select, button') && pickAndDragRef.current(e)) return;
+      if (useStore.getState().tool === 'select' && !target.closest('.annot')) {
         const s = useStore.getState();
         if (s.selected?.pageId === pageId) s.select(null);
         if (s.selectedField && !(e.target as Element).closest('.field-box')) useStore.setState({ selectedField: null });
@@ -393,7 +464,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
         <g
           key={a.id}
           className={`annot annot-${a.type}`}
-          onPointerDown={(e) => startDrag(e, a, 'move')}
+          onPointerDown={(e) => pickAndDrag(e, a)}
           onDoubleClick={() => onDoubleClick(a)}
         >
           <AnnotShape a={a} pageId={pageId} geom={geom} scale={S} editing={editing === a.id} />
@@ -404,6 +475,12 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       ))}
       {selected && <Selection a={annots.find((a) => a.id === selected)} geom={geom} scale={S} onResize={startDrag} />}
       {draft && <DraftShape draft={draft} tool={tool} scale={S} />}
+      {hint && (
+        <g className="pick-hint" transform={`translate(${hint.at.x * S + 12},${hint.at.y * S + 14})`}>
+          <rect width={hint.text.length * 7 + 12} height={20} rx={10} />
+          <text x={6} y={14}>{hint.text}</text>
+        </g>
+      )}
       {tool === 'stamp' && drawing && hover && !draft && <StampPreview at={hover} scale={S} pending={pending} geom={geom} />}
     </svg>
   );

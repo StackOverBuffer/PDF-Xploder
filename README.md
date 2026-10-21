@@ -133,6 +133,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Stamps (Approved, Draft, Confidential, … or custom text); stamps made in other programs (e.g. PDF-XChange custom stamps) keep their own drawing and can be moved, resized and commented
 - Pictures and signatures hang on the pointer like stamps and are placed with a click; they keep their proportions when resized (Shift: freely). Typed signatures in four bundled handwriting fonts
 - Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
+- Selecting overlapping comments: the smaller one under the pointer comes first; click again on the same spot for the next one underneath (Alt+click: directly), right-click → Select lists everything there, Tab / Shift+Tab steps through the page's comments; thin lines and outlines are picked within a few pixels
 - Comment text and author on every annotation; comments list
 - Reply threads: replies made in PDF-XChange or Acrobat show under their comment (Comments pane, properties); add and delete replies; saved as standard replies (/IRT) that those programs show in the thread
 - Saved as native, editable PDF annotations with appearance streams (or flattened on request)
@@ -155,7 +156,7 @@ The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page com
 - Page labels (*Seiten nummerieren*): ranges with decimal, roman or letter numbering, prefix and start number; shown in the status bar like PDF-XChange ("iv (4 / 20)")
 
 ### Edit content
-- **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several
+- **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several; overlapping objects: click again on the same spot (or Alt+click) for the one underneath, right-click → Select, Tab / Shift+Tab
 - Move (drag, arrow keys; Shift = 10 pt / constrain), resize with handles (pictures keep their proportions, Shift resizes them freely; other objects keep them with Shift), rotate with the green handle (Shift snaps to 15°), rotate ±90°, flip, numeric position/size/rotation
 - Arrange: bring to front/forward, send backward/to back; align left/centre/right/top/middle/bottom (to the selection, or to the page for one object); distribute; same width/height
 - Edit existing text in place (double-click a line): the original font is kept when it has the characters, otherwise Noto Sans is used; change font, size, colour, character and word spacing, horizontal scale, baseline shift

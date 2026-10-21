@@ -39,6 +39,8 @@ const DE: Record<string, string> = {
   'Choose an image first.': 'Bitte zuerst ein Bild auswählen.',
   'Could not place the signature': 'Die Unterschrift konnte nicht platziert werden',
   'This places an image of your signature. For a certificate-based digital signature use Protect → Sign.': 'Hiermit wird ein Bild Ihrer Unterschrift platziert. Für eine digitale Signatur mit Zertifikat: Schützen → Signieren.',
+  // selecting overlapping objects
+  Group: 'Gruppe',
   // in-app questions
   'Please confirm': 'Bitte bestätigen',
   Enter: 'Eingabe',

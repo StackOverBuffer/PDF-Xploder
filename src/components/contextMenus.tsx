@@ -23,7 +23,9 @@ import { pdfRectToView, viewToPdf } from '../lib/geometry';
 import { about, rotate, scale as scaleM } from '../lib/content/matrix';
 import { toUser } from './ContentLayer';
 import type { LayerInfo, ObjectInfo } from '../lib/content/page';
-import type { PageGeom, Pt, Rect } from '../lib/types';
+import type { Annotation, PageGeom, Pt, Rect } from '../lib/types';
+import { annotationsAt } from '../lib/annotHit';
+import { ANNOT_LABELS, annotSummary, viewBounds } from '../lib/annotGeom';
 import { askText } from '../lib/ask';
 
 const S = () => useStore.getState();
@@ -271,11 +273,43 @@ export function textSelectionMenu(page: number, geom: PageGeom, at: Pt): MenuIte
 }
 
 /** Menu on the page for the other tools. */
+/** "Select ▸": every comment under the pointer (overlapping or hidden ones too). */
+function selectUnder(page: number, geom: PageGeom, at: Pt): MenuItem[] {
+  const s = S();
+  const pageId = s.pageIds[page];
+  const under = annotationsAt(s.annotations[pageId] ?? [], geom, at, 5 / s.scale);
+  if (!under.length) return [];
+  const snippet = (a: Annotation) => {
+    const text = (a.type === 'text' || a.type === 'note' ? a.text : a.comment ?? annotSummary(a)).trim().replace(/\s+/g, ' ');
+    return text.length > 32 ? `${text.slice(0, 30)}…` : text;
+  };
+  const size = (a: Annotation) => {
+    const v = viewBounds(a, geom);
+    return `${Math.round(v.width)} × ${Math.round(v.height)} pt`;
+  };
+  return [
+    {
+      label: 'Select', icon: i(MousePointer2), submenu: under.map((a): MenuItem => ({
+        label: a.subject ?? ANNOT_LABELS[a.type],
+        // Without text, the size tells otherwise equal entries apart.
+        value: `– ${snippet(a) || size(a)}`,
+        checked: s.selected?.id === a.id,
+        onClick: () => {
+          S().setTool('select');
+          S().select({ pageId, id: a.id });
+        },
+      })),
+    },
+    null,
+  ];
+}
+
 export function pageMenu(page: number, geom: PageGeom, at: Pt): MenuItem[] {
   const userAt = viewToPdf(geom, at);
   const sel = window.getSelection();
   const selected = sel && !sel.isCollapsed ? sel.toString() : '';
   return [
+    ...selectUnder(page, geom, at),
     { label: 'Copy', icon: i(Copy), hint: 'Ctrl+C', disabled: !selected || !can('copy'), onClick: () => navigator.clipboard?.writeText(selected) },
     { label: 'Add Bookmark', icon: i(BookmarkPlus), hint: 'Ctrl+Shift+B', disabled: !can('modify'), onClick: () => ca.addBookmarkAt(page, userAt.y, selected) },
     null,

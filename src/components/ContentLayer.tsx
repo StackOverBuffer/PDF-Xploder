@@ -5,7 +5,8 @@ import { useCan } from '../store/permissions';
 import { pdfRectToView, pdfToView, viewToPdf, type VRect } from '../lib/geometry';
 import { IDENTITY, about, apply, inv, mul, rotate, scale as scaleM, translate, type M } from '../lib/content/matrix';
 import type { ObjectInfo } from '../lib/content/page';
-import { useContextMenu } from './Menu';
+import { useContextMenu, type MenuItem } from './Menu';
+import { MousePointer2 } from 'lucide-react';
 import { objectMenu } from './contextMenus';
 import * as ca from '../store/contentActions';
 import type { PageGeom, Pt } from '../lib/types';
@@ -46,6 +47,9 @@ const unionV = (rs: VRect[]): VRect => {
   const b = Math.max(...rs.map((v) => v.top + v.height));
   return { left: l, top: t, width: r - l, height: b - t };
 };
+
+/** Names of the object kinds in the Select menu (English keys). */
+const OBJECT_KINDS: Record<string, string> = { text: 'Text', path: 'Shape', image: 'Image', form: 'Group', shading: 'Shading' };
 
 const contains = (r: VRect, p: Pt, pad = 1.5) => p.x >= r.left - pad && p.x <= r.left + r.width + pad && p.y >= r.top - pad && p.y <= r.top + r.height + pad;
 const intersects = (a: VRect, b: VRect) => a.left < b.left + b.width && a.left + a.width > b.left && a.top < b.top + b.height && a.top + a.height > b.top;
@@ -121,6 +125,29 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
   };
   const select = (ids: number[]) => useStore.setState({ contentSelection: ids.length ? { page: index, ids } : null, selected: null });
 
+  /** Objects under p, in the order a click picks them: clearly smaller first (steps of 1.5×), then the one on top. */
+  const objectsAt = (p: Pt): ObjectInfo[] => {
+    const step = (o: ObjectInfo) => {
+      const b = vbox(o);
+      return Math.floor(Math.log(Math.max(1, b.width) * Math.max(1, b.height)) / Math.log(1.5));
+    };
+    return visible
+      .map((o, z) => ({ o, z, size: step(o) }))
+      .filter((x) => contains(vbox(x.o), p, 3 / S))
+      .sort((a, b) => a.size - b.size || b.z - a.z)
+      .map((x) => x.o);
+  };
+  /** The last pick (see AnnotationLayer): a click on the same spot goes to the next object underneath. */
+  const pick = useRef<{ client: Pt; ids: number[]; cycle: boolean } | null>(null);
+  const [hint, setHint] = useState<{ at: Pt; text: string } | null>(null);
+  const hintTimer = useRef(0);
+  const showHint = (at: Pt, i: number, n: number) => {
+    window.clearTimeout(hintTimer.current);
+    setHint({ at, text: `${i + 1} / ${n}` });
+    hintTimer.current = window.setTimeout(() => setHint(null), 1400);
+  };
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const p = pt(e);
@@ -144,9 +171,21 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       setDrag({ mode: handle === 'rot' ? 'rotate' : 'scale', start: p, box: selBox, handle, t: IDENTITY, moved: false });
       return;
     }
-    const hit = [...visible].reverse().find((o) => contains(vbox(o), p));
+    const under = objectsAt(p);
+    const cur = selection?.length === 1 ? under.findIndex((o) => o.id === selection[0]) : -1;
+    const prev = pick.current;
+    const same = !!prev && Math.hypot(e.clientX - prev.client.x, e.clientY - prev.client.y) <= 4;
+    // The selected object stays picked where it is hit (to drag it); Alt+click: the next one underneath.
+    let hit = cur >= 0 ? under[cur] : under.find((o) => selection?.includes(o.id)) ?? under[0];
+    if (e.altKey && under.length > 1) {
+      const i = cur >= 0 ? (cur + 1) % under.length : 1;
+      hit = under[i];
+      showHint(p, i, under.length);
+    }
+    pick.current = { client: { x: e.clientX, y: e.clientY }, ids: under.map((o) => o.id), cycle: !e.altKey && !e.shiftKey && !e.ctrlKey && same && cur >= 0 && under.length > 1 };
     if (hit) {
       let ids = selection ?? [];
+      if (e.altKey) ids = [];
       if (e.shiftKey || e.ctrlKey || e.metaKey) ids = ids.includes(hit.id) ? ids.filter((i) => i !== hit.id) : [...ids, hit.id];
       else if (!ids.includes(hit.id)) ids = [hit.id];
       select(ids);
@@ -228,6 +267,15 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       applyContentEdits(index, [{ type: 'addShape', shape, rect, stroke: st.color, fill: st.fill, width: st.width }]);
       return;
     }
+    // A click (no drag) on the spot of the previous one: the next object underneath.
+    const pk = pick.current;
+    if (d.mode === 'move' && !d.moved && pk?.cycle && selection?.length === 1) {
+      const i = (pk.ids.indexOf(selection[0]) + 1) % pk.ids.length;
+      select([pk.ids[i]]);
+      showHint(d.start, i, pk.ids.length);
+      pk.cycle = false;
+      return;
+    }
     if (isArea(d) || !d.moved || !selection) return;
     applyContentEdits(index, [{ type: 'transform', ids: selection, m: toUser(geom, d.t) }]);
   };
@@ -238,13 +286,19 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
     if (tool !== 'content' || !objects) return;
     const p = pt(e);
     const ev = { clientX: e.clientX, clientY: e.clientY, preventDefault() {} };
-    const hit = [...visible].reverse().find((o) => contains(vbox(o), p));
+    const under = objectsAt(p);
+    const hit = under.find((o) => selection?.includes(o.id)) ?? under[0];
     let ids = selection ?? [];
     if (hit && !ids.includes(hit.id)) ids = [hit.id];
     if (!hit) ids = selBox && contains(selBox, p) ? ids : [];
     select(ids);
     const layers = await ca.documentLayers().catch(() => []);
-    menu.open(ev, objectMenu(index, geom, objects.filter((o) => ids.includes(o.id)), layers, p));
+    // Everything under the pointer, to reach objects hidden by others.
+    const choose: MenuItem[] = under.length > 1 ? [
+      { label: 'Select', icon: <MousePointer2 size={14} />, submenu: under.map((o): MenuItem => ({ label: OBJECT_KINDS[o.kind] ?? o.kind, value: `– ${o.text ? (o.text.length > 32 ? `${o.text.slice(0, 30)}…` : o.text) : `${Math.round(vbox(o).width)} × ${Math.round(vbox(o).height)} pt`}`, checked: ids.length === 1 && ids[0] === o.id, onClick: () => select([o.id]) })) },
+      null,
+    ] : [];
+    menu.open(ev, [...choose, ...objectMenu(index, geom, objects.filter((o) => ids.includes(o.id)), layers, p)]);
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
@@ -262,6 +316,14 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable) return;
       const s = useStore.getState();
       const sel = s.contentSelection;
+      // Tab / Shift+Tab: the next / previous object on the page.
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && visible.length && (sel?.page === index || (!sel && s.currentPage === index))) {
+        e.preventDefault();
+        const i = sel?.page === index && sel.ids.length === 1 ? visible.findIndex((o) => o.id === sel.ids[0]) : -1;
+        const n = visible.length;
+        select([visible[i < 0 ? (e.shiftKey ? n - 1 : 0) : (i + (e.shiftKey ? n - 1 : 1)) % n].id]);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && s.currentPage === index && objects) {
         e.preventDefault();
         select(visible.map((o) => o.id));
@@ -329,6 +391,7 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
+      {hint && <div className="pick-hint-box" style={{ left: hint.at.x * S + 12, top: hint.at.y * S + 14 }}>{hint.text}</div>}
       {drag && !isArea(drag) && drag.ghost && drag.moved && (
         <img
           className="content-ghost"
