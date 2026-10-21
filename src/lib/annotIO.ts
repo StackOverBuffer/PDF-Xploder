@@ -250,16 +250,24 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
-  for (const r of replies ?? []) page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, rect)));
+  for (const r of replies ?? []) {
+    // The reply's icon: a note at the comment's top-left corner (in the page's view), as PDF-XChange draws it.
+    const corner = pdfToView(g, { x: rect.x, y: rect.y + rect.h });
+    const far = pdfToView(g, { x: rect.x + rect.w, y: rect.y });
+    const at = viewToPdf(g, { x: Math.min(corner.x, far.x), y: Math.min(corner.y, far.y) });
+    const icon = await buildAppearance(ctx, { id: r.id, type: 'note', at, text: r.text, color: '#ffee58', opacity: 1, author: r.author, createdAt: r.createdAt }, g, opts);
+    page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, icon)));
+  }
 }
 
-/** A reply as other editors write it: a note "in reply to" its comment, at the comment's corner. */
-function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, rect: Rect): PDFDict {
-  const top = rect.y + rect.h;
+/** A reply as other editors write it: a note "in reply to" its comment, with a note icon. */
+function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }): PDFDict {
+  const { rect } = icon;
   return pdf.obj({
     Type: 'Annot',
     Subtype: 'Text',
-    Rect: [rect.x, top - 18, rect.x + 20, top],
+    Rect: [rect.x, rect.y, rect.x + rect.w, rect.y + rect.h],
+    AP: { N: icon.ref },
     IRT: parent,
     RT: 'R',
     NM: PDFHexString.fromText(r.id),
