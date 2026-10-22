@@ -986,14 +986,16 @@ export function whenIdle(): Promise<void> {
  * of its own (see updateAnnotation's quiet), so it should not be undone with another.
  */
 function keepPopupsOpen(next: Record<string, Annotation[]>, now: Record<string, Annotation[]>): Record<string, Annotation[]> {
-  const open = new Map<string, boolean>();
-  for (const list of Object.values(now)) for (const a of list) if (a.popup) open.set(a.id, a.popup.open);
-  if (!open.size) return next;
+  const popups = new Map<string, NonNullable<Annotation['popup']>>();
+  for (const list of Object.values(now)) for (const a of list) if (a.popup) popups.set(a.id, a.popup);
+  if (!popups.size) return next;
   const out: Record<string, Annotation[]> = {};
   for (const [pid, list] of Object.entries(next)) {
     out[pid] = list.map((a) => {
-      const o = open.get(a.id);
-      return o === undefined || o === a.popup?.open ? a : ({ ...a, popup: { ...a.popup, open: o } } as Annotation);
+      const p = popups.get(a.id);
+      // Nothing to keep for a comment whose popup is closed now and had none then.
+      if (!p || p.open === !!a.popup?.open || (!p.open && !a.popup)) return a;
+      return { ...a, popup: { open: p.open, rect: a.popup?.rect ?? p.rect } } as Annotation;
     });
   }
   return out;

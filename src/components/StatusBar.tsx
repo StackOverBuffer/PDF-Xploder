@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useStore } from '../store/store';
 import { turnPage } from '../store/viewActions';
+import { usePrefs } from '../lib/prefs';
+import { stepPage } from '../lib/viewLayout';
 import { pageRot, viewSize } from '../lib/geometry';
 import { formatPercent, tf, useLang, useT } from '../lib/i18n';
 
@@ -9,7 +11,11 @@ export function StatusBar() {
   const t = useT();
   const lang = useLang((l) => l.lang);
   const current = useStore((s) => s.currentPage);
+  const pageLayout = usePrefs((p) => p.pageLayout);
+  const coverPage = usePrefs((p) => p.coverPage);
   const count = useStore((s) => s.pageIds.length);
+  // In the facing layouts the last spread may start before the last page.
+  const lastView = stepPage(current, 1, count, pageLayout, coverPage) === current;
   const scale = useStore((s) => s.scale);
   const geom = useStore((s) => s.geoms[s.currentPage]);
   const busy = useStore((s) => s.busy);
@@ -50,7 +56,7 @@ export function StatusBar() {
           onBlur={() => setText(shown(current))}
         />
         <span>{labels ? `(${current + 1} / ${count})` : `/ ${count}`}</span>
-        <button onClick={() => turnPage(1)} disabled={current >= count - 1} title={t('Next page')}><ChevronRight size={16} /></button>
+        <button onClick={() => turnPage(1)} disabled={lastView} title={t('Next page')}><ChevronRight size={16} /></button>
         <button onClick={() => S().goToPage(count - 1)} disabled={current >= count - 1} title={t('Last page')}><ChevronLast size={16} /></button>
       </div>
       <div className="muted small">

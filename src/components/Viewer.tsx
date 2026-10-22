@@ -94,23 +94,28 @@ export function Viewer({ pane = 0 }: { pane?: Pane }) {
   const layout = useMemo(() => computeLayout(geoms, viewScale, mode, cover, row), [geoms, viewScale, mode, cover, row]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
+  // Read live, not from the last render: a click or the wheel may have just made this pane active.
+  const isActive = useCallback(() => {
+    const p = usePanes.getState();
+    return p.split === 'none' || p.active === pane;
+  }, [pane]);
   const activeRef = useRef(active);
   activeRef.current = active;
 
   /** This pane's view: the store's when active, else its own (see panes.ts). */
   const view = useCallback(() => {
     const s = useStore.getState();
-    return activeRef.current ? { scale: s.scale, fit: s.fit, currentPage: s.currentPage } : usePanes.getState().other;
-  }, []);
+    return isActive() ? { scale: s.scale, fit: s.fit, currentPage: s.currentPage } : usePanes.getState().other;
+  }, [isActive]);
   const setView = useCallback((patch: { scale?: number; fit?: 'width' | 'page' | null; currentPage?: number }) => {
-    if (activeRef.current) {
+    if (isActive()) {
       const s = useStore.getState();
       if (patch.scale !== undefined) s.setScale(patch.scale, patch.fit ?? null);
       if (patch.currentPage !== undefined && s.currentPage !== patch.currentPage) s.setCurrentPage(patch.currentPage);
     } else {
       setOtherView({ ...patch, ...(patch.scale !== undefined ? { scale: Math.min(8, Math.max(0.1, patch.scale)), fit: patch.fit ?? null } : {}) });
     }
-  }, []);
+  }, [isActive]);
 
   const updateVisible = useCallback(() => {
     const el = ref.current;
@@ -214,8 +219,13 @@ export function Viewer({ pane = 0 }: { pane?: Pane }) {
     const flip = flipTo.current;
     flipTo.current = null;
     if (el && flip) el.scrollTop = flip === 'top' ? 0 : el.scrollHeight;
+    // Another layout: the current page stays in view (before it is read back from the scroll position).
+    else if (el && (prev.mode !== layout.mode || prev.cover !== layout.cover)) {
+      const t = layout.tops[view().currentPage];
+      if (t !== undefined) el.scrollTop = Math.max(0, t - GAP / 2);
+    }
     // At the very top (e.g. right after opening) stay there unless zooming at the pointer.
-    else if (el && prev !== layout && prev.scale !== layout.scale && prev.mode === layout.mode && prev.rows.length === layout.rows.length && (el.scrollTop > 0 || anchor)) {
+    else if (el && prev !== layout && prev.scale !== layout.scale && prev.rows.length === layout.rows.length && (el.scrollTop > 0 || anchor)) {
       const ay = anchor?.y ?? el.clientHeight / 2;
       const ax = anchor?.x ?? el.clientWidth / 2;
       const docY = el.scrollTop + ay;
@@ -228,17 +238,7 @@ export function Viewer({ pane = 0 }: { pane?: Pane }) {
       el.scrollLeft = docX * (layout.scale / prev.scale) + boxW(layout) / 2 - ax;
     }
     updateVisible();
-  }, [layout, updateVisible]);
-
-  // Another layout: the current page stays in view.
-  const shownMode = useRef(`${mode}:${cover}`);
-  useEffect(() => {
-    if (shownMode.current === `${mode}:${cover}`) return;
-    shownMode.current = `${mode}:${cover}`;
-    const el = ref.current;
-    const t = layoutRef.current.tops[view().currentPage];
-    if (el && t !== undefined) el.scrollTop = Math.max(0, t - GAP / 2);
-  }, [mode, cover, view]);
+  }, [layout, updateVisible, view]);
 
   useEffect(() => {
     const el = ref.current;

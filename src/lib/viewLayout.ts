@@ -31,6 +31,7 @@ export function rowsOf(n: number, mode: PageLayout, cover: boolean): number[][] 
 export interface Layout {
   scale: number;
   mode: PageLayout;
+  cover: boolean;
   /** Rows laid out (all of them when continuous, else only the current one). */
   rows: { pages: number[]; top: number; height: number }[];
   /** Per page (only for pages in `rows`): top, its offset from the centre line, size. */
@@ -54,7 +55,7 @@ export function computeLayout(geoms: PageGeom[], scale: number, mode: PageLayout
     const { width, height } = viewSize(geoms[i]);
     return { w: Math.floor(width * scale), h: Math.floor(height * scale) };
   };
-  const L: Layout = { scale, mode, rows: [], tops: {}, lefts: {}, widths: {}, heights: {}, total: 0, maxWidth: 0 };
+  const L: Layout = { scale, mode, cover, rows: [], tops: {}, lefts: {}, widths: {}, heights: {}, total: 0, maxWidth: 0 };
   const facing = isFacing(mode);
   let y = PAD;
   let half = 0;
