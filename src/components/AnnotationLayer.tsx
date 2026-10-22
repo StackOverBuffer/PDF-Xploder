@@ -17,6 +17,7 @@ import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type Measu
 import { useAppearanceImage } from '../lib/appearanceImage';
 import { annotationsAt } from '../lib/annotHit';
 import { hasPopup } from '../lib/popups';
+import { inActivePane } from '../lib/activeViewer';
 import { setPopupOpen } from '../store/popups';
 
 interface Props {
@@ -317,6 +318,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+      // In a split view the page is in both panes: only the active one answers.
+      if (!inActivePane(svgRef.current)) return;
       const s = useStore.getState();
       if (s.tool !== 'select' || !annots.length) return;
       if ((e.target as Element)?.closest?.('input, textarea, select, [contenteditable="true"], .modal, .rmenu')) return;

@@ -112,7 +112,8 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Light and dark theme (View → Theme: same as system, light, dark); Preferences dialog; resizable side panes; the ribbon folds groups into drop-downs in narrow windows
 
 ### View & navigate
-- Continuous scrolling, lazy page rendering, HiDPI canvases
+- Page layouts (View → Page layout): single page (the wheel turns the page at its end), continuous, facing pages and continuous facing, optionally with the first page alone as a cover; Page Down / Page Up move one page or spread. Lazy page rendering, HiDPI canvases
+- Split view (View → Split): the document in two panes, side by side or one above the other, each with its own zoom and position; the pane last clicked is the one commands, zoom and page navigation act on
 - Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth while they draw (experimental; File → Preferences; uses more memory)
 - Zoom in/out, presets, fit width, fit page, Ctrl+wheel zoom
 - Hand (pan), Select Text and Edit Comments tools, text selection & copy

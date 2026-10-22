@@ -7,11 +7,13 @@ import {
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
-  MessageSquareText, MessageSquareOff,
+  MessageSquareText, MessageSquareOff, File as FileIcon, GalleryVertical, BookOpen, BookOpenText, Book, Columns2,
   Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { setAllPopups } from '../store/popups';
+import { setSplit, usePanes } from '../store/panes';
+import { isFacing } from '../lib/viewLayout';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import * as extra from '../store/extras';
@@ -195,6 +197,9 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
   const reading = extra.useExtras((x) => x.reading);
   const invert = extra.useExtras((x) => x.invert);
   const theme = useTheme((x) => x.theme);
+  const pageLayout = usePrefs((p) => p.pageLayout);
+  const coverPage = usePrefs((p) => p.coverPage);
+  const split = usePanes((p) => p.split);
   const noDoc = !hasDoc;
   const installPrompt = usePwa((p) => !!p.prompt);
   const measureScale = useStore((s) => s.measureScale);
@@ -358,6 +363,20 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
             <Btn size="small" icon={<Maximize size={I} />} label="Fit page" active={fit === 'page'} disabled={noDoc} onClick={() => S().setScale(scale, 'page')} />
             <Btn size="small" icon={<MoveHorizontal size={I} />} label="Fit width" active={fit === 'width'} disabled={noDoc} onClick={() => S().setScale(scale, 'width')} />
           </Stack>
+        </Group>
+        <Group label="Page layout">
+          <Btn icon={<FileIcon size={L} />} label="Single page" title="One page at a time; the wheel turns the page at its end" active={pageLayout === 'single'} disabled={noDoc} onClick={() => setPrefs({ pageLayout: 'single' })} />
+          <Btn icon={<GalleryVertical size={L} />} label="Continuous" title="All pages one below the other" active={pageLayout === 'continuous'} disabled={noDoc} onClick={() => setPrefs({ pageLayout: 'continuous' })} />
+          <Stack>
+            <Btn size="small" icon={<BookOpen size={I} />} label="Facing" title="Two pages side by side, one spread at a time" active={pageLayout === 'facing'} disabled={noDoc} onClick={() => setPrefs({ pageLayout: 'facing' })} />
+            <Btn size="small" icon={<BookOpenText size={I} />} label="Continuous facing" title="Two pages side by side, all spreads one below the other" active={pageLayout === 'continuousFacing'} disabled={noDoc} onClick={() => setPrefs({ pageLayout: 'continuousFacing' })} />
+            <Btn size="small" icon={<Book size={I} />} label="Cover page" title="In the facing layouts, show the first page on its own, as a book's cover" active={coverPage} disabled={noDoc || !isFacing(pageLayout)} onClick={() => setPrefs({ coverPage: !coverPage })} />
+          </Stack>
+          <Btn icon={<Columns2 size={L} />} label="Split" title="The document in two panes, each with its own zoom and position" active={split !== 'none'} disabled={noDoc} menu={[
+            { label: 'No split', checked: split === 'none', onClick: () => setSplit('none') },
+            { label: 'Side by side', checked: split === 'sideBySide', onClick: () => setSplit('sideBySide') },
+            { label: 'One above the other', checked: split === 'stacked', onClick: () => setSplit('stacked') },
+          ]} />
         </Group>
         <Group label="Rotate">
           <Btn icon={<RotateCcw size={L} />} label="Rotate view left" disabled={noDoc} onClick={() => S().rotateView(-90)} />

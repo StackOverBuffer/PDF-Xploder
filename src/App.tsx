@@ -11,7 +11,9 @@ import { FOCUS_COMMAND_SEARCH } from './components/CommandSearch';
 import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
 import { addBookmarkAt } from './store/contentActions';
 import { goToBookmark } from './store/bookmarkCommands';
+import { turnPage } from './store/viewActions';
 import { Viewer } from './components/Viewer';
+import { usePanes } from './store/panes';
 import { Thumbnails } from './components/Thumbnails';
 import { Outline } from './components/Outline';
 import { CommentsPanel } from './components/CommentsPanel';
@@ -116,10 +118,10 @@ function useShortcuts() {
         goToBookmark(e.key === 'PageDown' ? 1 : -1);
       } else if (e.key === 'PageDown') {
         e.preventDefault();
-        s.goToPage(s.currentPage + 1);
+        turnPage(1);
       } else if (e.key === 'PageUp') {
         e.preventDefault();
-        s.goToPage(s.currentPage - 1);
+        turnPage(-1);
       } else if (!e.altKey && TOOL_KEYS[e.key]) {
         const tool = TOOL_KEYS[e.key];
         if (['select', 'selectText', 'hand', 'zoom'].includes(tool) || (tool === 'snapshot' ? can('copy') : can('annotate'))) s.setTool(tool);
@@ -128,6 +130,19 @@ function useShortcuts() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+/** The viewer, or two of the same document (View → Split). The pane that stays on its own keeps its position. */
+function ViewerPanes() {
+  const split = usePanes((p) => p.split);
+  const active = usePanes((p) => p.active);
+  return (
+    <div className={`split split-${split}`}>
+      {(split === 'none' ? [active] : [0, 1] as const).map((pane) => (
+        <Viewer key={pane} pane={pane} />
+      ))}
+    </div>
+  );
 }
 
 function Welcome() {
@@ -340,7 +355,7 @@ export function App() {
           </aside>
         )}
         {hasDoc && sidebar && <PaneResizer pane="sidebar" />}
-        <main className="main">{hasDoc ? <><DocBanner /><Viewer /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
+        <main className="main">{hasDoc ? <><DocBanner /><ViewerPanes /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
         {hasDoc && showProps && <PaneResizer pane="props" />}
         {hasDoc && showProps && <PropertiesPanel />}
       </div>

@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { applyContentEdits, matchesFilter, pageObjects } from '../store/content';
 import { useCan } from '../store/permissions';
+import { inActivePane } from '../lib/activeViewer';
 import { pdfRectToView, pdfToView, viewToPdf, type VRect } from '../lib/geometry';
 import { IDENTITY, about, apply, inv, mul, rotate, scale as scaleM, translate, type M } from '../lib/content/matrix';
 import type { ObjectInfo } from '../lib/content/page';
@@ -314,6 +315,8 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable) return;
+      // In a split view the page is in both panes: only the active one answers.
+      if (!inActivePane(ref.current)) return;
       const s = useStore.getState();
       const sel = s.contentSelection;
       // Tab / Shift+Tab: the next / previous object on the page.

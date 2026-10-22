@@ -70,6 +70,23 @@ const DE: Record<string, string> = {
   'Close popup': 'Popup schließen',
   'Add a comment…': 'Kommentar hinzufügen…',
   'Comment text': 'Kommentartext',
+  // page layouts and split view
+  'Page layout': 'Seitenlayout',
+  'Single page': 'Einzelseite',
+  Continuous: 'Fortlaufend',
+  Facing: 'Doppelseite',
+  'Continuous facing': 'Doppelseite fortlaufend',
+  'Cover page': 'Deckblatt',
+  Split: 'Teilen',
+  'No split': 'Nicht teilen',
+  'Side by side': 'Nebeneinander',
+  'One above the other': 'Übereinander',
+  'One page at a time; the wheel turns the page at its end': 'Eine Seite nach der anderen; am Seitenende blättert das Mausrad weiter',
+  'All pages one below the other': 'Alle Seiten untereinander',
+  'Two pages side by side, one spread at a time': 'Zwei Seiten nebeneinander, eine Doppelseite nach der anderen',
+  'Two pages side by side, all spreads one below the other': 'Zwei Seiten nebeneinander, alle Doppelseiten untereinander',
+  "In the facing layouts, show the first page on its own, as a book's cover": 'In den Doppelseiten-Layouts die erste Seite allein zeigen, wie den Umschlag eines Buchs',
+  'The document in two panes, each with its own zoom and position': 'Das Dokument in zwei Bereichen, jeder mit eigenem Zoom und eigener Position',
   // preferences: background drawing
   'Draw complex pages in the background (experimental)': 'Aufwendige Seiten im Hintergrund zeichnen (experimentell)',
   'Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth. Uses more memory.':

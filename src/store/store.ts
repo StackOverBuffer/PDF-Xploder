@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
 import { inheritOffscreen } from '../lib/render/offscreen';
+import { activeViewer } from '../lib/activeViewer';
 import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 import { copyFromWorker, ops as opsW, sec as secW } from '../lib/worker';
@@ -287,7 +288,7 @@ export interface TabSnapshot {
 /** Every tab with a document, in tab order, for the session backup. */
 export function sessionTabs(): { tabs: TabSnapshot[]; active: string } {
   const s = useStore.getState();
-  const viewer = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.viewer') : null;
+  const viewer = activeViewer();
   const tabs: TabSnapshot[] = [];
   for (const t of s.tabs) {
     const live = t.id === s.activeTab;
@@ -601,7 +602,7 @@ export const useStore = create<Store>()((set, get) => {
     const s = get();
     const p: Parked = {};
     for (const k of DOC_KEYS) (p as Record<string, unknown>)[k] = s[k];
-    const viewer = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.viewer') : null;
+    const viewer = activeViewer();
     if (viewer) p.scroll = { top: viewer.scrollTop, left: viewer.scrollLeft };
     parked.set(s.activeTab, p);
     set({ tabs: s.tabs.map((t) => (t.id === s.activeTab ? { ...t, fileName: s.fileName, dirty: s.dirty } : t)) });

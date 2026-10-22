@@ -1,5 +1,8 @@
 /** Zooming around a point or into a box (Zoom tool, context menu). */
 import { useStore } from './store';
+import { activeViewer } from '../lib/activeViewer';
+import { usePrefs } from '../lib/prefs';
+import { stepPage } from '../lib/viewLayout';
 import { viewSize, viewToPdf, type VRect } from '../lib/geometry';
 import type { Pt } from '../lib/types';
 
@@ -9,7 +12,7 @@ const S = () => useStore.getState();
 function centreOn(page: number, p: Pt) {
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      const viewer = document.querySelector<HTMLElement>('.viewer');
+      const viewer = activeViewer();
       const pageEl = viewer?.querySelector<HTMLElement>(`.page[data-index="${page}"]`);
       if (!viewer || !pageEl) return;
       const vr = viewer.getBoundingClientRect();
@@ -28,7 +31,7 @@ export function zoomAt(page: number, p: Pt, factor: number) {
 
 /** Zoom so that a box on the page fills the viewer. */
 export function zoomToBox(page: number, box: VRect) {
-  const viewer = document.querySelector<HTMLElement>('.viewer');
+  const viewer = activeViewer();
   if (!viewer || box.width < 1 || box.height < 1) return;
   const g = S().geoms[page];
   const fit = Math.min((viewer.clientWidth - 40) / box.width, (viewer.clientHeight - 40) / box.height);
@@ -42,7 +45,7 @@ export function zoomToBox(page: number, box: VRect) {
 export function currentViewTarget(): { page: number; y?: number } {
   const s = S();
   const page = s.currentPage;
-  const viewer = document.querySelector<HTMLElement>('.viewer');
+  const viewer = activeViewer();
   const pageEl = viewer?.querySelector<HTMLElement>(`.page[data-index="${page}"]`);
   const g = s.geoms[page];
   if (!viewer || !pageEl || !g) return { page };
@@ -50,4 +53,11 @@ export function currentViewTarget(): { page: number; y?: number } {
   const p = viewToPdf(g, { x: 0, y: top });
   // Destinations give a top only for upright pages.
   return g.rotation === 0 ? { page, y: Math.round(p.y) } : { page };
+}
+
+/** The next or previous view: one page, or one spread in the facing layouts (Page Down / Page Up). */
+export function turnPage(dir: 1 | -1) {
+  const s = S();
+  const { pageLayout, coverPage } = usePrefs.getState();
+  s.goToPage(stepPage(s.currentPage, dir, s.pageIds.length, pageLayout, coverPage));
 }

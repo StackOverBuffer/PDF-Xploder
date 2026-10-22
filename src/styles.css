@@ -331,9 +331,16 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 
 /* ---------------------------------------------------------- viewer */
 .viewer { flex: 1; overflow: auto; background: var(--viewer); position: relative; }
+.split { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.split-stacked { flex-direction: column; }
+.split > .viewer { min-width: 0; min-height: 0; flex-basis: 0; }
+.split-sideBySide > .viewer + .viewer { border-left: 4px solid var(--border); }
+.split-stacked > .viewer + .viewer { border-top: 4px solid var(--border); }
+/* The pane commands act on. */
+.viewer.active { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -2px; }
 .viewer.drag-over { outline: 3px dashed var(--accent); outline-offset: -6px; }
 .pages { position: relative; margin: 0 auto; }
-.page-slot { position: absolute; left: 50%; transform: translateX(-50%); }
+.page-slot { position: absolute; left: 50%; }
 .page { position: relative; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); overflow: hidden; }
 /* Comment popups (PopupLayer): beside the page so they can reach past its edge; the page they belong to is drawn above its neighbours. */
 .page-slot:has(.annot-popup) { z-index: 3; }

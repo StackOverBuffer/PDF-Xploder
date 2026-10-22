@@ -1,9 +1,10 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TextLayer } from 'pdfjs-dist';
 import { useStore } from '../store/store';
 import { viewSize } from '../lib/geometry';
 import { AnnotationLayer } from './AnnotationLayer';
 import { PopupLayer } from './PopupLayer';
+import { ViewScale } from './viewScale';
 import { WidgetLayer } from './WidgetLayer';
 import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
@@ -60,7 +61,8 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   const docVersion = useStore((s) => s.docVersion);
   const geom = useStore((s) => s.geoms[index]);
   const pageId = useStore((s) => s.pageIds[index]);
-  const scale = useStore((s) => s.scale);
+  // The zoom of the pane it is in (split view).
+  const scale = useContext(ViewScale);
   // While another document is being opened, stop rendering this one (and cancel what is running).
   const opening = useStore((s) => s.opening);
   const contentTool = useStore((s) => s.tool.startsWith('content'));

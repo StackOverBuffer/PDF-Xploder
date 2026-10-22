@@ -12,8 +12,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 2. **Compare documents**: side by side, with changed text and changed areas marked.
 3. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
 4. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
-5. **Page layouts**: single page, two pages, facing pages; split view.
-6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+5. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -152,7 +151,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Quick Launch / search for commands | ✅ search box beside the ribbon tabs (Ctrl+K): finds every ribbon button and menu entry in English or German, shows where it lives and its shortcut, recently used first |
 | Set the UI Language | ✅ German/English throughout, following the browser |
 | Dark Page Mode | ✅ dark interface (View → Theme: same as system, light, dark) and inverted page colours |
-| Page Display Options / Default Page Layouts | 🟡 continuous scrolling; ⬜ single/facing pages |
+| Page Display Options / Default Page Layouts | ✅ single page, continuous, facing, continuous facing, cover page (View → Page layout; remembered) |
 | Right-to-Left Page Layout | ⬜ |
 | Tabbed Interface and Multiple Tab Groups | 🟡 document tabs (open several files, switch, reorder, close others/right/all, unsaved marker, per-tab undo, zoom and position; drag pages between tabs or onto "+" for a new document); ⬜ multiple tab groups |
 | Desktop application, shell integration ("Open with", default PDF app) | ✅ installable app (own window, works offline, registered for PDFs; files opened from the system arrive as tabs in the running window) |
@@ -257,7 +256,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Optimize Documents | ⬜ |
 | Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
 | Autoscroll, Playback, Page Transitions, Full-Screen Mode | ⬜ |
-| Split the Page View, Spreadsheet Split | ⬜ |
+| Split the Page View, Spreadsheet Split | 🟡 split view side by side or one above the other, each pane with its own zoom and position; ⬜ spreadsheet split (four panes) |
 | Loupe Tool, Pan and Zoom Pane | ⬜ |
 | Zoom Features | ✅ zoom box, presets, fit width/page, Zoom tool, rotate view |
 | Calibrate Measurement Scales | ✅ drawing scale 1:n or calibration from a line of known length; applies to existing measurements |

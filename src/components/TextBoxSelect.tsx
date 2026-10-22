@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { styleFor, uid, useStore } from '../store/store';
 import { can, useCan } from '../store/permissions';
 import { viewRectToPdf, type VRect } from '../lib/geometry';
+import { activeViewer } from '../lib/activeViewer';
 import { tr } from '../lib/i18n';
 import { useContextMenu } from './Menu';
 import { textSelectionMenu } from './contextMenus';
@@ -112,7 +113,7 @@ export function textInBox(pageEl: HTMLElement, box: VRect, scale: number): { rec
 
 /** Select all text on a page. */
 export function selectAllText(page: number) {
-  const pageEl = document.querySelector<HTMLElement>(`.page[data-index="${page}"]`);
+  const pageEl = activeViewer()?.querySelector<HTMLElement>(`.page[data-index="${page}"]`);
   if (!pageEl) return;
   const s = useStore.getState();
   const { rects, text } = textInBox(pageEl, { left: -1e4, top: -1e4, width: 2e4, height: 2e4 }, s.scale);

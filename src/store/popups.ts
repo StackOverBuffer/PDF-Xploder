@@ -1,5 +1,6 @@
 /** Opening, closing and placing comment popups (see lib/popups.ts). */
 import { useStore } from './store';
+import { activeViewer } from '../lib/activeViewer';
 import { defaultPopupRect, hasPopup, hasText } from '../lib/popups';
 import type { Annotation, Rect } from '../lib/types';
 
@@ -28,7 +29,7 @@ export function togglePopup(pageId: string, id: string) {
 
 /** Put the cursor into a popup's text once it is on screen. */
 export function focusPopup(id: string) {
-  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(`.annot-popup[data-id="${id}"] textarea.popup-text`)?.focus()));
+  requestAnimationFrame(() => requestAnimationFrame(() => activeViewer()?.querySelector<HTMLTextAreaElement>(`.annot-popup[data-id="${id}"] textarea.popup-text`)?.focus()));
 }
 
 /** Move or resize a popup (a change to the document, like moving the comment). */

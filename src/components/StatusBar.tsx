@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useStore } from '../store/store';
+import { turnPage } from '../store/viewActions';
 import { pageRot, viewSize } from '../lib/geometry';
 import { formatPercent, tf, useLang, useT } from '../lib/i18n';
 
@@ -40,7 +41,7 @@ export function StatusBar() {
     <footer className="statusbar">
       <div className="nav">
         <button onClick={() => S().goToPage(0)} disabled={current === 0} title={t('First page')}><ChevronFirst size={16} /></button>
-        <button onClick={() => S().goToPage(current - 1)} disabled={current === 0} title={t('Previous page')}><ChevronLeft size={16} /></button>
+        <button onClick={() => turnPage(-1)} disabled={current === 0} title={t('Previous page')}><ChevronLeft size={16} /></button>
         <input
           aria-label={t('Page number')}
           value={text}
@@ -49,7 +50,7 @@ export function StatusBar() {
           onBlur={() => setText(shown(current))}
         />
         <span>{labels ? `(${current + 1} / ${count})` : `/ ${count}`}</span>
-        <button onClick={() => S().goToPage(current + 1)} disabled={current >= count - 1} title={t('Next page')}><ChevronRight size={16} /></button>
+        <button onClick={() => turnPage(1)} disabled={current >= count - 1} title={t('Next page')}><ChevronRight size={16} /></button>
         <button onClick={() => S().goToPage(count - 1)} disabled={current >= count - 1} title={t('Last page')}><ChevronLast size={16} /></button>
       </div>
       <div className="muted small">

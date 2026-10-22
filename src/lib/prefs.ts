@@ -3,6 +3,7 @@
  * panes are open, the ribbon tab) and how documents open. Kept in this browser only.
  */
 import { create } from 'zustand';
+import type { PageLayout } from './viewLayout';
 
 export type DefaultZoom = 'width' | 'page' | 'actual';
 
@@ -19,10 +20,14 @@ export interface Prefs {
    * draw, 'off', or 'always' (every document; for testing, not offered in the interface).
    */
   backgroundDrawing: 'auto' | 'off' | 'always';
+  /** How pages are arranged in the viewer (see viewLayout.ts). */
+  pageLayout: PageLayout;
+  /** In the facing layouts, the first page alone (a cover), so spreads pair even and odd pages as in print. */
+  coverPage: boolean;
 }
 
 const KEY = 'pdf-xploder.prefs';
-export const DEFAULT_PREFS: Prefs = { defaultZoom: 'width', showProps: true, sidebarWidth: 240, propsWidth: 250, ribbonTab: 'Home', backgroundDrawing: 'auto' };
+export const DEFAULT_PREFS: Prefs = { defaultZoom: 'width', showProps: true, sidebarWidth: 240, propsWidth: 250, ribbonTab: 'Home', backgroundDrawing: 'auto', pageLayout: 'continuous', coverPage: false };
 
 export const PANE_MIN = 180;
 export const PANE_MAX = 520;
