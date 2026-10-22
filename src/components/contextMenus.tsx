@@ -5,7 +5,7 @@
 import {
   ImageUp, Images, FileArchive, Download, Stamp, ScanText, ScanBarcode, BookmarkPlus, Link2, Layers, Hand, Camera, TextSelect,
   ZoomIn, Scissors, Copy, ClipboardPaste, Trash2, BringToFront, BoxSelect, SquareX, LayoutGrid, FilePlus2, FileOutput, Settings2,
-  Pencil, Highlighter, Underline, Strikethrough, Search, MousePointer2, Type,
+  Pencil, Highlighter, Underline, Strikethrough, Search, MousePointer2, Type, MessageSquareText, MessageSquareOff,
 } from 'lucide-react';
 import type { MenuItem } from './Menu';
 import { tr } from '../lib/i18n';
@@ -25,6 +25,8 @@ import { toUser } from './ContentLayer';
 import type { LayerInfo, ObjectInfo } from '../lib/content/page';
 import type { Annotation, PageGeom, Pt, Rect } from '../lib/types';
 import { annotationsAt } from '../lib/annotHit';
+import { hasPopup } from '../lib/popups';
+import { popupCounts, setAllPopups, setPopupOpen } from '../store/popups';
 import { ANNOT_LABELS, annotSummary, viewBounds } from '../lib/annotGeom';
 import { askText } from '../lib/ask';
 
@@ -304,12 +306,32 @@ function selectUnder(page: number, geom: PageGeom, at: Pt): MenuItem[] {
   ];
 }
 
+/** The popup of the comment under the pointer, and all popups. */
+function popupItems(page: number, geom: PageGeom, at: Pt): MenuItem[] {
+  const s = S();
+  const pageId = s.pageIds[page];
+  const top = annotationsAt(s.annotations[pageId] ?? [], geom, at, 5 / s.scale).find(hasPopup);
+  const counts = popupCounts(s.annotations);
+  if (!top && !counts.withText && !counts.open) return [];
+  return [
+    ...(top
+      ? [top.popup?.open
+          ? { label: 'Close Popup', icon: i(MessageSquareOff), onClick: () => setPopupOpen(pageId, top.id, false) }
+          : { label: 'Open Popup', icon: i(MessageSquareText), onClick: () => setPopupOpen(pageId, top.id, true, { focus: true }) }]
+      : []),
+    { label: 'Open All Popups', icon: i(MessageSquareText), disabled: !counts.withText, onClick: () => setAllPopups(true) },
+    { label: 'Close All Popups', icon: i(MessageSquareOff), disabled: !counts.open, onClick: () => setAllPopups(false) },
+    null,
+  ];
+}
+
 export function pageMenu(page: number, geom: PageGeom, at: Pt): MenuItem[] {
   const userAt = viewToPdf(geom, at);
   const sel = window.getSelection();
   const selected = sel && !sel.isCollapsed ? sel.toString() : '';
   return [
     ...selectUnder(page, geom, at),
+    ...popupItems(page, geom, at),
     { label: 'Copy', icon: i(Copy), hint: 'Ctrl+C', disabled: !selected || !can('copy'), onClick: () => navigator.clipboard?.writeText(selected) },
     { label: 'Add Bookmark', icon: i(BookmarkPlus), hint: 'Ctrl+Shift+B', disabled: !can('modify'), onClick: () => ca.addBookmarkAt(page, userAt.y, selected) },
     null,

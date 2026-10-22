@@ -7,9 +7,11 @@ import {
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
+  MessageSquareText, MessageSquareOff,
   Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
 } from 'lucide-react';
 import { useStore } from '../store/store';
+import { setAllPopups } from '../store/popups';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import * as extra from '../store/extras';
@@ -432,6 +434,10 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         </Group>
         <Group label="Manage">
           <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments" />
+          <Stack>
+            <Btn size="small" icon={<MessageSquareText size={I} />} label="Open all popups" title="Open the popups of all comments that contain text" disabled={noDoc} onClick={() => setAllPopups(true)} />
+            <Btn size="small" icon={<MessageSquareOff size={I} />} label="Close all popups" disabled={noDoc} onClick={() => setAllPopups(false)} />
+          </Stack>
           <Btn icon={<Layers size={L} />} label="Flatten" disabled={!canModify} onClick={cmd.flattenAnnotations} />
         </Group>
       </>

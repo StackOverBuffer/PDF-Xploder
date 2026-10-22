@@ -10,6 +10,7 @@ import { UNITS, type Measure, type MeasureUnit } from './measure';
 import {
   decodePDFRawStream,
   PDFArray,
+  PDFBool,
   PDFDict,
   PDFDocument,
   PDFHexString,
@@ -250,14 +251,17 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
-  // A (closed) popup for the text: some viewers (Preview, mobile apps) show comments only through it.
-  if (contents && a.type !== 'redact') {
-    const [vx0, vy0, vx1, vy1] = g.view;
-    const pw = 200;
-    const ph = 100;
-    const top = Math.min(rect.y + rect.h, vy1);
-    const x = Math.min(rect.x + rect.w + 4, vx1 - pw);
-    const popup = pdf.register(pdf.obj({ Type: 'Annot', Subtype: 'Popup', Parent: annotRef, Rect: [Math.max(vx0, x), Math.max(vy0, top - ph), Math.max(vx0, x) + pw, Math.max(vy0, top - ph) + ph], Open: false, F: 28 }));
+  // A popup for the text (where it was placed here, open or closed as it is now): some
+  // viewers (Preview, mobile apps) show comments only through it.
+  if ((contents || a.popup) && a.type !== 'redact') {
+    let r = a.popup?.rect;
+    if (!r) {
+      const [vx0, vy0, vx1, vy1] = g.view;
+      const top = Math.min(rect.y + rect.h, vy1);
+      const x = Math.max(vx0, Math.min(rect.x + rect.w + 4, vx1 - 200));
+      r = { x, y: Math.max(vy0, top - 100), w: 200, h: 100 };
+    }
+    const popup = pdf.register(pdf.obj({ Type: 'Annot', Subtype: 'Popup', Parent: annotRef, Rect: [r.x, r.y, r.x + r.w, r.y + r.h], Open: !!a.popup?.open, F: 28 }));
     dict.set(PDFName.of('Popup'), popup);
     page.node.addAnnot(popup);
   }
@@ -535,6 +539,12 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
         if (!pdf) continue;
         a.appearance = pdf;
       }
+      // Its popup: where it is now (another editor may have moved it) and whether it is open.
+      // A closed popup nobody placed (one written for other viewers) is left out.
+      const pop = dict.lookup(PDFName.of('Popup'));
+      const popRect = pop instanceof PDFDict ? rectOf(pop) : undefined;
+      const popOpen = pop instanceof PDFDict && pop.lookup(PDFName.of('Open')) === PDFBool.True;
+      if (popRect && (popOpen || a.popup) && a.type !== 'text' && a.type !== 'redact') a.popup = { open: popOpen, rect: popRect };
       out.push(a);
       count++;
       remove.add(entry as PDFRef);

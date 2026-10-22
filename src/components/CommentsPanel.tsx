@@ -4,6 +4,8 @@ import { useCan } from '../store/permissions';
 import { ANNOT_LABELS, annotSummary } from '../lib/annotGeom';
 import { flattenAnnotations } from '../store/commands';
 import { tf, useT } from '../lib/i18n';
+import { hasPopup } from '../lib/popups';
+import { setPopupOpen } from '../store/popups';
 
 export function CommentsPanel() {
   const t = useT();
@@ -43,6 +45,7 @@ export function CommentsPanel() {
                       // goToPage takes a user-space y; for rotated pages fall back to the page top.
                       s.goToPage(i, anchor && geoms[i].rotation === 0 ? anchor.y : undefined);
                     }}
+                    onDoubleClick={() => hasPopup(a) && setPopupOpen(pid, a.id, true, { focus: true })}
                   >
                     <span className="swatch" style={{ background: a.type === 'redact' ? '#000' : a.color }} />
                     <div className="comment-body">

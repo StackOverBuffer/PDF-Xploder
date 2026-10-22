@@ -44,6 +44,18 @@ interface AnnotBase {
   subject?: string;
   /** Answers to the comment, oldest first. */
   replies?: Reply[];
+  /** The comment's popup window on the page (a /Popup annotation in the file). */
+  popup?: PopupState;
+}
+
+/**
+ * A popup window showing a comment's text on the page. `rect` is in user space with the
+ * size in points at 100 % (popups keep their size when zooming, like /NoZoom); missing
+ * until it is first placed.
+ */
+export interface PopupState {
+  open: boolean;
+  rect?: Rect;
 }
 
 /**

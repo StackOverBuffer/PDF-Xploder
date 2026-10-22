@@ -16,6 +16,8 @@ import { useLang, useT } from '../lib/i18n';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 import { useAppearanceImage } from '../lib/appearanceImage';
 import { annotationsAt } from '../lib/annotHit';
+import { hasPopup } from '../lib/popups';
+import { setPopupOpen } from '../store/popups';
 
 interface Props {
   index: number;
@@ -161,7 +163,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     useStore.getState().addAnnotation(index, a);
     useStore.getState().setTool('select');
     useStore.getState().select({ pageId, id: a.id });
-    requestAnimationFrame(() => document.getElementById('prop-text')?.focus());
+    // Typed into its popup, as in PDF-XChange.
+    setPopupOpen(pageId, a.id, true, { focus: true });
   }
 
   function placePendingStamp(p: Pt) {
@@ -388,9 +391,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     if (a.type === 'text' && editable) {
       useStore.getState().armCheckpoint();
       useStore.getState().setEditing(a.id);
-    } else if (a.type === 'note') {
-      useStore.getState().setSidebar(useStore.getState().sidebar);
-      document.getElementById('prop-text')?.focus();
+    } else if (hasPopup(a)) {
+      // The comment's popup, with the cursor in its text.
+      setPopupOpen(pageId, a.id, true, { focus: true });
     }
   };
 
@@ -455,6 +458,13 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onPointerLeave={() => setHover(null)}
+      onDoubleClick={(e) => {
+        // Here, not on the comment: the layer holds the pointer from the first click (dragging).
+        if (tool !== 'select') return;
+        const under = annotationsAt(annots, geom, viewPt(e), 5 / scale);
+        const a = under.find((x) => x.id === useStore.getState().selected?.id) ?? under[0];
+        if (a) onDoubleClick(a);
+      }}
     >
       {pageHits.map(({ h, i }) => {
         const v = pdfRectToView(geom, h.rect);
@@ -465,7 +475,6 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
           key={a.id}
           className={`annot annot-${a.type}`}
           onPointerDown={(e) => pickAndDrag(e, a)}
-          onDoubleClick={() => onDoubleClick(a)}
         >
           <AnnotShape a={a} pageId={pageId} geom={geom} scale={S} editing={editing === a.id} />
           {a.comment || a.type === 'note' || a.replies?.length ? (

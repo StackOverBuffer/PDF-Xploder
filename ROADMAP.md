@@ -69,7 +69,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Fit Box by Text Content | ⬜ |
 | Flatten Comments | ✅ |
 | Summarize Comments (with font customization) | ⬜ |
-| Open All Comment Popups that Contain Text | ⬜ |
+| Open All Comment Popups that Contain Text | ✅ popups on the page (double-click a comment), open/close all, saved as /Popup with position and open state |
 | Comment Replies (threads) | ✅ shown, added and saved as standard /IRT replies |
 | Comment Review Status | ⬜ |
 | Support for Existing Screen Annotations | ⬜ |

@@ -3,6 +3,7 @@ import { TextLayer } from 'pdfjs-dist';
 import { useStore } from '../store/store';
 import { viewSize } from '../lib/geometry';
 import { AnnotationLayer } from './AnnotationLayer';
+import { PopupLayer } from './PopupLayer';
 import { WidgetLayer } from './WidgetLayer';
 import { ContentLayer } from './ContentLayer';
 import { registerTextLayer } from '../lib/textSelection';
@@ -281,27 +282,31 @@ export const PageView = memo(function PageView({ index, visible }: Props) {
   }, [visible, capped, pdf, opening, index, scale, geom.rotation, dpr, w, h, docVersion]);
 
   return (
-    <div
-      ref={pageRef}
-      className="page"
-      data-index={index}
-      style={{ width: w, height: h }}
-      onContextMenu={(e) => {
-        // Layers with their own menus (objects, text box selection) handle it first.
-        if (e.defaultPrevented || (e.target as Element).closest('input, textarea, select, .widget')) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        menu.open(e, pageMenu(index, geom, { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }));
-      }}
-    >
-      <div className="canvas-host" ref={canvasHost} />
-      <div className="detail-host" ref={detailHost} />
-      <div className="textLayer" ref={textRef} />
-      {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
-      {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}
-      {visible && textBoxTool && <TextBoxLayer index={index} geom={geom} scale={scale} />}
-      {visible && contentTool && <ContentLayer index={index} geom={geom} scale={scale} width={w} height={h} />}
-      <div className="page-label">{index + 1}</div>
-      {menu.element}
-    </div>
+    <>
+      <div
+        ref={pageRef}
+        className="page"
+        data-index={index}
+        style={{ width: w, height: h }}
+        onContextMenu={(e) => {
+          // Layers with their own menus (objects, text box selection) handle it first.
+          if (e.defaultPrevented || (e.target as Element).closest('input, textarea, select, .widget')) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          menu.open(e, pageMenu(index, geom, { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }));
+        }}
+      >
+        <div className="canvas-host" ref={canvasHost} />
+        <div className="detail-host" ref={detailHost} />
+        <div className="textLayer" ref={textRef} />
+        {visible && <WidgetLayer index={index} geom={geom} scale={scale} />}
+        {visible && pageId && <AnnotationLayer index={index} pageId={pageId} geom={geom} scale={scale} width={w} height={h} />}
+        {visible && textBoxTool && <TextBoxLayer index={index} geom={geom} scale={scale} />}
+        {visible && contentTool && <ContentLayer index={index} geom={geom} scale={scale} width={w} height={h} />}
+        <div className="page-label">{index + 1}</div>
+        {menu.element}
+      </div>
+      {/* Beside the page, not in it: popups may reach past its edge. */}
+      {visible && pageId && <PopupLayer pageId={pageId} geom={geom} scale={scale} />}
+    </>
   );
 });

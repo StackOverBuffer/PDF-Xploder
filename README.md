@@ -137,6 +137,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
 - Selecting overlapping comments: the smaller one under the pointer comes first; click again on the same spot for the next one underneath (Alt+click: directly), right-click → Select lists everything there, Tab / Shift+Tab steps through the page's comments; thin lines and outlines are picked within a few pixels
 - Comment text and author on every annotation; comments list
+- Comment popups on the page: double-click a comment (or a new note) to open its popup with author, date, text and replies; type and reply in it, drag it by its title, resize it at the corner; it keeps its size when zooming. Comment → Open all / Close all popups, or right-click. Saved as the comment's /Popup (position and open state), so other viewers open it in the same place
 - Reply threads: replies made in PDF-XChange or Acrobat show under their comment (Comments pane, properties); add and delete replies; saved as standard replies (/IRT) that those programs show in the thread
 - Saved as native, editable PDF annotations with appearance streams (or flattened on request)
 - Import and edit annotations already present in a PDF (Highlight, Underline, Squiggly, StrikeOut, Ink, Square, Circle, Line, FreeText, Text, Redact), with lossless round trips of our own

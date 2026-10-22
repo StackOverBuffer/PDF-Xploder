@@ -174,6 +174,28 @@ describe('export', () => {
     expect(left?.size() ?? 0).toBe(0);
   });
 
+  it('keeps a popup where it was placed, open or closed', async () => {
+    const note: Annotation = { ...base, id: 'p1', type: 'note', at: { x: 20, y: 250 }, text: 'Look here', popup: { open: true, rect: { x: 60, y: 150, w: 220, h: 120 } } };
+    const box: Annotation = { ...base, id: 'p2', type: 'rect', rect: { x: 50, y: 50, w: 30, h: 30 }, width: 2, fill: null, comment: 'Closed', popup: { open: false, rect: { x: 90, y: 40, w: 180, h: 100 } } };
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [[note, box]]);
+    const doc = await PDFDocument.load(out);
+    const popups = doc.getPage(0).node.Annots()!.asArray().map((r) => doc.context.lookup(r) as PDFDict).filter((d) => d.get(PDFName.of('Subtype'))?.toString() === '/Popup');
+    expect(popups.map((d) => d.get(PDFName.of('Open'))?.toString())).toEqual(['true', 'false']);
+    expect((popups[0].get(PDFName.of('Rect')) as PDFArray).asArray().map((x) => (x as PDFNumber).asNumber())).toEqual([60, 150, 280, 270]);
+    const back = await ops.importForEditing(out, () => 'x');
+    expect(back.annotations[0]).toEqual([note, box]);
+  });
+
+  it('leaves out closed popups nobody placed, and opens the ones another editor left open', async () => {
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [[{ ...base, id: 'c1', type: 'rect', rect: { x: 50, y: 50, w: 30, h: 30 }, width: 2, fill: null, comment: 'Hi' }]]);
+    expect((await ops.importForEditing(out, () => 'x')).annotations[0][0].popup).toBeUndefined();
+    const doc = await PDFDocument.load(out);
+    const popup = doc.getPage(0).node.Annots()!.asArray().map((r) => doc.context.lookup(r) as PDFDict).find((d) => d.get(PDFName.of('Subtype'))?.toString() === '/Popup')!;
+    popup.set(PDFName.of('Open'), doc.context.obj(true));
+    const back = await ops.importForEditing(await doc.save(), () => 'x');
+    expect(back.annotations[0][0].popup).toMatchObject({ open: true, rect: { w: 200, h: 100 } });
+  });
+
   it('follows a move made by another editor', async () => {
     const out = await ops.exportWithAnnotations(await makeDoc(1), [[all[3]]]);
     const doc = await PDFDocument.load(out);

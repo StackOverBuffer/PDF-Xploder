@@ -59,6 +59,17 @@ const DE: Record<string, string> = {
   Undo: 'Rückgängig',
   'Deleted {n} page(s).': '{n} Seite(n) gelöscht.',
   'Deleted {n} blank page(s): {pages}.': '{n} leere Seite(n) gelöscht: {pages}.',
+  // comment popups
+  'Open all popups': 'Alle Popups öffnen',
+  'Close all popups': 'Alle Popups schließen',
+  'Open the popups of all comments that contain text': 'Die Popups aller Kommentare mit Text öffnen',
+  'Open Popup': 'Popup öffnen',
+  'Close Popup': 'Popup schließen',
+  'Open All Popups': 'Alle Popups öffnen',
+  'Close All Popups': 'Alle Popups schließen',
+  'Close popup': 'Popup schließen',
+  'Add a comment…': 'Kommentar hinzufügen…',
+  'Comment text': 'Kommentartext',
   // preferences: background drawing
   'Draw complex pages in the background (experimental)': 'Aufwendige Seiten im Hintergrund zeichnen (experimentell)',
   'Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth. Uses more memory.':

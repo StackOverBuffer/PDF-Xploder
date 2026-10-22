@@ -217,7 +217,8 @@ interface Actions {
   /** Replace the document bytes (after a page operation). `pageIds` defaults to the current ids. */
   commitBytes(bytes: Uint8Array, pageIds?: string[], annotations?: Record<string, Annotation[]>, formValues?: Record<string, FieldValue>): Promise<void>;
   addAnnotation(pageIndex: number, a: Annotation): void;
-  updateAnnotation(pageId: string, id: string, patch: Partial<Annotation>, opts?: { history?: boolean }): void;
+  /** quiet: no undo point and no unsaved change (opening or closing a comment's popup). */
+  updateAnnotation(pageId: string, id: string, patch: Partial<Annotation>, opts?: { history?: boolean; quiet?: boolean }): void;
   deleteAnnotation(pageId: string, id: string): void;
   setFormValue(name: string, value: FieldValue, opts?: { history?: boolean }): void;
   /** Push the current state onto the undo stack (used before a drag starts). */
@@ -436,7 +437,7 @@ export const useStore = create<Store>()((set, get) => {
     set({
       ...doc,
       pageIds: snap.pageIds,
-      annotations: snap.annotations,
+      annotations: keepPopupsOpen(snap.annotations, cur.annotations),
       formValues: snap.formValues,
       selected: null,
       editing: null,
@@ -848,7 +849,9 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     updateAnnotation(pageId, id, patch, opts = {}) {
-      if (opts.history !== false) pushHistory();
+      if (opts.quiet) {
+        // Does not touch the undo history either (see restore).
+      } else if (opts.history !== false) pushHistory();
       else takeArmed();
       const list = get().annotations[pageId] ?? [];
       set({
@@ -856,7 +859,7 @@ export const useStore = create<Store>()((set, get) => {
           ...get().annotations,
           [pageId]: list.map((a) => (a.id === id ? ({ ...a, ...patch } as Annotation) : a)),
         },
-        dirty: true,
+        ...(opts.quiet ? {} : { dirty: true }),
       });
     },
 
@@ -977,6 +980,24 @@ export function whenIdle(): Promise<void> {
 }
 
 /** Annotations ordered by page index. */
+/**
+ * Undo and redo leave popups open or closed as they are now: opening one is not a change
+ * of its own (see updateAnnotation's quiet), so it should not be undone with another.
+ */
+function keepPopupsOpen(next: Record<string, Annotation[]>, now: Record<string, Annotation[]>): Record<string, Annotation[]> {
+  const open = new Map<string, boolean>();
+  for (const list of Object.values(now)) for (const a of list) if (a.popup) open.set(a.id, a.popup.open);
+  if (!open.size) return next;
+  const out: Record<string, Annotation[]> = {};
+  for (const [pid, list] of Object.entries(next)) {
+    out[pid] = list.map((a) => {
+      const o = open.get(a.id);
+      return o === undefined || o === a.popup?.open ? a : ({ ...a, popup: { ...a.popup, open: o } } as Annotation);
+    });
+  }
+  return out;
+}
+
 export function annotationsByPage(s: Pick<State, 'pageIds' | 'annotations'>): Annotation[][] {
   return s.pageIds.map((id) => s.annotations[id] ?? []);
 }
