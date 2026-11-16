@@ -335,8 +335,8 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
       if (mod && key === 'v' && s.currentPage === index && ca.hasObjectClipboard()) {
-        e.preventDefault();
-        ca.pasteObjects(index, { inPlace: e.shiftKey });
+        // No preventDefault: the paste event decides between these objects and a newer image.
+        ca.requestObjectPaste(index, e.shiftKey);
         return;
       }
       if (!sel || sel.page !== index) return;

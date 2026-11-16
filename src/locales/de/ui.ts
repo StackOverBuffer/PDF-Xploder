@@ -279,8 +279,8 @@ const DE: Record<string, string> = {
   'Select some text with the Select Text tool first.': 'Markieren Sie zuerst Text mit dem Werkzeug Textauswahl.', 'Text copied to the clipboard.': 'Text in die Zwischenablage kopiert.',
   'The browser blocked clipboard access; use Ctrl+C instead.': 'Der Browser hat den Zugriff auf die Zwischenablage blockiert; verwenden Sie stattdessen Strg+C.',
   'The clipboard does not contain an image.': 'Die Zwischenablage enthält kein Bild.',
-  'The browser blocked clipboard access. Paste images with Ctrl+V into a dialog or insert them from a file instead.':
-    'Der Browser hat den Zugriff auf die Zwischenablage blockiert. Fügen Sie Bilder mit Strg+V in einen Dialog ein oder fügen Sie sie stattdessen aus einer Datei ein.',
+  'The browser blocked clipboard access. Press Ctrl+V on the page or insert the image from a file instead.':
+    'Der Browser hat den Zugriff auf die Zwischenablage blockiert. Drücken Sie Strg+V auf der Seite oder fügen Sie das Bild stattdessen aus einer Datei ein.',
   'This browser cannot share files directly, so the PDF was downloaded for you to send.': 'Dieser Browser kann Dateien nicht direkt teilen, daher wurde die PDF-Datei zum Versenden heruntergeladen.',
   'Remove the attachment “{name}”?': 'Dateianlage „{name}“ entfernen?', 'This browser cannot read text aloud.': 'Dieser Browser kann keinen Text vorlesen.',
   'This document’s security settings do not allow text extraction for accessibility.': 'Die Sicherheitseinstellungen dieses Dokuments erlauben keine Textextraktion für die Barrierefreiheit.',

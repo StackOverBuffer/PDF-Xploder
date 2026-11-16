@@ -166,6 +166,7 @@ The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page com
 - Edit existing text in place (double-click a line): the original font is kept when it has the characters, otherwise Noto Sans is used; change font, size, colour, character and word spacing, horizontal scale, baseline shift
 - Shapes: fill and stroke colour (or none), line width; images: replace (scaled to the original's size), export any selection as a 300 dpi PNG; remove clipping paths; duplicate (Ctrl+D) and delete
 - Add text, images, rectangles, ellipses and lines to the page content itself
+- Paste an image from the clipboard with Ctrl+V (a screenshot, a picture copied in another app, or an image file copied in the file manager): it lands centred on the current page, selected for moving and resizing. With the Edit objects tool it becomes page content, otherwise an image comment
 - Add text boxes, images and signatures as comments; watermarks; headers/footers with page numbers, dates, title and Bates numbering
 - Unicode text: Latin, Greek, Cyrillic, symbols and, when online, Chinese, Japanese and Korean
 

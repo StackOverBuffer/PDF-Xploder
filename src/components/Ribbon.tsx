@@ -299,7 +299,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
               { label: 'Copy selected text', icon: <ClipboardCopy size={14} />, hint: 'Ctrl+C', disabled: !canCopy, onClick: extra.copySelectedText },
               { label: 'Copy page as image', icon: <ImageIcon size={14} />, disabled: !canCopy, onClick: () => extra.copyPageImage() },
               null,
-              { label: 'Paste image as comment', icon: <ClipboardPaste size={14} />, disabled: !canAnnotate, onClick: extra.pasteImage },
+              { label: 'Paste image as comment', icon: <ClipboardPaste size={14} />, hint: 'Ctrl+V', disabled: !canAnnotate, onClick: extra.pasteImage },
             ]} />
             <Btn size="small" icon={<Search size={I} />} label="Find" disabled={noDoc} menu={[
               { label: 'Find…', icon: <Search size={14} />, hint: 'Ctrl+F', onClick: () => openSearch('find') },

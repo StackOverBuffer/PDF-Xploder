@@ -9,7 +9,8 @@ import { Ribbon } from './components/Ribbon';
 import { TabBar } from './components/TabBar';
 import { FOCUS_COMMAND_SEARCH } from './components/CommandSearch';
 import { copyBoxText, selectAllText, useTextBox } from './components/TextBoxSelect';
-import { addBookmarkAt } from './store/contentActions';
+import { addBookmarkAt, takeObjectPaste } from './store/contentActions';
+import { imageFromClipboard, insertImageBlob } from './store/extras';
 import { goToBookmark } from './store/bookmarkCommands';
 import { turnPage } from './store/viewActions';
 import { Viewer } from './components/Viewer';
@@ -127,8 +128,29 @@ function useShortcuts() {
         if (['select', 'selectText', 'hand', 'zoom'].includes(tool) || (tool === 'snapshot' ? can('copy') : can('annotate'))) s.setTool(tool);
       }
     };
+    // Ctrl+V / Edit → Paste: an image from the clipboard goes onto the current page.
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement;
+      const textInput = t.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'color', 'button'].includes((t as HTMLInputElement).type);
+      if (t.isContentEditable || textInput || ['TEXTAREA', 'SELECT'].includes(t.tagName)) return;
+      const s = useStore.getState();
+      if (useDialog.getState().open || s.busy || !s.pdf) return;
+      const objects = takeObjectPaste();
+      const image = imageFromClipboard(e.clipboardData);
+      if (image) {
+        e.preventDefault();
+        void s.run('Pasting…', () => insertImageBlob(image));
+      } else if (objects) {
+        e.preventDefault();
+        objects();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('paste', onPaste);
+    };
   }, []);
 }
 
