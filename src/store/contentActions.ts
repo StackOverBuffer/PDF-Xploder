@@ -155,8 +155,9 @@ export async function copyObjects() {
   const iso = await isolateObjects(S().bytes!, sel.page, sel.objects.map((o) => o.id));
   const text = sel.objects.filter((o) => o.kind === 'text').map((o) => o.text).join('\n');
   clip = { bytes: iso.bytes, box: iso.box, page: sel.page, text };
-  // Text also goes to the system clipboard, for pasting elsewhere.
-  if (text) navigator.clipboard?.writeText(text).catch(() => {});
+  // Text also goes to the system clipboard, for pasting elsewhere. Without text it is
+  // cleared, so an image copied earlier does not win over these objects on Ctrl+V.
+  navigator.clipboard?.writeText(text).catch(() => {});
   S().notify(`${sel.objects.length} ${tr('object(s) copied')}`);
 }
 
@@ -166,6 +167,30 @@ export async function cutObjects() {
   if (!sel) return;
   await copyObjects();
   if (clip) await applyContentEdits(sel.page, [{ type: 'delete', ids: sel.ids }]);
+}
+
+/**
+ * Ctrl+V with the Edit Content tool. The browser's paste event that follows decides
+ * (see takeObjectPaste): an image on the system clipboard is newer than these objects.
+ * Browsers that send no paste event get the objects after a moment.
+ */
+let pendingPaste: { run: () => void; timer: number } | null = null;
+export function requestObjectPaste(page: number, inPlace: boolean) {
+  if (pendingPaste) window.clearTimeout(pendingPaste.timer);
+  const run = () => {
+    pendingPaste = null;
+    void pasteObjects(page, { inPlace });
+  };
+  pendingPaste = { run, timer: window.setTimeout(run, 150) };
+}
+
+/** Cancel the pending object paste and hand it over, to run now or not at all. */
+export function takeObjectPaste(): (() => void) | null {
+  const p = pendingPaste;
+  if (!p) return null;
+  window.clearTimeout(p.timer);
+  pendingPaste = null;
+  return p.run;
 }
 
 /**

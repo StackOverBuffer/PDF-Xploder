@@ -524,7 +524,12 @@ export async function addContentImage() {
   if (!requirePermission('modify')) return;
   const [f] = await pickFile('image/*');
   if (!f) return;
-  const img = await normaliseImage(await readAsDataUrl(f));
+  await placeContentImage(await normaliseImage(await readAsDataUrl(f)));
+}
+
+/** Add a normalised image to the current page's content, centred and selected for moving/resizing. */
+export async function placeContentImage(img: { src: string; width: number; height: number }) {
+  if (!requirePermission('modify')) return;
   const s = S();
   const index = s.currentPage;
   const g = s.geoms[index];

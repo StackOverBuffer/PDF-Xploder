@@ -8,7 +8,7 @@ import { annotationsByPage, useStore } from './store';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
 import { ops } from '../lib/worker';
-import { buildFileForSave, currentBytes, normaliseImage, placeImage } from './commands';
+import { buildFileForSave, currentBytes, normaliseImage, placeContentImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import { openPdf, renderToCanvas, type PDFDocumentProxy } from '../lib/pdfjs';
@@ -99,7 +99,7 @@ export async function copySelectedText() {
   }
 }
 
-/** Paste an image from the clipboard onto the current page as an image comment. */
+/** Paste an image from the clipboard onto the current page (Clipboard → Paste image as comment). */
 export async function pasteImage() {
   if (!requirePermission('annotate')) return;
   try {
@@ -107,15 +107,36 @@ export async function pasteImage() {
     for (const item of items) {
       const type = item.types.find((t) => t.startsWith('image/'));
       if (!type) continue;
-      const blob = await item.getType(type);
-      const img = await normaliseImage(await readAsDataUrl(blob));
-      placeImage(img.src, img.width * 0.75, img.height * 0.75);
+      await insertImageBlob(await item.getType(type), 'comment');
       return;
     }
     S().notify('The clipboard does not contain an image.');
   } catch {
-    S().notify('The browser blocked clipboard access. Paste images with Ctrl+V into a dialog or insert them from a file instead.', 'error');
+    S().notify('The browser blocked clipboard access. Press Ctrl+V on the page or insert the image from a file instead.', 'error');
   }
+}
+
+/** The first image in pasted data: a copied picture or screenshot, or an image file copied in a file manager. */
+export function imageFromClipboard(data: DataTransfer | null): File | null {
+  for (const item of Array.from(data?.items ?? [])) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    const f = item.getAsFile();
+    if (f) return f;
+  }
+  return null;
+}
+
+/**
+ * Put an image on the current page, centred and selected so it can be moved
+ * and resized: as page content with the Edit Content tool (or `as: 'content'`),
+ * otherwise as an image comment.
+ */
+export async function insertImageBlob(blob: Blob, as: 'auto' | 'comment' | 'content' = 'auto') {
+  const content = as === 'content' || (as === 'auto' && S().tool === 'content');
+  if (!requirePermission(content ? 'modify' : 'annotate')) return;
+  const img = await normaliseImage(await readAsDataUrl(blob));
+  if (content) await placeContentImage(img);
+  else placeImage(img.src, img.width * 0.75, img.height * 0.75);
 }
 
 // ---------------------------------------------------------------- sharing
