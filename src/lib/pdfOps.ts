@@ -30,6 +30,23 @@ export async function load(bytes: Uint8Array): Promise<PDFDocument> {
   return PDFDocument.load(bytes, { updateMetadata: false });
 }
 
+/**
+ * `dest.copyPages(src, indices)`, with each copied annotation's /P pointing at its new page.
+ * pdf-lib follows /P to the source page and writes a second, orphaned copy of it, so the
+ * annotations (3D models, form fields, …) would belong to a page that is not in the document.
+ */
+export async function copyPages(dest: PDFDocument, src: PDFDocument, indices: number[]): Promise<PDFPage[]> {
+  const pages = await dest.copyPages(src, indices);
+  const P = PDFName.of('P');
+  for (const page of pages) {
+    for (const ref of page.node.Annots()?.asArray() ?? []) {
+      const annot = dest.context.lookup(ref);
+      if (annot instanceof PDFDict && annot.has(P)) annot.set(P, page.ref);
+    }
+  }
+  return pages;
+}
+
 async function save(doc: PDFDocument): Promise<Uint8Array> {
   return saveDoc(doc);
 }
@@ -104,7 +121,7 @@ export async function duplicatePages(bytes: Uint8Array, indices: number[]): Prom
   const doc = await load(bytes);
   const sorted = [...new Set(indices)].sort((a, b) => a - b);
   // One copy operation, so resources the pages share (fonts, images) are copied once.
-  const copies = await doc.copyPages(doc, sorted);
+  const copies = await copyPages(doc, doc, sorted);
   for (let k = sorted.length - 1; k >= 0; k--) doc.insertPage(sorted[k] + 1, copies[k]);
   return save(doc);
 }
@@ -113,7 +130,7 @@ export async function duplicatePages(bytes: Uint8Array, indices: number[]): Prom
 export async function extractPages(source: Uint8Array | PDFDocument, indices: number[]): Promise<Uint8Array> {
   const src = source instanceof Uint8Array ? await load(source) : source;
   const out = await PDFDocument.create();
-  const pages = await out.copyPages(src, indices);
+  const pages = await copyPages(out, src, indices);
   pages.forEach((p) => out.addPage(p));
   return save(out);
 }
@@ -122,7 +139,7 @@ export async function extractPages(source: Uint8Array | PDFDocument, indices: nu
 export async function insertDocument(bytes: Uint8Array, other: Uint8Array, at: number): Promise<{ bytes: Uint8Array; count: number }> {
   const doc = await load(bytes);
   const src = await load(other);
-  const pages = await doc.copyPages(src, src.getPageIndices());
+  const pages = await copyPages(doc, src, src.getPageIndices());
   pages.forEach((p, i) => doc.insertPage(at + i, p));
   return { bytes: await save(doc), count: pages.length };
 }

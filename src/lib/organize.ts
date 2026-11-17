@@ -109,14 +109,14 @@ export async function assemblePages(bytes: Uint8Array, layout: PageSource[], oth
     } else (external.get(e.file) ?? external.set(e.file, []).get(e.file)!).push(k);
   });
   if (repeats.length) {
-    const copies = await doc.copyPages(doc, repeats.map((k) => layout[k] as number));
+    const copies = await ops.copyPages(doc, doc, repeats.map((k) => layout[k] as number));
     repeats.forEach((k, j) => (result[k] = copies[j]));
   }
   for (const [file, slots] of external) {
     const src = await load(others[file]);
     const idx = slots.map((k) => (layout[k] as { page: number }).page);
     for (const i of idx) if (i < 0 || i >= src.getPageCount()) throw new Error(`Page ${i + 1} does not exist in the other file.`);
-    const copies = await doc.copyPages(src, idx);
+    const copies = await ops.copyPages(doc, src, idx);
     slots.forEach((k, j) => (result[k] = copies[j]));
   }
   const rootRef = doc.catalog.get(N('Pages')) as PDFRef;

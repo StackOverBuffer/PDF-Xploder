@@ -262,3 +262,45 @@ describe('export', () => {
     expect(new TextDecoder('latin1').decode(res.bytes)).not.toContain('123-45-6789');
   });
 });
+
+describe('copied pages keep their annotations attached', () => {
+  /** Two pages; the first carries a 3D-style annotation whose /P names its page, as Acrobat writes it. */
+  async function withPageRefs(): Promise<Uint8Array> {
+    const doc = await PDFDocument.load(await makeDoc(2));
+    const page = doc.getPage(0);
+    const model = doc.context.flateStream('PRC data', { Type: '3D', Subtype: 'PRC' });
+    const annot = doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: '3D', Rect: [10, 10, 100, 100], P: page.ref, '3DD': doc.context.register(model) }));
+    page.node.set(PDFName.of('Annots'), doc.context.obj([annot]));
+    return doc.save();
+  }
+
+  async function check(bytes: Uint8Array) {
+    const doc = await PDFDocument.load(bytes);
+    let annots = 0;
+    for (const page of doc.getPages()) {
+      for (const ref of page.node.Annots()?.asArray() ?? []) {
+        const a = doc.context.lookup(ref, PDFDict);
+        expect(a.get(PDFName.of('P'))).toBe(page.ref);
+        expect(a.lookup(PDFName.of('3DD'))).toBeDefined();
+        annots++;
+      }
+    }
+    // No stray copies of a page left behind by /P.
+    const pageObjects = doc.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of('Type')) === PDFName.of('Page'));
+    expect(pageObjects.length).toBe(doc.getPageCount());
+    return annots;
+  }
+
+  it('when duplicating', async () => {
+    expect(await check(await ops.duplicatePages(await withPageRefs(), [0]))).toBe(2);
+  });
+
+  it('when extracting', async () => {
+    expect(await check(await ops.extractPages(await withPageRefs(), [0]))).toBe(1);
+  });
+
+  it('when inserting another document', async () => {
+    const { bytes } = await ops.insertDocument(await makeDoc(1), await withPageRefs(), 1);
+    expect(await check(bytes)).toBe(1);
+  });
+});
