@@ -448,6 +448,11 @@ const DE: Record<string, string> = {
   'The text is too long for a QR code.': 'Der Text ist zu lang für einen QR-Code.',
   'Saved to {name}': 'Gespeichert in {name}',
   'Could not write to the file, so a copy was downloaded instead.': 'Die Datei konnte nicht geschrieben werden, daher wurde stattdessen eine Kopie heruntergeladen.',
+  // ungrouping Form XObjects
+  Ungroup: 'Gruppierung aufheben',
+  'Split the group into its objects, so they can be moved and edited one by one':
+    'Die Gruppe in ihre Objekte aufteilen, damit sie sich einzeln verschieben und bearbeiten lassen',
+  'Double-click a group to take it apart.': 'Doppelklicken Sie auf eine Gruppe, um sie aufzuteilen.',
   // 3D models and rich media on the page
   '3D model': '3D-Modell', 'Rich media': 'Rich Media',
   'PDF-Xploder cannot display this content. It stays in the file; open the file in Adobe Acrobat Reader to view it.':

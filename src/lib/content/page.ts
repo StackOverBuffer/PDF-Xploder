@@ -18,9 +18,9 @@ import {
   decodePDFRawStream,
 } from '@cantoo/pdf-lib';
 import { readFont, type FontInfo } from './fonts';
-import { emitObjects, initialState, interpret, measureShow, objectBounds, tj, type ContentObject, type GState, type TextRun } from './objects';
-import { IDENTITY, maxScale, mul, translate, type M } from './matrix';
-import { name as nm, parseContent, writeContent, type Op } from './syntax';
+import { emitObject, emitObjects, initialState, interpret, measureShow, objectBounds, tj, type ContentObject, type GState, type Resources, type TextRun } from './objects';
+import { IDENTITY, isIdentity, maxScale, mul, translate, type M } from './matrix';
+import { isName, name as nm, parseContent, writeContent, type Op } from './syntax';
 import { hexToRgbTuple } from '../color';
 import type { Rect } from '../types';
 
@@ -62,50 +62,77 @@ export interface PageContent {
   layers: Map<string, string>;
   /** Operators that were not understood. */
   unknown: string[];
+  /** Indices of form objects whose content shows text. */
+  textForms: Set<number>;
+}
+
+/** Lookups into the page's resources for the content interpreter; fonts are read into `fonts` as they are used. */
+function pageResources(page: PDFPage, fonts: Map<string, FontInfo>): Resources {
+  const res = resourcesOf(page);
+  const sub = (k: string) => res?.lookup(PDFName.of(k));
+  const fontDict = sub('Font');
+  const xobjDict = sub('XObject');
+  const gsDict = sub('ExtGState');
+  return {
+    font(key) {
+      if (!fonts.has(key)) {
+        const d = fontDict instanceof PDFDict ? fontDict.lookup(PDFName.of(key)) : undefined;
+        if (d instanceof PDFDict) fonts.set(key, readFont(key, d));
+      }
+      return fonts.get(key);
+    },
+    xobject(key) {
+      const x = xobjDict instanceof PDFDict ? xobjDict.lookup(PDFName.of(key)) : undefined;
+      const dict = x instanceof PDFStream ? x.dict : undefined;
+      if (!dict) return undefined;
+      const st = dict.lookup(PDFName.of('Subtype'))?.toString();
+      const arr = (k: string) => {
+        const a = dict.lookup(PDFName.of(k));
+        return a instanceof PDFArray ? a.asArray().map((v) => n(dict.context.lookup(v)) ?? 0) : undefined;
+      };
+      return { subtype: st === '/Image' ? 'Image' : st === '/Form' ? 'Form' : 'Other', bbox: arr('BBox'), matrix: arr('Matrix') as M | undefined };
+    },
+    extGState(key) {
+      const g = gsDict instanceof PDFDict ? gsDict.lookup(PDFName.of(key)) : undefined;
+      const out = new Map<string, number | undefined>();
+      if (g instanceof PDFDict) for (const [k, v] of g.entries()) if (k.toString() !== '/Type') out.set(k.toString().slice(1), n(v));
+      return out;
+    },
+  };
+}
+
+const pageBox = (page: PDFPage): Rect => {
+  const mb = page.getMediaBox();
+  return { x: mb.x, y: mb.y, w: mb.width, h: mb.height };
+};
+
+/** The Form XObject a form object draws (`/Name Do`), if it is one in the page's resources. */
+function formOf(page: PDFPage, o: ContentObject): PDFStream | undefined {
+  const op = o.ops[0];
+  if (o.kind !== 'form' || o.ops.length !== 1 || op.op !== 'Do' || !isName(op.args[0])) return undefined;
+  const xobjs = resourcesOf(page)?.lookup(PDFName.of('XObject'));
+  const x = xobjs instanceof PDFDict ? xobjs.lookup(PDFName.of(op.args[0].v)) : undefined;
+  return x instanceof PDFStream && x.dict.lookup(PDFName.of('Subtype'))?.toString() === '/Form' ? x : undefined;
+}
+
+/** Does a content stream show text? (A quick scan for the BT operator.) */
+function showsText(bytes: Uint8Array): boolean {
+  return /(^|[\s\]>)}])BT(?=[\s/[(<]|$)/.test(new TextDecoder('latin1').decode(bytes));
 }
 
 export function readPage(page: PDFPage): PageContent {
   const res = resourcesOf(page);
-  const sub = (k: string) => res?.lookup(PDFName.of(k));
   const fonts = new Map<string, FontInfo>();
-  const fontDict = sub('Font');
-  const xobjDict = sub('XObject');
-  const gsDict = sub('ExtGState');
-  const mb = page.getMediaBox();
-  const { objects, unknown } = interpret(
-    parseContent(contentBytes(page)),
-    {
-      font(key) {
-        if (!fonts.has(key)) {
-          const d = fontDict instanceof PDFDict ? fontDict.lookup(PDFName.of(key)) : undefined;
-          if (d instanceof PDFDict) fonts.set(key, readFont(key, d));
-        }
-        return fonts.get(key);
-      },
-      xobject(key) {
-        const x = xobjDict instanceof PDFDict ? xobjDict.lookup(PDFName.of(key)) : undefined;
-        const dict = x instanceof PDFStream ? x.dict : undefined;
-        if (!dict) return undefined;
-        const st = dict.lookup(PDFName.of('Subtype'))?.toString();
-        const arr = (k: string) => {
-          const a = dict.lookup(PDFName.of(k));
-          return a instanceof PDFArray ? a.asArray().map((v) => n(dict.context.lookup(v)) ?? 0) : undefined;
-        };
-        return { subtype: st === '/Image' ? 'Image' : st === '/Form' ? 'Form' : 'Other', bbox: arr('BBox'), matrix: arr('Matrix') as M | undefined };
-      },
-      extGState(key) {
-        const g = gsDict instanceof PDFDict ? gsDict.lookup(PDFName.of(key)) : undefined;
-        const out = new Map<string, number | undefined>();
-        if (g instanceof PDFDict) for (const [k, v] of g.entries()) if (k.toString() !== '/Type') out.set(k.toString().slice(1), n(v));
-        return out;
-      },
-    },
-    { x: mb.x, y: mb.y, w: mb.width, h: mb.height },
-  );
+  const { objects, unknown } = interpret(parseContent(contentBytes(page)), pageResources(page, fonts), pageBox(page));
   const layers = new Map<string, string>();
-  const props = sub('Properties');
+  const props = res?.lookup(PDFName.of('Properties'));
   if (props instanceof PDFDict) for (const [k, v] of props.entries()) if (v instanceof PDFRef) layers.set(k.decodeText(), v.toString());
-  return { objects, fonts, unknown, layers };
+  const textForms = new Set<number>();
+  objects.forEach((o, i) => {
+    const form = o.kind === 'form' ? formOf(page, o) : undefined;
+    if (form && showsText(bytesOf(form))) textForms.add(i);
+  });
+  return { objects, fonts, unknown, layers, textForms };
 }
 
 export function writePage(page: PDFPage, objects: ContentObject[]) {
@@ -139,7 +166,9 @@ export type ContentEdit =
   /** Draw a Form XObject (already in this document) with matrix `m`; `bbox` is its bounds on the page. */
   | { type: 'addForm'; ref: PDFRef; m: M; bbox: Rect }
   /** Put objects on an optional content group (layer), or take them off any layer with null. */
-  | { type: 'layer'; ids: number[]; ocg: PDFRef | null };
+  | { type: 'layer'; ids: number[]; ocg: PDFRef | null }
+  /** Replace Form XObjects by their content, as separate objects (other objects are left as they are). */
+  | { type: 'ungroup'; ids: number[] };
 
 const rgb = (hex: string, op: 'rg' | 'RG'): Op => ({ op, args: [...hexToRgbTuple(hex)] });
 
@@ -416,6 +445,21 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
         selection = [obj];
         break;
       }
+      case 'ungroup': {
+        const next: ContentObject[] = [];
+        for (const o of pick(e.ids)) {
+          const parts = inlineForm(page, o, fonts);
+          if (!parts) {
+            next.push(o);
+            continue;
+          }
+          list.splice(pos.get(o)!, 1, ...parts);
+          reindex();
+          next.push(...parts);
+        }
+        selection = next;
+        break;
+      }
       case 'layer': {
         const key = e.ocg ? propertiesKey(page, e.ocg) : null;
         selection = pick(e.ids).map((o) => {
@@ -431,6 +475,103 @@ export async function editPage(page: PDFPage, edits: ContentEdit[]): Promise<num
   writePage(page, final);
   const finalAt = new Map(final.map((o, i) => [o, i]));
   return selection.map((o) => finalAt.get(o) ?? -1).filter((i) => i >= 0);
+}
+
+// ---------------------------------------------------------------- ungrouping forms
+
+const RESOURCE_KINDS = ['Font', 'XObject', 'ExtGState', 'ColorSpace', 'Pattern', 'Shading', 'Properties'] as const;
+type ResourceKind = (typeof RESOURCE_KINDS)[number];
+
+/** Operators that name a resource: which kind, and which operand (-1: the last). */
+const RESOURCE_OPERAND: Record<string, [ResourceKind, number]> = {
+  Tf: ['Font', 0], Do: ['XObject', 0], gs: ['ExtGState', 0], cs: ['ColorSpace', 0], CS: ['ColorSpace', 0],
+  scn: ['Pattern', -1], SCN: ['Pattern', -1], sh: ['Shading', 0], BDC: ['Properties', 1], DP: ['Properties', 1],
+};
+
+/**
+ * Add a form's resources to the page's, under new names where the page already uses a name
+ * for something else. Returns the renamed entries (old → new) per kind of resource.
+ */
+function mergeResources(page: PDFPage, form: PDFDict | undefined): Map<ResourceKind, Map<string, string>> {
+  const ctx = page.doc.context;
+  let res = page.node.Resources();
+  if (!res) {
+    // Inherited resources may be shared with other pages: give this page its own.
+    res = resourcesOf(page)?.clone(ctx) ?? ctx.obj({});
+    page.node.set(PDFName.of('Resources'), res);
+  }
+  const renames = new Map<ResourceKind, Map<string, string>>();
+  for (const kind of RESOURCE_KINDS) {
+    const src = form?.lookup(PDFName.of(kind));
+    if (!(src instanceof PDFDict)) continue;
+    let dst = res.lookup(PDFName.of(kind));
+    if (!(dst instanceof PDFDict)) {
+      dst = ctx.obj({});
+      res.set(PDFName.of(kind), dst as PDFDict);
+    }
+    const into = dst as PDFDict;
+    const map = new Map<string, string>();
+    for (const [k, v] of src.entries()) {
+      const have = into.get(k);
+      if (have === undefined) into.set(k, v);
+      else if (have !== v && !(have instanceof PDFRef && v instanceof PDFRef && have.toString() === v.toString())) {
+        const base = k.decodeText();
+        let i = 1;
+        while (into.has(PDFName.of(`${base}_${i}`))) i++;
+        into.set(PDFName.of(`${base}_${i}`), v);
+        map.set(base, `${base}_${i}`);
+      }
+    }
+    if (map.size) renames.set(kind, map);
+  }
+  return renames;
+}
+
+function renameResources(ops: Op[], renames: Map<ResourceKind, Map<string, string>>): Op[] {
+  if (!renames.size) return ops;
+  return ops.map((op) => {
+    const which = RESOURCE_OPERAND[op.op];
+    const map = which && renames.get(which[0]);
+    if (!map) return op;
+    const at = which[1] < 0 ? op.args.length - 1 : which[1];
+    const arg = op.args[at];
+    if (arg === undefined || !isName(arg) || !map.has(arg.v)) return op;
+    const args = [...op.args];
+    args[at] = nm(map.get(arg.v)!);
+    return { ...op, args };
+  });
+}
+
+/**
+ * The objects a form object draws, as page objects in the same place and graphics state.
+ * Null when the object is not a form that can be taken apart (for example one on a layer of its own).
+ */
+function inlineForm(page: PDFPage, o: ContentObject, fonts: Map<string, FontInfo>): ContentObject[] | null {
+  const form = formOf(page, o);
+  if (!form) return null;
+  const d = form.dict;
+  // The form's own layer (/OC) and reference XObjects (/Ref) would be lost.
+  if (d.has(PDFName.of('OC')) || d.has(PDFName.of('Ref'))) return null;
+  const nums = (k: string) => {
+    const a = d.lookup(PDFName.of(k));
+    return a instanceof PDFArray ? a.asArray().map((v) => n(d.context.lookup(v)) ?? 0) : undefined;
+  };
+  const matrix = nums('Matrix');
+  const bbox = nums('BBox');
+  const res = d.lookup(PDFName.of('Resources'));
+  const body = renameResources(parseContent(bytesOf(form)), mergeResources(page, res instanceof PDFDict ? res : undefined));
+  const head: Op[] = matrix?.length === 6 && !isIdentity(matrix as M) ? [{ op: 'cm', args: matrix }] : [];
+  const clip: Op[] = bbox?.length === 4
+    ? [{ op: 're', args: [Math.min(bbox[0], bbox[2]), Math.min(bbox[1], bbox[3]), Math.abs(bbox[2] - bbox[0]), Math.abs(bbox[3] - bbox[1])] }, { op: 'W', args: [] }, { op: 'n', args: [] }]
+    : [];
+  const parts = (clipped: boolean) =>
+    interpret(emitObject({ ...o, ops: [...head, ...(clipped ? clip : []), ...body] }), pageResources(page, fonts), pageBox(page)).objects;
+  // The form clips to its bounding box. Most forms draw well inside it: leave the clip off then,
+  // so each piece can be moved freely.
+  const loose = parts(false);
+  const box = objectBounds(o);
+  const inside = (r: Rect) => r.x >= box.x - 0.5 && r.y >= box.y - 0.5 && r.x + r.w <= box.x + box.w + 0.5 && r.y + r.h <= box.y + box.h + 0.5;
+  return !clip.length || loose.every((p) => inside(objectBounds(p))) ? loose : parts(true);
 }
 
 const isOcMarker = (m: Op) => m.op === 'BDC' && typeof m.args[0] === 'object' && m.args[0] !== null && 't' in m.args[0] && m.args[0].t === 'name' && m.args[0].v === 'OC';
@@ -592,6 +733,8 @@ export interface ObjectInfo {
   layer?: string;
   /** Can the line's text be re-encoded in its own font? (checked per character on commit) */
   fontKey?: string;
+  /** A form whose content shows text (it can be ungrouped to edit that text). */
+  hasText?: boolean;
 }
 
 const toHex = (args: unknown[]): string | undefined => {
@@ -628,6 +771,7 @@ export function describeObjects(pc: PageContent): ObjectInfo[] {
       info.fill = colorOf(o.state.fill);
       Object.assign(info, { Tc: r.Tc, Tw: r.Tw, Tz: r.Tz, Ts: r.Ts });
     }
+    if (pc.textForms.has(id)) info.hasText = true;
     if (o.kind === 'path') {
       const paint = o.ops[o.ops.length - 1]?.op ?? 'n';
       if (['f', 'F', 'f*', 'B', 'B*', 'b', 'b*'].includes(paint)) info.fill = colorOf(o.state.fill);
