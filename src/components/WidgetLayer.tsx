@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from 'react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import { pdfRectToView, viewRectToPdf, type VRect } from '../lib/geometry';
-import { Lock } from 'lucide-react';
+import { Box, Lock } from 'lucide-react';
 import { moveFieldWidget } from '../store/commands';
 import { resolveDest, type PDFDocumentProxy } from '../lib/pdfjs';
 import type { FieldInfo, FieldValue } from '../lib/pdfOps';
@@ -19,6 +19,10 @@ interface AnnotData {
   subtype: string;
   rect: [number, number, number, number];
   hidden?: boolean;
+  hasAppearance?: boolean;
+  backgroundColor?: Uint8ClampedArray | null;
+  borderColor?: Uint8ClampedArray | null;
+  borderStyle?: { width: number };
   // widgets
   fieldName?: string;
   fieldType?: 'Tx' | 'Btn' | 'Ch' | 'Sig';
@@ -53,6 +57,11 @@ function pageAnnotations(pdf: PDFDocumentProxy, index: number): Promise<AnnotDat
   }
   return p;
 }
+
+/** Annotations whose content (3D models, embedded media) this viewer cannot play. */
+const MEDIA_LABEL: Record<string, string> = { '3D': '3D model', RichMedia: 'Rich media' };
+
+const css = (c: Uint8ClampedArray | null | undefined) => (c && c.length >= 3 ? `rgb(${c[0]}, ${c[1]}, ${c[2]})` : undefined);
 
 const toRect = (r: AnnotData['rect']): Rect => ({ x: Math.min(r[0], r[2]), y: Math.min(r[1], r[3]), w: Math.abs(r[2] - r[0]), h: Math.abs(r[3] - r[1]) });
 
@@ -89,7 +98,7 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
 
   useEffect(() => {
     let live = true;
-    if (pdf) pageAnnotations(pdf, index).then((a) => live && setItems(a.filter((x) => !x.hidden && (x.subtype === 'Link' || x.subtype === 'Widget'))));
+    if (pdf) pageAnnotations(pdf, index).then((a) => live && setItems(a.filter((x) => !x.hidden && (x.subtype === 'Link' || x.subtype === 'Widget' || x.subtype in MEDIA_LABEL))));
     return () => {
       live = false;
     };
@@ -121,6 +130,19 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
             />
           );
         }
+        if (a.subtype in MEDIA_LABEL) {
+          // Kept in the file untouched, but not shown: say so instead of leaving an unexplained gap.
+          // With an appearance (a poster image) on the canvas, only a small badge in the corner.
+          return (
+            <div key={a.id} className={`media-placeholder ${a.hasAppearance ? 'badge' : ''}`} style={style}>
+              <div className="media-note">
+                <Box size={a.hasAppearance ? 12 : 20} />
+                <strong>{t(MEDIA_LABEL[a.subtype])}</strong>
+                {!a.hasAppearance && <span>{t('PDF-Xploder cannot display this content. It stays in the file; open the file in Adobe Acrobat Reader to view it.')}</span>}
+              </div>
+            </div>
+          );
+        }
         const f = a.fieldName ? byName.get(a.fieldName) : undefined;
         if (!f || a.pushButton || a.fieldType === 'Sig') return null;
         const why = [...(editable ? [] : ['the document’s security settings do not allow filling in forms']), ...fillBlockers(f), ...(a.readOnly && !f.props.readOnly ? ['it is marked read-only'] : [])];
@@ -137,7 +159,9 @@ function Widget({ a, f, value, disabled, reason, style, scale }: { a: AnnotData;
   // Font size 0 in the field's default appearance means "auto".
   const da = a.defaultAppearanceData?.fontSize;
   const fontSize = da ? da * scale : Math.max(8 * scale, Math.min(h * 0.65, 12 * scale));
-  const textStyle: React.CSSProperties = { ...style, fontSize, textAlign: (['left', 'center', 'right'] as const)[a.textAlignment ?? 0] };
+  // The field's own background and border (/MK), which the HTML control stands in for.
+  const border = a.borderStyle?.width ? css(a.borderColor) : undefined;
+  const textStyle = { ...style, '--field-bg': css(a.backgroundColor), ...(border && { borderColor: border, borderWidth: a.borderStyle!.width * scale }), fontSize, textAlign: (['left', 'center', 'right'] as const)[a.textAlignment ?? 0] } as React.CSSProperties;
   const common = { className: 'widget', disabled, title: reason ?? f.name, onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
 
   if (f.kind === 'text') {

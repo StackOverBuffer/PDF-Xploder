@@ -138,7 +138,7 @@ button.icon-btn { border: none; background: none; padding: 4px; }
 button.icon-btn:hover:not(:disabled) { background: var(--panel-2); }
 button.link { border: none; background: none; padding: 2px 4px; text-align: left; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.link:hover { color: var(--accent); background: none; }
-input:not([type=checkbox]):not([type=range]):not([type=color]), select, textarea {
+input:not([type=checkbox]):not([type=range]):not([type=color]):not(.widget), select:not(.widget), textarea:not(.widget) {
   border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; background: var(--input-bg); min-width: 0;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
@@ -411,13 +411,19 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 /* form fields and links */
 .widget-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .viewer.tool-select .widget-layer > *, .viewer.tool-selectText .widget-layer > *, .viewer.tool-hand .widget-layer > .pdf-link { pointer-events: auto; }
-.widget { position: absolute; margin: 0; padding: 0 3px; border: 1px solid transparent; border-radius: 0; background: transparent; color: #000; font-family: Helvetica, Arial, sans-serif; line-height: 1.15; resize: none; outline: none; }
+.widget { position: absolute; margin: 0; padding: 0 3px; border: 1px solid transparent; border-radius: 0; background: var(--field-bg, transparent); min-width: 0; color: #000; font-family: Helvetica, Arial, sans-serif; line-height: 1.15; resize: none; outline: none; }
 .widget:focus, .widget:focus-within { border-color: var(--accent); background: rgba(255, 255, 255, 0.9); }
 .highlight-fields .widget { background: rgba(204, 215, 255, 0.55); }
 .highlight-fields .widget:disabled { background: rgba(220, 220, 220, 0.5); }
 .widget-check { display: flex; align-items: center; justify-content: center; padding: 0; }
 .widget-check input { width: 80%; height: 80%; margin: 0; accent-color: #1d3557; }
 select.widget { padding: 0; }
+/* 3D models and rich media: a note where the content would be (it stays in the file). */
+.widget-layer > .media-placeholder { position: absolute; pointer-events: none; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border); background: rgba(127, 127, 127, 0.06); overflow: hidden; }
+.media-note { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 24em; padding: 8px 12px; text-align: center; font-size: 12px; line-height: 1.35; color: var(--muted); background: var(--panel); border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.media-note strong { color: var(--text); }
+.widget-layer > .media-placeholder.badge { border: none; background: none; align-items: flex-start; justify-content: flex-start; }
+.media-placeholder.badge .media-note { flex-direction: row; padding: 2px 6px; font-size: 11px; margin: 4px; }
 .pdf-link { position: absolute; cursor: pointer; }
 .pdf-link:hover { background: rgba(26, 95, 180, 0.12); outline: 1px solid rgba(26, 95, 180, 0.4); }
 

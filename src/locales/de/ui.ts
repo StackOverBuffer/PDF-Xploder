@@ -448,6 +448,10 @@ const DE: Record<string, string> = {
   'The text is too long for a QR code.': 'Der Text ist zu lang für einen QR-Code.',
   'Saved to {name}': 'Gespeichert in {name}',
   'Could not write to the file, so a copy was downloaded instead.': 'Die Datei konnte nicht geschrieben werden, daher wurde stattdessen eine Kopie heruntergeladen.',
+  // 3D models and rich media on the page
+  '3D model': '3D-Modell', 'Rich media': 'Rich Media',
+  'PDF-Xploder cannot display this content. It stays in the file; open the file in Adobe Acrobat Reader to view it.':
+    'PDF-Xploder kann diesen Inhalt nicht anzeigen. Er bleibt in der Datei erhalten; öffnen Sie die Datei in Adobe Acrobat Reader, um ihn anzusehen.',
 };
 
 export default DE;
