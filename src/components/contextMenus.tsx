@@ -5,13 +5,13 @@
 import {
   ImageUp, Images, FileArchive, Download, Stamp, ScanText, ScanBarcode, BookmarkPlus, Link2, Layers, Hand, Camera, TextSelect,
   ZoomIn, Scissors, Copy, ClipboardPaste, Trash2, BringToFront, BoxSelect, SquareX, LayoutGrid, FilePlus2, FileOutput, Settings2,
-  Pencil, Highlighter, Underline, Strikethrough, Search, MousePointer2, Type, MessageSquareText, MessageSquareOff,
+  Pencil, Highlighter, Underline, Strikethrough, Search, MousePointer2, Type, MessageSquareText, MessageSquareOff, Ungroup,
 } from 'lucide-react';
 import type { MenuItem } from './Menu';
 import { tr } from '../lib/i18n';
 import { useStore } from '../store/store';
 import { can } from '../store/permissions';
-import { applyContentEdits, exportRegionAsImage } from '../store/content';
+import { applyContentEdits, exportRegionAsImage, ungroupForms } from '../store/content';
 import * as ca from '../store/contentActions';
 import { copyPageImage } from '../store/extras';
 import { copyBoxText, markupBox, selectAllText, useTextBox } from './TextBoxSelect';
@@ -134,6 +134,9 @@ export function objectMenu(page: number, geom: PageGeom, chosen: ObjectInfo[], l
       } },
       null,
     );
+  }
+  if (chosen.some((o) => o.kind === 'form')) {
+    items.push({ label: 'Ungroup', icon: i(Ungroup), disabled: !modify, onClick: () => ungroupForms(page, chosen.filter((o) => o.kind === 'form').map((o) => o.id)) }, null);
   }
   if (one?.kind === 'text') {
     items.push(

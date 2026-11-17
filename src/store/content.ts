@@ -18,7 +18,7 @@ const S = () => useStore.getState();
 export type ContentFilter = 'all' | 'text' | 'image' | 'shape';
 
 export const matchesFilter = (o: ObjectInfo, f: ContentFilter) =>
-  f === 'all' || (f === 'text' ? o.kind === 'text' : f === 'image' ? o.kind === 'image' : o.kind === 'path' || o.kind === 'form' || o.kind === 'shading');
+  f === 'all' || (f === 'text' ? o.kind === 'text' || !!o.hasText : f === 'image' ? o.kind === 'image' : o.kind === 'path' || o.kind === 'form' || o.kind === 'shading');
 
 // ---------------------------------------------------------------- reading
 
@@ -165,6 +165,20 @@ async function applyNow(page: number, edits: ContentEdit[]) {
     verified.add(S().pageIds[page]);
     useStore.setState({ contentSelection: ids.length ? { page, ids } : null });
   });
+}
+
+/**
+ * Take Form XObjects apart into the objects they draw, so those can be moved and edited one by one.
+ * With `editAt` (a point in user space), start editing the text there afterwards.
+ */
+export async function ungroupForms(page: number, ids: number[], editAt?: { x: number; y: number }) {
+  await applyContentEdits(page, [{ type: 'ungroup', ids }]);
+  const sel = S().contentSelection;
+  if (!editAt || sel?.page !== page) return;
+  const objs = await pageObjects(page);
+  const at = (r: Rect) => editAt.x >= r.x && editAt.x <= r.x + r.w && editAt.y >= r.y && editAt.y <= r.y + r.h;
+  const hit = objs.filter((o) => sel.ids.includes(o.id) && o.kind === 'text' && at(o.bbox)).pop();
+  if (hit) useStore.setState({ contentEditing: { page, id: hit.id }, contentSelection: { page, ids: [hit.id] } });
 }
 
 /** Render a page region (user-space rect) at high resolution and download it as PNG. */

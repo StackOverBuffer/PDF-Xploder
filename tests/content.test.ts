@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, StandardFonts, rgb, degrees } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName, StandardFonts, concatTransformationMatrix, degrees, drawObject, popGraphicsState, pushGraphicsState, rgb } from '@cantoo/pdf-lib';
 import { parseContent, writeContent } from '../src/lib/content/syntax';
 import { describeObjects, editPage, readPage } from '../src/lib/content/page';
 import { about, rotate, translate } from '../src/lib/content/matrix';
@@ -105,5 +105,56 @@ describe('content objects', () => {
     expect(plain.state.clips).toHaveLength(0);
     await editPage(page, [{ type: 'removeClip', ids: [0] }]);
     expect(readPage(page).objects[0].state.clips).toHaveLength(0);
+  });
+});
+
+describe('ungrouping Form XObjects', () => {
+  /** A page with Helvetica, and a form that uses the same font name for Courier, drawn at (200, 100) — like a flattened form field. */
+  async function formPage() {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([400, 400]);
+    const helv = await doc.embedFont(StandardFonts.Helvetica);
+    const courier = await doc.embedFont(StandardFonts.Courier);
+    page.drawText('On the page', { x: 20, y: 350, size: 12, font: helv });
+    const fontKey = (page.node.Resources()!.lookup(PDFName.of('Font'), PDFDict)).keys()[0].decodeText();
+    const form = doc.context.stream(
+      enc.encode(`/Tx BMC q 1 1 98 18 re W n BT /${fontKey} 10 Tf 5 6 Td (Inside) Tj ET Q EMC`),
+      { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, 100, 20], Matrix: [2, 0, 0, 2, 0, 0], Resources: { Font: { [fontKey]: courier.ref } } },
+    );
+    const key = page.node.newXObject('Fm', doc.context.register(form));
+    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, 200, 100), drawObject(key), popGraphicsState());
+    const loaded = await PDFDocument.load(await doc.save());
+    return { doc: loaded, page: loaded.getPage(0) };
+  }
+
+  it('lists the form as one object that shows text', async () => {
+    const { page } = await formPage();
+    const info = describeObjects(readPage(page));
+    expect(info.map((o) => [o.kind, o.hasText])).toEqual([['text', undefined], ['form', true]]);
+  });
+
+  it('replaces the form by its text, in place, with its own font', async () => {
+    const { doc, page } = await formPage();
+    const ids = await editPage(page, [{ type: 'ungroup', ids: [1] }]);
+    expect(ids).toEqual([1]);
+    const again = await PDFDocument.load(await doc.save());
+    const info = describeObjects(readPage(again.getPage(0)));
+    expect(info.map((o) => [o.kind, o.text])).toEqual([['text', 'On the page'], ['text', 'Inside']]);
+    // Courier, not the page's Helvetica that has the same resource name; scaled by the form matrix.
+    expect(info[0].fontName).toBe('Helvetica');
+    expect(info[1].fontName).toBe('Courier');
+    expect(info[1].fontSize).toBe(20);
+    expect(info[1].bbox.x).toBeCloseTo(200 + 2 * 5, 0);
+    expect(info[1].bbox.y).toBeGreaterThan(100);
+    expect(info[1].bbox.y).toBeLessThan(100 + 40);
+    // The text is now an ordinary object: it moves on its own.
+    await editPage(again.getPage(0), [{ type: 'transform', ids: [1], m: translate(-100, 0) }]);
+    expect(describeObjects(readPage(again.getPage(0)))[1].bbox.x).toBeCloseTo(110, 0);
+  });
+
+  it('leaves other objects alone', async () => {
+    const { page } = await formPage();
+    expect(await editPage(page, [{ type: 'ungroup', ids: [0] }])).toEqual([0]);
+    expect(describeObjects(readPage(page)).map((o) => o.kind)).toEqual(['text', 'form']);
   });
 });

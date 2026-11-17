@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
-import { applyContentEdits, matchesFilter, pageObjects } from '../store/content';
+import { applyContentEdits, matchesFilter, pageObjects, ungroupForms } from '../store/content';
 import { useCan } from '../store/permissions';
 import { inActivePane } from '../lib/activeViewer';
 import { pdfRectToView, pdfToView, viewToPdf, type VRect } from '../lib/geometry';
@@ -305,8 +305,10 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== 'content' || !canEdit) return;
     const p = pt(e);
-    const hit = [...visible].reverse().find((o) => o.kind === 'text' && contains(vbox(o), p));
-    if (hit) useStore.setState({ contentEditing: { page: index, id: hit.id }, contentSelection: { page: index, ids: [hit.id] } });
+    const hit = [...visible].reverse().find((o) => (o.kind === 'text' || o.kind === 'form') && contains(vbox(o), p));
+    if (hit?.kind === 'text') useStore.setState({ contentEditing: { page: index, id: hit.id }, contentSelection: { page: index, ids: [hit.id] } });
+    // A form (a group, e.g. a flattened form field): take it apart, then edit the text clicked on.
+    else if (hit) ungroupForms(index, [hit.id], hit.hasText ? viewToPdf(geom, p) : undefined);
   };
 
   // Keyboard: nudge, delete, duplicate, select all.
@@ -439,7 +441,8 @@ export const ContentLayer = memo(function ContentLayer({ index, geom, scale: S, 
           )
         )}
       </svg>
-      {editing && <InlineTextEditor index={index} geom={geom} scale={S} objects={objects ?? []} editing={editing} />}
+      {/* Right after an edit the page's objects are re-read: wait for the one to edit. */}
+      {editing && objects && (editing.id === undefined || objects.some((o) => o.id === editing.id)) && <InlineTextEditor index={index} geom={geom} scale={S} objects={objects} editing={editing} />}
       {menu.element}
     </div>
   );

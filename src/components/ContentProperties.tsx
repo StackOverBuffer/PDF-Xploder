@@ -2,10 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import {
   AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, BringToFront, SendToBack, ArrowUp, ArrowDown,
-  RotateCcw, RotateCw, FlipHorizontal2, FlipVertical2, Copy, Trash2, ImageUp, Download, Scissors,
+  RotateCcw, RotateCw, FlipHorizontal2, FlipVertical2, Copy, Trash2, ImageUp, Download, Scissors, Ungroup,
 } from 'lucide-react';
 import { useStore } from '../store/store';
-import { applyContentEdits, exportRegionAsImage, imageBytes, pageObjects } from '../store/content';
+import { applyContentEdits, exportRegionAsImage, imageBytes, pageObjects, ungroupForms } from '../store/content';
 import { useCan } from '../store/permissions';
 import { normaliseImage } from '../store/commands';
 import { pickFile, readAsDataUrl } from '../lib/download';
@@ -241,6 +241,12 @@ export function ContentProperties() {
         </div>
       )}
 
+      {chosen.some((o) => o.kind === 'form') && (
+        <div className="icon-row wide">
+          <button title={t('Split the group into its objects, so they can be moved and edited one by one')} onClick={() => ungroupForms(page, chosen.filter((o) => o.kind === 'form').map((o) => o.id))}><Ungroup size={15} /> {t('Ungroup')}</button>
+        </div>
+      )}
+
       <div className="icon-row wide">
         <button onClick={() => exportRegionAsImage(page, box, one ? KIND[one.kind].toLowerCase() : 'selection')}><Download size={15} /> {t('Export as PNG')}</button>
         {chosen.some((o) => o.clipped) && <button title={t('Remove the clipping path')} onClick={() => edit({ type: 'removeClip', ids })}><Scissors size={15} /> {t('Remove clip')}</button>}
@@ -249,7 +255,7 @@ export function ContentProperties() {
         <button onClick={() => edit({ type: 'duplicate', ids, dx: 10, dy: -10 })}><Copy size={15} /> {t('Duplicate')}</button>
         <button className="danger" onClick={() => edit({ type: 'delete', ids })}><Trash2 size={15} /> {t('Delete')}</button>
       </div>
-      <p className="muted small">{t('Drag to move, drag the handles to resize or rotate (Shift: keep proportions / 15° steps). Double-click text to edit it. Arrow keys nudge.')}</p>
+      <p className="muted small">{t('Drag to move, drag the handles to resize or rotate (Shift: keep proportions / 15° steps). Double-click text to edit it. Arrow keys nudge.')}{chosen.some((o) => o.kind === 'form') && ` ${t('Double-click a group to take it apart.')}`}</p>
     </fieldset>
   );
 }
