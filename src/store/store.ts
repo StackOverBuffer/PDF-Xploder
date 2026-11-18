@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { userMessage } from '../lib/errors';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
 import { inheritOffscreen } from '../lib/render/offscreen';
@@ -140,6 +141,13 @@ interface State {
   lock: { userPassword: string; needsUserPassword: boolean } | null;
   /** The author's restrictions were lifted for this session without the permissions password. */
   restrictionsLifted: boolean;
+  /**
+   * XFA form data (an Adobe-only format) in the file: 'hybrid' next to standard form
+   * fields, 'pure' with no standard fields at all. Saving changes leaves it out.
+   */
+  xfa: 'hybrid' | 'pure' | null;
+  /** The XFA notice was closed for this document. */
+  xfaNoticeClosed: boolean;
   /** Where the document came from (File System Access API), so Save can write back to it. */
   fileHandle: FileSystemFileHandle | null;
   /** Saved at least once: the opened bytes no longer match what the user has on disk. */
@@ -309,6 +317,8 @@ export function anyUnsavedUnprotected(backupOn: boolean): boolean {
 
 const initialDoc = {
   restrictionsLifted: false,
+  xfa: null as State['xfa'],
+  xfaNoticeClosed: false,
   fileHandle: null as FileSystemFileHandle | null,
   savedOnce: false,
   fileName: '',
@@ -453,6 +463,18 @@ export const useStore = create<Store>()((set, get) => {
     });
   }
 
+  /** Whether the document has XFA form data, and whether it is all the form there is. */
+  async function xfaKind(pdf: PDFDocumentProxy): Promise<State['xfa']> {
+    try {
+      const { info } = await pdf.getMetadata();
+      if (!(info as { IsXFAPresent?: boolean })?.IsXFAPresent) return null;
+      const fields = await pdf.getFieldObjects();
+      return fields && Object.keys(fields).length ? 'hybrid' : 'pure';
+    } catch {
+      return null;
+    }
+  }
+
   async function openDocumentImpl(bytes: Uint8Array, name: string, opts: OpenOptions = {}) {
     const original = bytes;
     let loaded;
@@ -551,9 +573,12 @@ export const useStore = create<Store>()((set, get) => {
         }
       }
     }
+    // pdf-lib cannot keep XFA data: tell the user before they save changes.
+    const xfa = await xfaKind(loaded.pdf);
     get().pdf?.destroy();
     set({
       ...initialDoc,
+      xfa,
       bytes,
       originalBytes: original,
       fileName: name,
@@ -948,7 +973,7 @@ export const useStore = create<Store>()((set, get) => {
         return await fn();
       } catch (e) {
         console.error(e);
-        get().notify((e as Error).message || String(e), 'error');
+        get().notify(userMessage(e), 'error');
         return undefined;
       } finally {
         running.splice(running.indexOf(entry), 1);

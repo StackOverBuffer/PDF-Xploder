@@ -71,6 +71,6 @@ self.onmessage = async (e: MessageEvent<{ id: number; mod: WorkerModule; fn: str
     if (result && typeof result === 'object' && !(result instanceof Uint8Array)) for (const [p, v] of Object.entries(result)) keep(v, p);
     post({ id, ok: true, result, has: [...held.keys()], resultKeys }, transferables(result));
   } catch (err) {
-    post({ id, ok: false, error: (err as Error)?.message ?? String(err), has: [...held.keys()] });
+    post({ id, ok: false, error: (err as Error)?.message ?? String(err), errorName: (err as Error)?.name, has: [...held.keys()] });
   }
 };

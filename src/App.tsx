@@ -21,7 +21,7 @@ import { CommentsPanel } from './components/CommentsPanel';
 import { AttachmentsPanel } from './components/AttachmentsPanel';
 import { FormsPanel } from './components/FormsPanel';
 import { SearchPanel } from './components/SearchPanel';
-import { DocBanner, SignaturesPanel } from './components/SignaturesPanel';
+import { DocBanner, SignaturesPanel, XfaBanner } from './components/SignaturesPanel';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
@@ -377,7 +377,7 @@ export function App() {
           </aside>
         )}
         {hasDoc && sidebar && <PaneResizer pane="sidebar" />}
-        <main className="main">{hasDoc ? <><DocBanner /><ViewerPanes /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
+        <main className="main">{hasDoc ? <><DocBanner /><XfaBanner /><ViewerPanes /></> : opening ? <div className="main-loading" /> : <Welcome />}</main>
         {hasDoc && showProps && <PaneResizer pane="props" />}
         {hasDoc && showProps && <PropertiesPanel />}
       </div>

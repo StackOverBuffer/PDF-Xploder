@@ -256,6 +256,12 @@ const DE: Record<string, string> = {
   // store messages, prompts and progress
   'Incorrect password. Try again:': 'Falsches Kennwort. Versuchen Sie es erneut:',
   'This document is password protected. Enter password:': 'Dieses Dokument ist kennwortgeschützt. Geben Sie das Kennwort ein:',
+  'This did not work: the document contains something PDF-Xploder cannot process here. Technical details are in the browser console.':
+    'Das hat nicht geklappt: Das Dokument enthält etwas, das PDF-Xploder hier nicht verarbeiten kann. Technische Details stehen in der Browser-Konsole.',
+  'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here, and saving changes removes them.':
+    'Dies ist ein XFA-Formular, ein Format, das nur Adobe-Programme vollständig unterstützen: Seine Felder können hier nicht angezeigt oder ausgefüllt werden, und beim Speichern von Änderungen werden sie entfernt.',
+  'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; saving changes removes the XFA part.':
+    'Dieses Formular enthält zusätzlich XFA-Daten, ein Format, das nur Adobe-Programme verwenden. PDF-Xploder füllt die normalen Formularfelder; beim Speichern von Änderungen wird der XFA-Teil entfernt.',
   'This document is damaged or uses unsupported encryption: it is open read-only.':
     'Dieses Dokument ist beschädigt oder verwendet eine nicht unterstützte Verschlüsselung: Es ist schreibgeschützt geöffnet.',
   'Please choose a PDF file.': 'Bitte wählen Sie eine PDF-Datei.', 'Discard unsaved changes?': 'Nicht gespeicherte Änderungen verwerfen?',

@@ -15,6 +15,8 @@ export interface Reply {
   ok: boolean;
   result?: unknown;
   error?: string;
+  /** The error's type (TypeError, …), so the main thread can tell library errors from ours. */
+  errorName?: string;
   /** Keys of the documents the worker holds now. */
   has: string[];
   /** Keys of documents in the result ('' for the result itself, else the property). */

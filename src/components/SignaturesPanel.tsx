@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion } from 'lucide-react';
+import { Info, ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan, usePermState } from '../store/permissions';
 import type { SigStatus } from '../lib/signature';
@@ -53,6 +53,23 @@ export function SignaturesPanel() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** A form with XFA data (an Adobe-only format), which saving changes leaves out. */
+export function XfaBanner() {
+  const xfa = useStore((s) => s.xfa);
+  const closed = useStore((s) => s.xfaNoticeClosed);
+  const t = useT();
+  if (!xfa || closed) return null;
+  return (
+    <div className="doc-banner warn">
+      <Info size={16} />
+      {t(xfa === 'pure'
+        ? 'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here, and saving changes removes them.'
+        : 'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; saving changes removes the XFA part.')}
+      <button onClick={() => useStore.setState({ xfaNoticeClosed: true })}>{t('OK')}</button>
     </div>
   );
 }
