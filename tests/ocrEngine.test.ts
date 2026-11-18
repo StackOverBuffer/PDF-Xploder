@@ -64,11 +64,11 @@ async function scannedPdf(img: Raster): Promise<Uint8Array> {
 
 async function textOf(bytes: Uint8Array) {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const pdf = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, standardFontDataUrl: `${resolve('node_modules/pdfjs-dist/standard_fonts')}/` }).promise;
+  const pdf = await pdfjs.getDocument({ data: bytes.slice(), standardFontDataUrl: `${resolve('node_modules/pdfjs-dist/standard_fonts')}/` }).promise;
   const page = await pdf.getPage(1);
   const tc = await page.getTextContent();
   const items = tc.items.filter((i): i is typeof i & { str: string; transform: number[] } => 'str' in i);
-  await pdf.destroy();
+  await pdf.loadingTask.destroy();
   return { text: items.map((i) => i.str).join(' ').replace(/\s+/g, ' '), items };
 }
 

@@ -11,7 +11,7 @@ import { tf, tr } from '../lib/i18n';
 import { ask, askText } from '../lib/ask';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import type { SignOptions } from '../lib/signature';
-import { openPdf, renderToCanvas } from '../lib/pdfjs';
+import { closePdf, openPdf, renderToCanvas } from '../lib/pdfjs';
 import type { Annotation, Rect } from '../lib/types';
 
 const S = () => useStore.getState();
@@ -304,7 +304,7 @@ export async function exportPageImage(page = S().currentPage, dpi = 150) {
       const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
       downloadBlob(blob, `${baseName(s.fileName)}-p${page + 1}.png`, 'image/png');
     } finally {
-      pdf.destroy();
+      closePdf(pdf);
     }
   });
 }
@@ -379,7 +379,7 @@ export async function applyRedactions() {
         images.push({ index: i, png: new Uint8Array(await blob.arrayBuffer()) });
       }
     } finally {
-      pdf.destroy();
+      closePdf(pdf);
     }
     const { bytes: out, removedFields } = await ops.replacePagesWithImages(s.bytes!, images);
     const annotations = { ...s.annotations };

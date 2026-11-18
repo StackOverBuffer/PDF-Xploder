@@ -11,7 +11,7 @@ import { ops } from '../lib/worker';
 import { buildFileForSave, currentBytes, normaliseImage, placeContentImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
-import { openPdf, renderToCanvas, type PDFDocumentProxy } from '../lib/pdfjs';
+import { closePdf, openPdf, renderToCanvas, type PDFDocumentProxy } from '../lib/pdfjs';
 import * as att from '../lib/attachments';
 import { applyAccessibilityFix, checkAccessibility, type CheckResult, type FixId } from '../lib/accessibility';
 import type { Rect } from '../lib/types';
@@ -41,7 +41,7 @@ async function withPageRendered<T>(page: number, scale: number, fn: (canvas: HTM
   try {
     return await fn(await renderToCanvas(await doc.getPage(page + 1), scale));
   } finally {
-    if (own) doc.destroy();
+    if (own) closePdf(doc);
   }
 }
 

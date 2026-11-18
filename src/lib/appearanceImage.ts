@@ -3,7 +3,7 @@
  * one-page PDF rendered by pdf.js into an image, once per drawing.
  */
 import { useEffect, useState } from 'react';
-import { openPdf, renderToCanvas } from './pdfjs';
+import { closePdf, openPdf, renderToCanvas } from './pdfjs';
 import { fromBase64 } from './foreignAppearance';
 
 /** Pixels on the longer side: sharp up to high zoom for stamp-sized drawings. */
@@ -23,7 +23,7 @@ function render(appearance: string): Promise<string> {
         canvas.width = canvas.height = 0;
         return url;
       } finally {
-        pdf.destroy();
+        closePdf(pdf);
       }
     })();
     p.catch(() => cache.delete(appearance));

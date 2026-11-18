@@ -26,6 +26,7 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
 import { createSampleDocument } from './lib/sample';
+import { countFields } from './lib/pdfjs';
 import type { FieldInfo } from './lib/pdfOps';
 import { ops as opsW } from './lib/worker';
 import type { Tool } from './lib/types';
@@ -235,7 +236,7 @@ function useFormFields() {
     // A restored tab gets its viewer document a moment later: wait for it.
     if (!pdf) return;
     // pdf.js already has the file: without any form field there, skip the (slow, for big files) pdf-lib parse.
-    const anyFields = useStore.getState().bytes === bytes ? pdf.getFieldObjects().then((o) => !!o && Object.keys(o).length > 0).catch(() => true) : Promise.resolve(true);
+    const anyFields = useStore.getState().bytes === bytes ? countFields(pdf).then((n) => n > 0).catch(() => true) : Promise.resolve(true);
     anyFields
       .then((has) => (has ? opsW.getFormFields(bytes) : []))
       .then((fields) => {

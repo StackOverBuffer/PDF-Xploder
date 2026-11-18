@@ -7,7 +7,7 @@ import { requirePermission } from './permissions';
 import { tf } from '../lib/i18n';
 import { loadForEditing, type ContentEdit, type ObjectInfo } from '../lib/content/page';
 import { content as contentW } from '../lib/worker';
-import { openPdf, renderToCanvas, type PDFPageProxy } from '../lib/pdfjs';
+import { closePdf, openPdf, renderToCanvas, type PDFPageProxy } from '../lib/pdfjs';
 import { downloadBlob, baseName } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
 import type { Rect } from '../lib/types';
@@ -103,7 +103,7 @@ async function confirmPageIsEditable(page: number): Promise<boolean> {
     verified.add(id);
     return true;
   } finally {
-    pdf.destroy();
+    closePdf(pdf);
   }
 }
 
@@ -127,7 +127,7 @@ export async function confirmPagesEditable(pages: number[]): Promise<number[]> {
       else verified.add(s.pageIds[p]);
     }
   } finally {
-    pdf.destroy();
+    closePdf(pdf);
   }
   if (!risky.length) return pages;
   const list = risky.map((p) => p + 1).join(', ');
