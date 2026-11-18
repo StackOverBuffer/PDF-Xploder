@@ -53,6 +53,7 @@ export function drawPage(
     const canvas = Object.assign(document.createElement('canvas'), size);
     try {
       const t = page.render({
+        canvas: null,
         canvasContext: canvas.getContext('2d', { alpha: false })!,
         viewport: page.getViewport(at),
         annotationMode: o.noForms ? AnnotationMode.ENABLE_FORMS : AnnotationMode.ENABLE,

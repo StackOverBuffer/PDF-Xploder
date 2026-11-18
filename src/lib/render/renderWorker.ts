@@ -12,7 +12,7 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import type { RenderReply, RenderRequest } from './protocol';
+import { IMAGE_MAX_AREA_BYTES, type RenderReply, type RenderRequest } from './protocol';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 /**
@@ -107,11 +107,12 @@ function open(m: Extract<RenderRequest, { type: 'open' }>, data: Uint8Array): Pr
     // Ours alone (a copy): handed to pdf.js's worker without another copy.
     data,
     password: m.password,
-    isEvalSupported: false,
     worker: parserWorker(),
     cMapUrl: `${m.base}pdfjs/cmaps/`,
     cMapPacked: true,
     standardFontDataUrl: `${m.base}pdfjs/standard_fonts/`,
+    wasmUrl: `${m.base}pdfjs/wasm/`,
+    canvasMaxAreaInBytes: IMAGE_MAX_AREA_BYTES,
     // pdf.js's own worker fetches them (its check for that reads document.baseURI).
     useWorkerFetch: true,
     // Fonts are loaded into the worker's FontFaceSet; without one, glyphs are drawn as paths.
@@ -144,7 +145,7 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
   if (m.type === 'close') {
     const d = docs.get(m.doc);
     docs.delete(m.doc);
-    void d?.pdf.then((p) => p.destroy()).catch(() => {});
+    void d?.pdf.then((p) => p.loadingTask.destroy()).catch(() => {});
     return;
   }
   if (m.type === 'cancel') {
@@ -164,7 +165,7 @@ self.onmessage = async (e: MessageEvent<RenderRequest>) => {
     const canvas = new OffscreenCanvas(m.width, m.height);
     const ctx = canvas.getContext('2d', { alpha: false })!;
     let cancelled = false;
-    const task = page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport, annotationMode: m.noForms ? pdfjs.AnnotationMode.ENABLE_FORMS : pdfjs.AnnotationMode.ENABLE });
+    const task = page.render({ canvas: null, canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport, annotationMode: m.noForms ? pdfjs.AnnotationMode.ENABLE_FORMS : pdfjs.AnnotationMode.ENABLE });
     running.set(m.id, { cancel: () => ((cancelled = true), task.cancel()) });
     try {
       await task.promise;

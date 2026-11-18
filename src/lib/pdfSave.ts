@@ -99,11 +99,51 @@ export function syncXmp(doc: PDFDocument): void {
   doc.context.assign(ref, out);
 }
 
-/** Save a document (with object streams), leaving out unreachable objects. */
+/** The catalog's XMP metadata as text, if the file has any. */
+function catalogXmp(doc: PDFDocument): string | undefined {
+  const stream = doc.catalog.lookup(PDFName.of('Metadata'));
+  if (!(stream instanceof PDFRawStream)) return undefined;
+  try {
+    return new TextDecoder().decode(stream.dict.get(PDFName.of('Filter')) ? decodePDFRawStream(stream).decode() : stream.getContents());
+  } catch {
+    return undefined;
+  }
+}
+
+/** The file declares PDF/A-1 conformance, which forbids object and cross-reference streams. */
+export function isPdfA1(doc: PDFDocument): boolean {
+  const xml = catalogXmp(doc);
+  return !!xml && /pdfaid:part(?:>\s*|\s*=\s*["'])1\b/.test(xml);
+}
+
+/**
+ * A widget whose /AP /N points nowhere (e.g. "/AP << /N 0 0 R >>") makes pdf-lib throw
+ * while it updates field appearances, so a form with one could not be saved at all.
+ * Drop such appearance dictionaries: pdf-lib then draws fresh ones.
+ */
+export function dropBrokenAppearances(doc: PDFDocument): number {
+  if (!doc.catalog.has(PDFName.of('AcroForm'))) return 0;
+  let dropped = 0;
+  const AP = PDFName.of('AP');
+  const N = PDFName.of('N');
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFDict) || obj.get(PDFName.of('Subtype'))?.toString() !== '/Widget') continue;
+    const ap = obj.lookup(AP);
+    if (ap === undefined) continue;
+    const n = ap instanceof PDFDict ? ap.lookup(N) : undefined;
+    if (n instanceof PDFDict || n instanceof PDFStream) continue;
+    obj.delete(AP);
+    dropped++;
+  }
+  return dropped;
+}
+
+/** Save a document (with object streams, unless it is PDF/A-1), leaving out unreachable objects. */
 export async function saveDoc(doc: PDFDocument, opts: { useObjectStreams?: boolean } = {}): Promise<Uint8Array> {
   // Embedded fonts and images become objects only when flushed: do that before pruning.
   await doc.flush();
   syncXmp(doc);
+  dropBrokenAppearances(doc);
   pruneUnreachable(doc);
-  return doc.save({ useObjectStreams: opts.useObjectStreams ?? true });
+  return doc.save({ useObjectStreams: opts.useObjectStreams ?? !isPdfA1(doc) });
 }

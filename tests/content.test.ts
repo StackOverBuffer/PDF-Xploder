@@ -158,3 +158,19 @@ describe('ungrouping Form XObjects', () => {
     expect(describeObjects(readPage(page)).map((o) => o.kind)).toEqual(['text', 'form']);
   });
 });
+
+describe('ToUnicode CMaps', () => {
+  it('reads destination strings with white space, like the "fi" ligature as <0066 0069>', async () => {
+    const { parseCMap } = await import('../src/lib/content/fonts');
+    const cmap = parseCMap(
+      '1 begincodespacerange\n<0003> <087c>\nendcodespacerange\n' +
+        '2 beginbfchar\n<0003> <0020>\n<087c> <0066 0069>\nendbfchar\n' +
+        '2 beginbfrange\n<0010> <0011> <002D>\n<0020> <0021> [<0066 006C> <0066 0066>]\nendbfrange\n',
+    );
+    expect(cmap.map.get(0x087c)).toBe('fi');
+    expect(cmap.map.get(0x0003)).toBe(' ');
+    expect(cmap.map.get(0x0011)).toBe('.');
+    expect(cmap.map.get(0x0020)).toBe('fl');
+    expect(cmap.map.get(0x0021)).toBe('ff');
+  });
+});

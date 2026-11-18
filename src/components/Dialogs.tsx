@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { userMessage } from '../lib/errors';
 import { create } from 'zustand';
 import { X } from 'lucide-react';
 import { uid, useStore } from '../store/store';
@@ -322,7 +323,7 @@ function SignatureDialog({ close }: { close: () => void }) {
       placeCustomStamp({ id: uid('sig'), name: t('Signature'), src: img.src, width: img.width * k, height: img.height * k, signature: true });
     } catch (e) {
       console.error(e);
-      useStore.getState().notify(`${t('Could not place the signature')}: ${(e as Error).message}`, 'error');
+      useStore.getState().notify(`${t('Could not place the signature')}: ${t(userMessage(e))}`, 'error');
     }
   };
 

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import { userMessage } from '../lib/errors';
 import type { Annotation, PageGeom, Rect, Tool } from '../lib/types';
 import { withViewRotation, normRot } from '../lib/geometry';
 import { inheritOffscreen } from '../lib/render/offscreen';
 import { activeViewer } from '../lib/activeViewer';
-import { openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
+import { closePdf, countFields, openPdf, pageGeoms, PasswordCancelled, type PDFDocumentProxy } from '../lib/pdfjs';
 import { load as loadPdfLib, type FieldInfo, type FieldValue } from '../lib/pdfOps';
 import { copyFromWorker, ops as opsW, sec as secW } from '../lib/worker';
 import { ALL_PERMISSIONS, allPermissionsGranted, containsAscii, inspectEncryption, opensWith, type EncryptionInfo, type Permissions, type SecuritySettings } from '../lib/security';
@@ -140,6 +141,13 @@ interface State {
   lock: { userPassword: string; needsUserPassword: boolean } | null;
   /** The author's restrictions were lifted for this session without the permissions password. */
   restrictionsLifted: boolean;
+  /**
+   * XFA form data (an Adobe-only format) in the file: 'hybrid' next to standard form
+   * fields, 'pure' with no standard fields at all. Saving changes leaves it out.
+   */
+  xfa: 'hybrid' | 'pure' | null;
+  /** The XFA notice was closed for this document. */
+  xfaNoticeClosed: boolean;
   /** Where the document came from (File System Access API), so Save can write back to it. */
   fileHandle: FileSystemFileHandle | null;
   /** Saved at least once: the opened bytes no longer match what the user has on disk. */
@@ -309,6 +317,8 @@ export function anyUnsavedUnprotected(backupOn: boolean): boolean {
 
 const initialDoc = {
   restrictionsLifted: false,
+  xfa: null as State['xfa'],
+  xfaNoticeClosed: false,
   fileHandle: null as FileSystemFileHandle | null,
   savedOnce: false,
   fileName: '',
@@ -429,7 +439,7 @@ export const useStore = create<Store>()((set, get) => {
       // Read the state after loading: it may have changed meanwhile.
       const cur = get();
       inheritOffscreen(cur.pdf, pdf);
-      if (cur.pdf !== pdf) cur.pdf?.destroy();
+      if (cur.pdf !== pdf) closePdf(cur.pdf);
       doc = { pdf, geoms, bytes: snap.bytes, docVersion: cur.docVersion + 1 };
     }
     const cur = get();
@@ -451,6 +461,17 @@ export const useStore = create<Store>()((set, get) => {
       dirty: true,
       search: { ...cur.search, hits: [], index: -1 },
     });
+  }
+
+  /** Whether the document has XFA form data, and whether it is all the form there is. */
+  async function xfaKind(pdf: PDFDocumentProxy): Promise<State['xfa']> {
+    try {
+      const { info } = await pdf.getMetadata();
+      if (!(info as { IsXFAPresent?: boolean })?.IsXFAPresent) return null;
+      return (await countFields(pdf)) ? 'hybrid' : 'pure';
+    } catch {
+      return null;
+    }
   }
 
   async function openDocumentImpl(bytes: Uint8Array, name: string, opts: OpenOptions = {}) {
@@ -503,7 +524,7 @@ export const useStore = create<Store>()((set, get) => {
         const password = owner ?? userPassword;
         const plain = await secW.decrypt(bytes, password);
         const reloaded = await loadPdfJs(plain);
-        loaded.pdf.destroy();
+        closePdf(loaded.pdf);
         loaded = { ...reloaded, password: loaded.password };
         bytes = plain;
         // Saving re-encrypts with the original key, so both passwords keep working.
@@ -536,7 +557,7 @@ export const useStore = create<Store>()((set, get) => {
           : { count: 0, bytes, annotations: [] as Annotation[][] };
         if (imp.count) {
           const reloaded = await loadPdfJs(imp.bytes, undefined, 0);
-          loaded.pdf.destroy();
+          closePdf(loaded.pdf);
           loaded = { ...reloaded, password: loaded.password };
           bytes = imp.bytes;
           imp.annotations.forEach((list, i) => list.length && (annotations[pageIds[i]] = list));
@@ -551,9 +572,12 @@ export const useStore = create<Store>()((set, get) => {
         }
       }
     }
-    get().pdf?.destroy();
+    // pdf-lib cannot keep XFA data: tell the user before they save changes.
+    const xfa = await xfaKind(loaded.pdf);
+    closePdf(get().pdf);
     set({
       ...initialDoc,
+      xfa,
       bytes,
       originalBytes: original,
       fileName: name,
@@ -631,7 +655,7 @@ export const useStore = create<Store>()((set, get) => {
     try {
       const { pdf, geoms } = await loadPdfJs(get().bytes!, undefined, get().viewRotation);
       if (get().activeTab !== id || get().pdf) {
-        pdf.destroy();
+        closePdf(pdf);
         return;
       }
       set({ pdf, geoms, docVersion: get().docVersion + 1, docSession: get().docSession + 1 });
@@ -658,7 +682,7 @@ export const useStore = create<Store>()((set, get) => {
     const i = s.tabs.findIndex((t) => t.id === id);
     if (i < 0) return;
     if (id === s.activeTab) {
-      s.pdf?.destroy();
+      closePdf(s.pdf);
       const rest = s.tabs.filter((t) => t.id !== id);
       if (!rest.length) {
         // Closing the last tab leaves one empty tab.
@@ -670,7 +694,7 @@ export const useStore = create<Store>()((set, get) => {
       set({ tabs: rest });
       activate(rest[Math.min(i, rest.length - 1)].id);
     } else {
-      parked.get(id)?.pdf?.destroy();
+      closePdf(parked.get(id)?.pdf);
       parked.delete(id);
       set({ tabs: s.tabs.filter((t) => t.id !== id) });
     }
@@ -815,11 +839,11 @@ export const useStore = create<Store>()((set, get) => {
       inheritOffscreen(s.pdf, pdf);
       const ids = pageIds ?? s.pageIds;
       if (ids.length !== geoms.length) {
-        pdf.destroy();
+        closePdf(pdf);
         throw new Error('Page id bookkeeping is out of sync');
       }
       pushHistory();
-      if (s.pdf !== pdf) s.pdf?.destroy();
+      if (s.pdf !== pdf) closePdf(s.pdf);
       const annots = annotations ?? s.annotations;
       // Drop annotations whose page no longer exists.
       const kept: Record<string, Annotation[]> = {};
@@ -948,7 +972,7 @@ export const useStore = create<Store>()((set, get) => {
         return await fn();
       } catch (e) {
         console.error(e);
-        get().notify((e as Error).message || String(e), 'error');
+        get().notify(userMessage(e), 'error');
         return undefined;
       } finally {
         running.splice(running.indexOf(entry), 1);

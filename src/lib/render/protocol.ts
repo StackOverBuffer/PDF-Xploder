@@ -30,3 +30,11 @@ export type RenderReply =
   | { id: -1; need: string }
   /** The editing worker's copy arrived. */
   | { id: -1; got: string };
+
+/**
+ * Largest picture pdf.js decodes at full size, in bytes (4 per pixel): 16 megapixels.
+ * Bigger images (huge scanned plans, microfilm sheets: often 50+ megapixels of JPEG 2000)
+ * are decoded at a reduced resolution, which takes seconds instead of ten or more. Such a
+ * page looks the same until zoomed far in; ordinary scans (about 10 megapixels) are not affected.
+ */
+export const IMAGE_MAX_AREA_BYTES = 64 << 20;

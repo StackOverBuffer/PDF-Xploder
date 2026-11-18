@@ -102,7 +102,9 @@ interface CMapData {
 }
 
 const hexToNum = (h: string) => parseInt(h, 16);
-const utf16 = (h: string) => {
+const utf16 = (hex: string) => {
+  // Hex strings may contain white space (e.g. "<0066 0069>" for the "fi" ligature).
+  const h = hex.replace(/\s+/g, '');
   let s = '';
   for (let i = 0; i + 3 < h.length + 1; i += 4) s += String.fromCharCode(parseInt(h.substr(i, 4).padEnd(4, '0'), 16));
   return s;
@@ -117,15 +119,15 @@ export function parseCMap(text: string): CMapData {
     }
   }
   for (const block of text.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
-    for (const m of block[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]*)>/g)) map.set(hexToNum(m[1]), utf16(m[2]));
+    for (const m of block[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f\s]*)>/g)) map.set(hexToNum(m[1]), utf16(m[2]));
   }
   for (const block of text.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)) {
-    for (const m of block[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<[0-9A-Fa-f]*>|\[[^\]]*\])/g)) {
+    for (const m of block[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<[0-9A-Fa-f\s]*>|\[[^\]]*\])/g)) {
       const lo = hexToNum(m[1]);
       const hi = hexToNum(m[2]);
       if (hi - lo > 65535) continue;
       if (m[3].startsWith('[')) {
-        const items = [...m[3].matchAll(/<([0-9A-Fa-f]*)>/g)].map((x) => x[1]);
+        const items = [...m[3].matchAll(/<([0-9A-Fa-f\s]*)>/g)].map((x) => x[1]);
         items.forEach((h, k) => map.set(lo + k, utf16(h)));
       } else {
         const dst = m[3].slice(1, -1);

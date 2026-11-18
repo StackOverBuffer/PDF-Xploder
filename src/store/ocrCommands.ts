@@ -71,7 +71,7 @@ async function renderPage(page: PDFPageProxy, scale: number): Promise<{ raster: 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: ctx, viewport, annotationMode: pdfjs.AnnotationMode.DISABLE }).promise;
+  await page.render({ canvas: null, canvasContext: ctx, viewport, annotationMode: pdfjs.AnnotationMode.DISABLE }).promise;
   const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
   canvas.width = canvas.height = 0;
   return { raster: { width: d.width, height: d.height, data: d.data }, viewport: viewport.transform as M };

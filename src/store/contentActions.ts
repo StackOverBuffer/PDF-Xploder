@@ -10,7 +10,7 @@ import { applyContentEdits, imageBytes, matchesFilter, pageObjects, type Content
 import { createLayer, findLayer, isolateObjects, loadForEditing, type LayerInfo, type ObjectInfo, type ContentEdit } from '../lib/content/page';
 import { about, scale as scaleM, translate } from '../lib/content/matrix';
 import { addBookmark, addLink, type LinkTarget } from '../lib/navigation';
-import { openPdf } from '../lib/pdfjs';
+import { closePdf, openPdf } from '../lib/pdfjs';
 import { baseName, downloadBlob } from '../lib/download';
 import { tr } from '../lib/i18n';
 import type { Rect } from '../lib/types';
@@ -44,10 +44,10 @@ async function renderIsolated(bytes: Uint8Array, scale: number): Promise<HTMLCan
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.ceil(viewport.width));
     canvas.height = Math.max(1, Math.ceil(viewport.height));
-    await page.render({ canvasContext: canvas.getContext('2d')!, viewport, background: 'rgba(0,0,0,0)' }).promise;
+    await page.render({ canvas: null, canvasContext: canvas.getContext('2d')!, viewport, background: 'rgba(0,0,0,0)' }).promise;
     return canvas;
   } finally {
-    pdf.destroy();
+    closePdf(pdf);
   }
 }
 

@@ -56,7 +56,7 @@ function getWorker(): Worker | null {
     pending.delete(e.data.id);
     if (!p) return;
     if (e.data.ok) p.resolve(e.data.result);
-    else p.reject(new Error(e.data.error));
+    else p.reject(Object.assign(new Error(e.data.error), e.data.errorName ? { name: e.data.errorName } : {}));
   };
   worker.onerror = (e) => {
     // A worker that cannot start (or crashed): finish what is pending here, and stop using it.

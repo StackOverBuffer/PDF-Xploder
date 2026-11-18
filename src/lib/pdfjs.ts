@@ -3,7 +3,8 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import type { PageGeom, Rect } from './types';
 import { normRot } from './geometry';
-import { rememberSource } from './render/offscreen';
+import { forgetOffscreen, rememberSource } from './render/offscreen';
+import { IMAGE_MAX_AREA_BYTES } from './render/protocol';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 /**
@@ -31,6 +32,9 @@ const ASSETS =
         cMapUrl: `${import.meta.env.BASE_URL}pdfjs/cmaps/`,
         cMapPacked: true,
         standardFontDataUrl: `${import.meta.env.BASE_URL}pdfjs/standard_fonts/`,
+        // Image decoders (JPEG 2000, JBIG2) and colour management, as WebAssembly.
+        wasmUrl: `${import.meta.env.BASE_URL}pdfjs/wasm/`,
+        canvasMaxAreaInBytes: IMAGE_MAX_AREA_BYTES,
       };
 
 /**
@@ -48,7 +52,7 @@ export async function openPdf(
 ): Promise<{ pdf: PDFDocumentProxy; password?: string }> {
   let password: string | undefined;
   const data = opts.handOver ? bytes : opts.copy ?? bytes.slice();
-  const task = pdfjs.getDocument({ data, isEvalSupported: false, worker: worker(), ...ASSETS });
+  const task = pdfjs.getDocument({ data, worker: worker(), ...ASSETS });
   task.onPassword = async (update: (pw: string) => void, reason: number) => {
     const pw = await askPassword(reason === pdfjs.PasswordResponses.INCORRECT_PASSWORD);
     if (pw === null) {
@@ -67,6 +71,13 @@ export async function openPdf(
     if (password === undefined && (e as Error)?.name === 'PasswordException') throw new PasswordCancelled();
     throw e;
   }
+}
+
+/** Close a document (pdf.js closes documents through their loading task), also where it is drawn in the background. */
+export function closePdf(pdf: PDFDocumentProxy | null | undefined): void {
+  if (!pdf) return;
+  forgetOffscreen(pdf);
+  void pdf.loadingTask.destroy();
 }
 
 export async function pageGeoms(pdf: PDFDocumentProxy): Promise<PageGeom[]> {
@@ -105,7 +116,7 @@ export async function renderToCanvas(page: PDFPageProxy, scale: number, opts: { 
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  await page.render({ canvasContext: ctx, viewport, ...(opts.transparent ? { background: 'rgba(0,0,0,0)' } : {}) }).promise;
+  await page.render({ canvas: null, canvasContext: ctx, viewport, ...(opts.transparent ? { background: 'rgba(0,0,0,0)' } : {}) }).promise;
   return canvas;
 }
 
@@ -119,4 +130,11 @@ export async function resolveDest(pdf: PDFDocumentProxy, dest: unknown): Promise
   if (kind?.name === 'XYZ' && typeof args[1] === 'number') y = args[1];
   else if ((kind?.name === 'FitH' || kind?.name === 'FitBH') && typeof args[0] === 'number') y = args[0];
   return { page, y };
+}
+
+/** Number of form fields pdf.js finds in the document (getFieldObjects: a Map since pdf.js 6). */
+export async function countFields(pdf: PDFDocumentProxy): Promise<number> {
+  const fields: Map<string, unknown> | Record<string, unknown> | null = await pdf.getFieldObjects();
+  if (!fields) return 0;
+  return fields instanceof Map ? fields.size : Object.keys(fields).length;
 }

@@ -8,19 +8,19 @@ import type { Plugin } from 'vite';
 
 /**
  * Serve pdf.js's character maps (CJK and other CID fonts) and standard font
- * data (non-embedded fonts like Arial) under pdfjs/ in dev and the build.
+ * data (non-embedded fonts like Arial) and the image decoders (wasm) under pdfjs/ in dev and the build.
  */
 function pdfjsAssets(): Plugin {
   const root = fileURLToPath(new URL('./node_modules/pdfjs-dist/', import.meta.url));
-  const dirs = ['cmaps', 'standard_fonts'];
+  const dirs = ['cmaps', 'standard_fonts', 'wasm'];
   return {
     name: 'pdfjs-assets',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const m = /\/pdfjs\/(cmaps|standard_fonts)\/([\w.-]+)$/.exec((req.url ?? '').split('?')[0]);
+        const m = /\/pdfjs\/(cmaps|standard_fonts|wasm)\/([\w.-]+)$/.exec((req.url ?? '').split('?')[0]);
         if (!m) return next();
         try {
-          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Type', m[2].endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream');
           res.end(readFileSync(`${root}${m[1]}/${m[2]}`));
         } catch {
           next();
@@ -30,7 +30,9 @@ function pdfjsAssets(): Plugin {
     generateBundle() {
       for (const dir of dirs) {
         for (const f of readdirSync(root + dir)) {
-          if (/\.(bcmap|pfb|ttf|otf)$/.test(f) || f.startsWith('LICENSE')) this.emitFile({ type: 'asset', fileName: `pdfjs/${dir}/${f}`, source: readFileSync(`${root}${dir}/${f}`) });
+          // quickjs: pdf.js's engine for scripts in forms, which the app does not run.
+          if (f.includes('quickjs') || f.includes('QUICKJS')) continue;
+          if (/\.(bcmap|pfb|ttf|otf|wasm)$/.test(f) || f.startsWith('LICENSE')) this.emitFile({ type: 'asset', fileName: `pdfjs/${dir}/${f}`, source: readFileSync(`${root}${dir}/${f}`) });
         }
       }
     },

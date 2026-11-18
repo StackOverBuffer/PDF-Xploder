@@ -100,12 +100,11 @@ function drop(pdf: PDFDocumentProxy) {
 /** The bytes a document was opened from (see openPdf), so the worker can open it too. */
 export function rememberSource(pdf: PDFDocumentProxy, bytes: Uint8Array, password?: string) {
   sources.set(pdf, { bytes, password });
-  // A closed document is closed in the worker too.
-  const destroy = pdf.destroy.bind(pdf);
-  pdf.destroy = () => {
-    drop(pdf);
-    return destroy();
-  };
+}
+
+/** A document is being closed (closePdf): close it in the worker too. */
+export function forgetOffscreen(pdf: PDFDocumentProxy) {
+  drop(pdf);
 }
 
 /** `next` replaces `prev` (an edit, undo): a document drawn in the worker stays there without a slow page first. */

@@ -24,7 +24,7 @@ import {
 import { hexToRgbTuple } from './color';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
-import { appearanceToPdf, fromBase64, normalAppearance, toBase64 } from './foreignAppearance';
+import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
 import type { Annotation, PageGeom, Pt, Rect, Reply } from './types';
 
 const PRIVATE = PDFName.of('AwesomePDF');
@@ -220,6 +220,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('DA', PDFString.of(`/Helv ${a.fontSize} Tf ${color.map((v) => v.toFixed(3)).join(' ')} rg`));
       set('BS', { W: a.border ? 1 : 0 });
       set('Rotate', a.rot ?? 0);
+      if (keepsAppearance(a)) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'note':
       set('Name', 'Comment');
@@ -248,6 +249,11 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const model: Record<string, unknown> = { ...rest, rect0: rect };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
+  if (a.type === 'text') {
+    // Kept only while it still shows the box (otherwise it is just dead weight).
+    if (keepsAppearance(a)) model.appearance = 'pdf';
+    else delete model.appearance, delete model.appearanceOf;
+  }
   dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
@@ -352,16 +358,23 @@ function fromPrivate(dict: PDFDict): Annotation | null {
     }
     a.src = bytesToDataUrl(data, (a.src as string) || 'image/png');
   }
-  if (a.type === 'stamp' && a.appearance) {
+  if ((a.type === 'stamp' || a.type === 'text') && a.appearance) {
     const ap = dict.lookup(PRIVATE_AP);
-    if (!(ap instanceof PDFRawStream)) return null;
-    let data = ap.getContents();
-    try {
-      if (ap.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(ap).decode();
-    } catch {
-      /* keep the raw bytes */
+    if (ap instanceof PDFRawStream) {
+      let data = ap.getContents();
+      try {
+        if (ap.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(ap).decode();
+      } catch {
+        /* keep the raw bytes */
+      }
+      a.appearance = toBase64(data);
+    } else if (a.type === 'stamp') {
+      return null;
+    } else {
+      // A text box can always be drawn from its text.
+      delete a.appearance;
+      delete a.appearanceOf;
     }
-    a.appearance = toBase64(data);
   }
   const subject = text(dict.lookup(PDFName.of('Subj')));
   if (subject) a.subject = subject;
@@ -538,6 +551,15 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
         const pdf = ap ? await appearanceToPdf(doc, ap).catch(() => undefined) : undefined;
         if (!pdf) continue;
         a.appearance = pdf;
+      }
+      // Another program's text box: keep its drawing (its font, line breaks) until it is edited.
+      if (!own && a.type === 'text') {
+        const ap = normalAppearance(dict);
+        const pdf = ap ? await appearanceToPdf(doc, ap).catch(() => undefined) : undefined;
+        if (pdf) {
+          a.appearance = pdf;
+          a.appearanceOf = textBoxKey(a);
+        }
       }
       // Its popup: where it is now (another editor may have moved it) and whether it is open.
       // A closed popup nobody placed (one written for other viewers) is left out.

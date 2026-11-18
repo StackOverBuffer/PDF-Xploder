@@ -5,7 +5,7 @@ import { Modal, parseRange } from './Dialogs';
 import { useStore } from '../store/store';
 import { printPreviewSheet, printWithOptions, releasePrintCache } from '../store/printCommands';
 import { DEFAULT_PRINT, PAPERS, type Paper, type PerSheet, type PrintOptions } from '../lib/printLayout';
-import { openPdf, renderToCanvas } from '../lib/pdfjs';
+import { closePdf, openPdf, renderToCanvas } from '../lib/pdfjs';
 import { tf, useT } from '../lib/i18n';
 
 type Settings = Omit<PrintOptions, 'pages'>;
@@ -57,7 +57,7 @@ function Preview({ o }: { o: PrintOptions }) {
         const vp = page.getViewport({ scale: 1 });
         const scale = Math.min(PREVIEW_BOX / vp.width, PREVIEW_BOX / vp.height) * (window.devicePixelRatio || 1);
         const canvas = await renderToCanvas(page, scale);
-        pdf.destroy();
+        closePdf(pdf);
         if (!live) return;
         canvas.style.width = `${canvas.width / (window.devicePixelRatio || 1)}px`;
         host.current?.replaceChildren(canvas);

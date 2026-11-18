@@ -1,5 +1,6 @@
 /** Commands of the Organize tab: glue between its dialogs, the store and the organize library. */
 import type * as OpsT from '../lib/pdfOps';
+import { userMessage } from '../lib/errors';
 import type * as OrgT from '../lib/organize';
 import { ops } from '../lib/worker';
 import { org } from '../lib/worker';
@@ -25,7 +26,8 @@ function run<T>(label: string, fn: () => Promise<T>): Promise<T | undefined> {
     try {
       return await fn();
     } catch (e) {
-      throw new Error(tr((e as Error).message || String(e)));
+      // Keep the error's type, so library and runtime errors are still recognised as such.
+      throw Object.assign(new Error(tr((e as Error).message || String(e))), { name: (e as Error)?.name ?? 'Error' });
     }
   });
 }
@@ -249,7 +251,7 @@ export async function swapPageGroups(a: number[], b: number[]) {
   try {
     layout = org.swapLayout(S().pageIds.length, a, b);
   } catch (e) {
-    return S().notify(tr((e as Error).message), 'error');
+    return S().notify(tr(userMessage(e)), 'error');
   }
   await arrange('Swapping pages…', layout);
 }
