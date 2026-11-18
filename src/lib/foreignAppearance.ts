@@ -1,10 +1,11 @@
 /**
- * Appearances drawn by other programs (custom stamps from PDF-XChange, Acrobat, …):
+ * Appearances drawn by other programs (custom stamps and text boxes from PDF-XChange, Acrobat, …):
  * the appearance stream is copied, with its resources, into a one-page PDF of its
  * own. That keeps the exact vector drawing with the annotation while it lives in our
  * model, and is embedded again as the appearance when saving.
  */
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFObjectCopier, PDFRawStream, PDFRef, PDFStream, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } from '@cantoo/pdf-lib';
+import type { Annotation, TextBoxAnnot } from './types';
 
 const nums = (o: unknown): number[] => (o instanceof PDFArray ? o.asArray().map((x) => (x instanceof PDFNumber ? x.asNumber() : 0)) : []);
 
@@ -50,6 +51,16 @@ export async function appearanceToPdf(src: PDFDocument, stream: PDFStream): Prom
   page.pushOperators(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, -x0, -y0), drawObject(name), popGraphicsState());
   const bytes = await dst.save({ useObjectStreams: false, addDefaultPage: false });
   return toBase64(bytes);
+}
+
+/** What a text box's appearance depends on: a change to any of it means drawing the box anew. */
+export function textBoxKey(a: TextBoxAnnot): string {
+  return JSON.stringify([a.text, a.rect, a.fontSize, a.color, a.opacity, a.border, a.rot ?? 0]);
+}
+
+/** The text box still looks as the program that made it drew it: use that drawing. */
+export function keepsAppearance(a: Annotation): a is TextBoxAnnot & { appearance: string } {
+  return a.type === 'text' && !!a.appearance && a.appearanceOf === textBoxKey(a);
 }
 
 export function toBase64(bytes: Uint8Array): string {

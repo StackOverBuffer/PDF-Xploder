@@ -15,6 +15,7 @@ import type { NewFieldKind } from '../lib/forms';
 import { useLang, useT } from '../lib/i18n';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 import { useAppearanceImage } from '../lib/appearanceImage';
+import { keepsAppearance } from '../lib/foreignAppearance';
 import { annotationsAt } from '../lib/annotHit';
 import { hasPopup } from '../lib/popups';
 import { inActivePane } from '../lib/activeViewer';
@@ -759,6 +760,9 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
       );
     }
     case 'text': {
+      // Another program's box, unchanged: its own drawing (drawn in the page's user space, like
+      // in the file); editing shows the text, and any change makes it drawn anew.
+      if (!editing && keepsAppearance(a)) return <ForeignStamp a={{ ...a, rot: 0 }} geom={geom} scale={S} />;
       const fg = frameGeom(geom, a.rot);
       const v = pdfRectToView(fg, a.rect);
       return (
@@ -812,8 +816,8 @@ const AnnotShape = memo(function AnnotShape({ a, pageId, geom, scale: S, editing
   }
 });
 
-/** A stamp made by another program: its own drawing (rendered once), placed in the rect. */
-function ForeignStamp({ a, geom, scale }: { a: Extract<Annotation, { type: 'stamp' }>; geom: PageGeom; scale: number }) {
+/** A stamp or text box made by another program: its own drawing (rendered once), placed in the rect. */
+function ForeignStamp({ a, geom, scale }: { a: Extract<Annotation, { type: 'stamp' | 'text' }>; geom: PageGeom; scale: number }) {
   const url = useAppearanceImage(a.appearance);
   const fg = frameGeom(geom, a.rot);
   const v = pdfRectToView(fg, a.rect);

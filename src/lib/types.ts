@@ -114,6 +114,14 @@ export interface TextBoxAnnot extends AnnotBase, Oriented {
   text: string;
   fontSize: number;
   border: boolean;
+  /**
+   * A text box made by another program: its own drawing, as a one-page PDF (base64).
+   * While the box is unchanged it is drawn with it, on screen and when saving, so its
+   * font and layout stay as they were; once edited it is drawn anew (see appearanceOf).
+   */
+  appearance?: string;
+  /** The state of the box the appearance shows (textBoxKey). */
+  appearanceOf?: string;
 }
 
 export interface NoteAnnot extends AnnotBase {

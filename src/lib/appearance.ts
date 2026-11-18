@@ -43,7 +43,7 @@ import { useLang } from './i18n';
 import { cloudEdges, cloudRadius } from './annotGeom';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { NOTE_SIZE } from './types';
-import { fromBase64 } from './foreignAppearance';
+import { fromBase64, keepsAppearance } from './foreignAppearance';
 
 /** Text shaping: how a string is split over fonts and how wide it is. */
 export interface TextEngine {
@@ -380,6 +380,17 @@ export interface AppearanceOptions {
   burnRedactions?: boolean;
 }
 
+/** Another program's drawing (a one-page PDF, base64), embedded once per document. */
+async function embedAppearance(ctx: DrawContext, appearance: string) {
+  ctx.pages ??= new Map();
+  let p = ctx.pages.get(appearance);
+  if (!p) {
+    [p] = await ctx.doc.embedPdf(fromBase64(appearance), [0]);
+    ctx.pages.set(appearance, p);
+  }
+  return p;
+}
+
 /** Build the appearance of an annotation; returns the XObject and the rect it covers. */
 export async function buildAppearance(
   ctx: DrawContext,
@@ -434,6 +445,10 @@ export async function buildAppearance(
       c.cloudy(a.vertices, { color: a.color, width: a.width, opacity: op, fill: a.fill, close: true });
       break;
     case 'text': {
+      if (keepsAppearance(a)) {
+        c.page(await embedAppearance(ctx, a.appearance), a.rect, op);
+        break;
+      }
       const fg = frameGeom(g, a.rot);
       const v = pdfRectToView(fg, a.rect);
       if (a.border) c.rect(a.rect, { stroke: a.color, width: 1, opacity: op });
@@ -449,13 +464,7 @@ export async function buildAppearance(
     }
     case 'stamp': {
       if (a.appearance) {
-        ctx.pages ??= new Map();
-        let p = ctx.pages.get(a.appearance);
-        if (!p) {
-          [p] = await ctx.doc.embedPdf(fromBase64(a.appearance), [0]);
-          ctx.pages.set(a.appearance, p);
-        }
-        c.page(p, a.rect, op);
+        c.page(await embedAppearance(ctx, a.appearance), a.rect, op);
         break;
       }
       const fg = frameGeom(g, a.rot);

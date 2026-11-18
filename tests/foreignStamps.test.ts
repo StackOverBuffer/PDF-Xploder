@@ -65,3 +65,66 @@ describe('stamps from other programs and replies', () => {
     expect(s.replies?.map((x) => x.text)).toEqual(['An answer', 'Answer to the answer']);
   });
 });
+
+/** A page with another program's text box: Times, drawn by its own appearance stream. */
+async function textBoxSample(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([400, 400]);
+  const ctx = doc.context;
+  const font = ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Times-Roman' }));
+  const ap = ctx.register(ctx.formXObject([], { BBox: [0, 0, 200, 30], Resources: { Font: { TiRo: font } } }));
+  (ctx.lookup(ap) as { contents?: Uint8Array }).contents = new TextEncoder().encode('BT /TiRo 12 Tf 0 0 1 rg 2 10 Td (Times text, as drawn) Tj ET');
+  const box = ctx.register(ctx.obj({
+    Type: 'Annot', Subtype: 'FreeText', Rect: [50, 300, 250, 330], AP: { N: ap }, DA: PDFHexString.fromText('/TimesNewRomanPSMT 12 Tf 0 0 1 rg'),
+    Contents: PDFHexString.fromText('Times text, as drawn'), T: PDFHexString.fromText('Jo'), NM: PDFHexString.fromText('box-1'), F: 4,
+  }));
+  page.node.set(PDFName.of('Annots'), ctx.obj([box]));
+  return doc.save();
+}
+
+/** Font names used by the appearance of the page's FreeText (through embedded pages, too). */
+function appearanceFonts(doc: PDFDocument): string[] {
+  const annots = (doc.getPage(0).node.Annots() as PDFArray).asArray().map((x) => doc.context.lookup(x) as PDFDict);
+  const box = annots.find((d) => d.get(PDFName.of('Subtype')) === PDFName.of('FreeText'))!;
+  const names: string[] = [];
+  const seen = new Set<unknown>();
+  const walk = (o: unknown) => {
+    if (seen.has(o)) return;
+    seen.add(o);
+    if (o instanceof PDFDict || (o && typeof o === 'object' && 'dict' in o)) {
+      const d = o instanceof PDFDict ? o : (o as { dict: PDFDict }).dict;
+      if (d.get(PDFName.of('Type')) === PDFName.of('Font')) names.push(String(d.get(PDFName.of('BaseFont'))));
+      for (const [, v] of d.entries()) walk(doc.context.lookup(v as never) ?? v);
+    } else if (o instanceof PDFArray) for (const v of o.asArray()) walk(doc.context.lookup(v as never) ?? v);
+  };
+  walk((box.lookup(PDFName.of('AP')) as PDFDict).lookup(PDFName.of('N')));
+  return names;
+}
+
+describe('text boxes from other programs', () => {
+  it('keep their own drawing while unchanged, also after saving and reopening', async () => {
+    const r = await importForEditing(await textBoxSample());
+    const box = r.annotations[0][0] as Extract<Annotation, { type: 'text' }>;
+    expect(box).toMatchObject({ type: 'text', text: 'Times text, as drawn' });
+    expect(box.appearance).toBeTruthy();
+    const out = await exportWithAnnotations(r.bytes, r.annotations);
+    expect(appearanceFonts(await PDFDocument.load(out))).toEqual(['/Times-Roman']);
+    // Reopened in PDF-Xploder and saved again: still the original drawing.
+    const again = await importForEditing(out);
+    const out2 = await exportWithAnnotations(again.bytes, again.annotations);
+    expect(appearanceFonts(await PDFDocument.load(out2))).toEqual(['/Times-Roman']);
+  });
+
+  it('are drawn anew once edited', async () => {
+    const r = await importForEditing(await textBoxSample());
+    const box = r.annotations[0][0] as Extract<Annotation, { type: 'text' }>;
+    const edited = [[{ ...box, text: 'Changed text' }]];
+    const out = await exportWithAnnotations(r.bytes, edited);
+    const fonts = appearanceFonts(await PDFDocument.load(out));
+    expect(fonts).not.toContain('/Times-Roman');
+    expect(fonts.length).toBeGreaterThan(0);
+    // The old drawing is not carried along any more.
+    const again = await importForEditing(out);
+    expect((again.annotations[0][0] as Extract<Annotation, { type: 'text' }>).appearance).toBeUndefined();
+  });
+});
