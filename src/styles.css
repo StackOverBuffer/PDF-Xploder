@@ -522,6 +522,9 @@ select.widget { padding: 0; }
 .modal .row { display: flex; align-items: center; gap: 10px; }
 .modal .row > span:first-child { width: 110px; flex-shrink: 0; color: var(--muted); }
 .modal .row input:not([type=color]):not([type=range]), .modal .row select { flex: 1; }
+.modal .row.choice { align-items: flex-start; margin: 6px 0; }
+.modal .row.choice > input[type] { flex: none; width: auto; height: auto; padding: 0; border: none; background: none; margin: 3px 0 0; }
+.modal .optimize-extras { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 6px; }
 .modal p { margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .sig-fonts button { font-size: 22px; padding: 4px 14px; }

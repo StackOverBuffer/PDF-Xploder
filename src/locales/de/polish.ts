@@ -91,6 +91,23 @@ const DE: Record<string, string> = {
   'Draw complex pages in the background (experimental)': 'Aufwendige Seiten im Hintergrund zeichnen (experimentell)',
   'Complex pages (plans, maps) are drawn in a background thread, so scrolling and zooming stay smooth. Uses more memory.':
     'Aufwendige Seiten (Pläne, Karten) werden in einem Hintergrund-Thread gezeichnet, damit Blättern und Zoomen flüssig bleiben. Braucht mehr Speicher.',
+  // Compress document
+  Compress: 'Komprimieren', 'Compress document': 'Dokument komprimieren', 'Compressing document…': 'Dokument wird komprimiert…',
+  'Make the file smaller: recompress images, remove unused objects': 'Datei verkleinern: Bilder neu komprimieren, ungenutzte Objekte entfernen',
+  'Current size': 'Aktuelle Größe', 'Document compressed': 'Dokument komprimiert',
+  'The document is already as small as these settings make it.': 'Das Dokument ist mit diesen Einstellungen bereits so klein wie möglich.',
+  'Smallest file': 'Kleinste Datei', Balanced: 'Ausgewogen', 'High quality': 'Hohe Qualität', 'Lossless only': 'Nur verlustfrei',
+  'Images at 100 ppi, JPEG quality 60%: for reading on screen and sending by mail.': 'Bilder mit 100 ppi, JPEG-Qualität 60 %: zum Lesen am Bildschirm und Versenden per E-Mail.',
+  'Images at 150 ppi, JPEG quality 75%: good on screen and in office printing.': 'Bilder mit 150 ppi, JPEG-Qualität 75 %: gut am Bildschirm und im Bürodruck.',
+  'Images at 300 ppi, JPEG quality 85%: for printing. CMYK images stay CMYK.': 'Bilder mit 300 ppi, JPEG-Qualität 85 %: für den Druck. CMYK-Bilder bleiben CMYK.',
+  'Images stay as they are; only the file structure is cleaned up.': 'Bilder bleiben unverändert; nur der Dateiaufbau wird bereinigt.',
+  'Choose the resolution and quality yourself.': 'Auflösung und Qualität selbst wählen.',
+  'Reduce images to': 'Bilder verkleinern auf',
+  'Remove embedded page thumbnails': 'Eingebettete Seitenminiaturen entfernen',
+  'Remove metadata (author, dates, XMP) except the title': 'Metadaten (Autor, Datum, XMP) außer dem Titel entfernen',
+  'Unused objects are always removed, identical fonts and images are stored once, and transparent areas and black-and-white scans stay lossless.':
+    'Ungenutzte Objekte werden immer entfernt, gleiche Schriften und Bilder nur einmal gespeichert; transparente Bereiche und Schwarzweiß-Scans bleiben verlustfrei.',
+  'This document is digitally signed. Compressing it invalidates the signatures.': 'Dieses Dokument ist digital signiert. Durch das Komprimieren werden die Signaturen ungültig.',
 };
 
 export default DE;

@@ -27,6 +27,7 @@ feels familiar if you know desktop PDF editors like PDF-XChange or Adobe Acrobat
 - **Sign and protect**: digital signatures with certificates (.p12/.pfx) and validation, AES-256 passwords and permissions, secure redaction (also search & redact)
 - **OCR**: make scanned PDFs searchable or editable (German, English, French, Italian, Spanish, Dutch, Polish), with table and style recognition
 - **Measure** distances, perimeters and areas on plans and drawings; add **QR codes and barcodes**
+- **Compress PDFs**: recompress and downsample images, merge duplicate fonts and images, remove unused objects and metadata; see the size before and after
 - **Comfortable**: tabs for several documents, command search (Ctrl+K), print dialog with N-up, dark theme, English and German, session restore, installable as an app that opens PDFs from your desktop
 
 The full feature list, compared with PDF-XChange Editor, is in [ROADMAP.md](ROADMAP.md).
@@ -158,6 +159,12 @@ The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page com
 - Resize pages to a paper size (scale the content or only change the page box, with an anchor), add margins, normalise pages (media box = crop box, bake the page rotation into the content, one common size); comments move with the content
 - Watermarks (in front of or behind the content), backgrounds (colour and/or image), headers and footers at six positions, Bates numbering: all written as `/Artifact <</Type /Pagination /Subtype …>>` marked content, so *Remove* finds exactly these marks (and Acrobat's or PDF-XChange's)
 - Page labels (*Seiten nummerieren*): ranges with decimal, roman or letter numbering, prefix and start number; shown in the status bar like PDF-XChange ("iv (4 / 20)")
+
+### Compress
+- File › Compress (also under Share): presets *Smallest file* (100 ppi, JPEG 60 %), *Balanced* (150 ppi, 75 %), *High quality* (300 ppi, 85 %, CMYK kept), *Lossless only*, or custom quality and resolution
+- Images are downsampled by the resolution they are shown at on the page (also inside Form XObjects) and re-encoded as JPEG only when that makes them clearly smaller; soft masks, colour-key masks and black-and-white scans (1-bit, JBIG2, CCITT) stay lossless; CMYK, JPEG 2000 and other formats are drawn by pdf.js and converted to RGB
+- Identical fonts and images are stored once, uncompressed streams are compressed, unused objects and embedded page thumbnails are removed, object streams are written; metadata can be removed too (except the title, and kept for PDF/A)
+- The result replaces the document only if it is smaller, with the size before and after and Undo
 
 ### Edit content
 - **Edit objects** tool (Edit tab) with an *All / Text / Images / Shapes* filter, like PDF-XChange's Edit Content tool: click to select, Shift/Ctrl+click or drag a marquee for several; overlapping objects: click again on the same spot (or Alt+click) for the one underneath, right-click → Select, Tab / Shift+Tab
