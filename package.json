@@ -40,7 +40,8 @@
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "corpus": "vite-node scripts/corpus/run.ts"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "2.11.1",

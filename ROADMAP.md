@@ -294,7 +294,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Type Your Signature | ✅ |
 | Word Count / Document Statistics | ⬜ |
 | Automation for scripts and AI agents (MCP server) | ⬜ the editing code in `src/lib/` is DOM-free (`bytes → bytes`), so a Node command-line tool and an opt-in MCP server over stdio can reuse it: open, inspect, extract text, organize pages, comment, fill forms, protect, save. Later, tools in the open app through WebMCP where browsers support it |
-| Corpus test in CI (open, render and save the pdf.js test files; check saved files with qpdf) | ⬜ |
+| Corpus test in CI (open, render and save the pdf.js test files; check saved files with qpdf) | ✅ all ~1,100 files in the pdf.js repository: every page drawn, comments imported, saved, reopened and checked with qpdf, in about 2 minutes; new problems fail CI (`scripts/corpus/`) |
 | Continuous Zoom | ✅ Ctrl+wheel |
 | Shell extensions, Terminal Server, command line, ARM64, Windows 11 corners, WebDAV, DocuSign, Azure Purview, tab-title and close-button options, recycle bin, WebP/MRC/PRC import… | 🚫 desktop/Windows-specific or third-party services |
 
