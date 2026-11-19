@@ -100,6 +100,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Sort Document Pages by Bookmarks | ✅ |
 | Use Selected Text to Update Bookmark Targets | 🟡 new bookmarks take the selected text as title |
 | Validate Bookmarks | ✅ |
+| Search Bookmark Titles (filter the tree, nested matches keep their parents) | ⬜ |
 
 ## 5. Convert documents to and from PDF
 
@@ -121,7 +122,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Feature | Status |
 |---|---|
 | Create a New PDF File | ✅ |
-| Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position |
+| Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position; ⬜ one bookmark per merged file, with that file's own bookmarks nested underneath |
 | Create a PDF from Clipboard Content | 🟡 insert a clipboard image as a page |
 | Create a PDF from an Image File | 🟡 insert images as pages into a new document |
 | Create a PDF from Text / Markdown / CSV / RTF | ⬜ |
@@ -144,7 +145,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Identify Forms Automatically | ⬜ |
 | Import/Export Form Data (FDF/XFDF/XML/CSV), Use CSV Files to Populate Forms | ⬜ |
 | Email Form Data | ⬜ |
-| Calculate / Validate Values (JavaScript) | ⬜ |
+| Calculate / Validate Values (JavaScript) | ⬜ (run the form's scripts in a sandbox) |
 | Field Tab Order | ⬜ |
 
 ## 8. User interface
@@ -276,6 +277,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 |---|---|
 | Add Signatures to Multiple Pages | ⬜ |
 | Custom Document Properties, Advanced Metadata, Import/Export Metadata, Templates | 🟡 standard properties |
+| Fonts and Security in Document Properties (every font, embedded or not; encryption method and each permission) | ⬜ |
 | Change Text Case Commands | ⬜ |
 | Colorize Documents | ⬜ |
 | Distribute Objects Horizontally/Vertically | ✅ |
@@ -291,6 +293,8 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Translate Documents | ⬜ |
 | Type Your Signature | ✅ |
 | Word Count / Document Statistics | ⬜ |
+| Automation for scripts and AI agents (MCP server) | ⬜ the editing code in `src/lib/` is DOM-free (`bytes → bytes`), so a Node command-line tool and an opt-in MCP server over stdio can reuse it: open, inspect, extract text, organize pages, comment, fill forms, protect, save. Later, tools in the open app through WebMCP where browsers support it |
+| Corpus test in CI (open, render and save the pdf.js test files; check saved files with qpdf) | ⬜ |
 | Continuous Zoom | ✅ Ctrl+wheel |
 | Shell extensions, Terminal Server, command line, ARM64, Windows 11 corners, WebDAV, DocuSign, Azure Purview, tab-title and close-button options, recycle bin, WebP/MRC/PRC import… | 🚫 desktop/Windows-specific or third-party services |
 
@@ -301,6 +305,8 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Perform OCR on Documents | ✅ tesseract.js, runs locally in the browser (Convert → OCR Pages) |
 | Enhanced OCR: style and table recognition, three output types, multithreading, skew/rotation detection and correction | ✅ |
 | OCR Selected Region / Multiple Selected Images via the Context Menu | 🟡 OCR from an image's context menu (whole page); ⬜ region |
+| Review Recognised Text Before Applying | ⬜ words coloured by confidence, jump between doubtful words, user dictionary, re-OCR a region, then apply |
+| Clean Up Scans Before OCR (denoise, binarize) and OCR a Folder of Files | ⬜ |
 | OCR when Converting to MS Office Formats | ⬜ (with the Office export) |
 
 ## 15. Secure documents
