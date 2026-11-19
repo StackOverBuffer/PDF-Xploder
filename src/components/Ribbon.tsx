@@ -9,6 +9,7 @@ import {
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
   MessageSquareText, MessageSquareOff, File as FileIcon, GalleryVertical, BookOpen, BookOpenText, Book, Columns2,
   Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText, FileArchive,
+  Images, SprayCan, Blend,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { setAllPopups } from '../store/popups';
@@ -17,6 +18,7 @@ import { isFacing } from '../lib/viewLayout';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import * as extra from '../store/extras';
+import * as cleanup from '../store/cleanupCommands';
 import { selectContent, type ContentFilter } from '../store/content';
 import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
@@ -472,6 +474,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         <Group label="Security">
           <Btn icon={<Lock size={L} />} label="Password" disabled={noDoc} title="Passwords and encryption" onClick={() => show('security')} />
           <Btn icon={<ListChecks size={L} />} label="Permissions" disabled={noDoc} title="What others may do with the document" onClick={() => show('permissions')} />
+          <Btn icon={<SprayCan size={L} />} label="Sanitize" disabled={!canModify} title="Remove scripts, form submission, attachments, metadata and hidden data" onClick={() => show('sanitize')} />
           {lock && <Btn icon={<KeyRound size={L} />} label="Unlock" onClick={() => show('security')} />}
         </Group>
         <Group label="Digital signatures">
@@ -535,6 +538,8 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         <Group label="Convert">
           <Btn icon={<FileImage size={L} />} label="To image" title="Save the current page as a PNG image" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
           <ToolBtn tool="snapshot" icon={<Camera size={L} />} label="Region to image" title="Drag a box to copy that part of the page as an image" />
+          <Btn icon={<Images size={L} />} label="Extract images" title="Save every image of the document in a ZIP file (JPEGs unchanged, others as PNG)" disabled={!canCopy} onClick={cleanup.extractAllImages} />
+          <Btn icon={<Blend size={L} />} label="Greyscale" title="Convert pages, images and comments to shades of grey" disabled={!canModify} onClick={cleanup.greyscale} />
         </Group>
         <Group label="Flatten">
           <Btn icon={<Layers size={L} />} label="Flatten comments" disabled={!canModify} onClick={cmd.flattenAnnotations} />

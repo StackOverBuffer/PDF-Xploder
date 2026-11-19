@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addTitleText, bookmarkEveryNth, bookmarksFromHeadings, bookmarksFromText, bookmarksFromToc, bookmarksToHtml, bookmarksToText, changeCase,
+  addTitleText, bookmarkEveryNth, filterBookmarks, bookmarksFromHeadings, bookmarksFromText, bookmarksFromToc, bookmarksToHtml, bookmarksToText, changeCase,
   mergeDuplicates, pageOrderByBookmarks, removeActions, replaceTitles, validateBookmarks, bookmarkNode as node,
 } from '../src/lib/bookmarkTools';
 import type { OutlineNode } from '../src/lib/outline';
@@ -115,5 +115,23 @@ describe('table of contents pages', () => {
     // The first link goes to the old first page, now page 2.
     const dest = (out.context.lookup(annots.get(0)) as import('@cantoo/pdf-lib').PDFDict).lookup(PDFName.of('Dest')) as import('@cantoo/pdf-lib').PDFArray;
     expect(dest.get(0).toString()).toBe(out.getPage(1).ref.toString());
+  });
+});
+
+describe('searching bookmarks', () => {
+  const n = (title: string, children: OutlineNode[] = []): OutlineNode => ({ id: title, title, page: 0, open: false, bold: false, italic: false, children });
+  const tree = [n('Einleitung'), n('Teil A', [n('Übersicht'), n('Details', [n('Über uns')])]), n('Anhang')];
+
+  it('keeps matches with their ancestors, ignoring case and accents', () => {
+    const { tree: t, matches } = filterBookmarks(tree, 'uber');
+    expect(t.map((x) => x.title)).toEqual(['Teil A']);
+    expect(t[0].children.map((x) => x.title)).toEqual(['Übersicht', 'Details']);
+    expect(t[0].children[1].children.map((x) => x.title)).toEqual(['Über uns']);
+    expect([...matches].sort()).toEqual(['Über uns', 'Übersicht']);
+  });
+
+  it('returns the whole tree for an empty query', () => {
+    expect(filterBookmarks(tree, '  ').tree).toBe(tree);
+    expect(filterBookmarks(tree, 'nothing').tree).toEqual([]);
   });
 });

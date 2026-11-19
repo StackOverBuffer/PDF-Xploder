@@ -108,6 +108,49 @@ const DE: Record<string, string> = {
   'Unused objects are always removed, identical fonts and images are stored once, and transparent areas and black-and-white scans stay lossless.':
     'Ungenutzte Objekte werden immer entfernt, gleiche Schriften und Bilder nur einmal gespeichert; transparente Bereiche und Schwarzweiß-Scans bleiben verlustfrei.',
   'This document is digitally signed. Compressing it invalidates the signatures.': 'Dieses Dokument ist digital signiert. Durch das Komprimieren werden die Signaturen ungültig.',
+  // merging with bookmarks, searching bookmarks
+  'Add a bookmark for each file (with its own bookmarks underneath)': 'Für jede Datei ein Lesezeichen hinzufügen (mit ihren eigenen Lesezeichen darunter)',
+  'Search bookmarks': 'Lesezeichen durchsuchen', 'No bookmarks match.': 'Keine Lesezeichen gefunden.', 'Clear search': 'Suche löschen',
+  // Document properties: fonts and security
+  Description: 'Beschreibung', Fonts: 'Schriften', 'Font type': 'Schrifttyp', Embedded: 'Eingebettet', 'Embedded subset': 'Teilmenge eingebettet',
+  'No (standard font)': 'Nein (Standardschrift)', No: 'Nein', 'The pages use no fonts.': 'Die Seiten verwenden keine Schriften.',
+  'Fonts that are not embedded are replaced by similar fonts on other computers, so the text may look different or not fit.':
+    'Nicht eingebettete Schriften werden auf anderen Computern durch ähnliche ersetzt; der Text kann dann anders aussehen oder nicht passen.',
+  'Not encrypted': 'Nicht verschlüsselt', Encrypted: 'Verschlüsselt', 'Encrypted, opens with a password': 'Verschlüsselt, öffnet mit Kennwort',
+  'Encrypted, opens without a password': 'Verschlüsselt, öffnet ohne Kennwort', 'When saving': 'Beim Speichern',
+  'Known (or no restrictions)': 'Bekannt (oder keine Einschränkungen)', 'Restrictions lifted for this session': 'Einschränkungen für diese Sitzung aufgehoben',
+  'Not known': 'Nicht bekannt', 'What this session may do': 'Was in dieser Sitzung erlaubt ist',
+  // greyscale, sanitize, extract images
+  Greyscale: 'Graustufen', 'Convert pages, images and comments to shades of grey': 'Seiten, Bilder und Kommentare in Graustufen umwandeln',
+  'Converting to greyscale…': 'In Graustufen umwandeln…', 'Converted to greyscale.': 'In Graustufen umgewandelt.',
+  'Converted to greyscale. {n} image(s) in formats that could not be read keep their colours.':
+    'In Graustufen umgewandelt. {n} Bild(er) in nicht lesbaren Formaten behalten ihre Farben.',
+  'This document is digitally signed. Changing it this way invalidates the signatures.': 'Dieses Dokument ist digital signiert. Diese Änderung macht die Signaturen ungültig.',
+  Continue: 'Fortfahren',
+  'Extract images': 'Bilder extrahieren', 'Extracting images…': 'Bilder werden extrahiert…',
+  'Save every image of the document in a ZIP file (JPEGs unchanged, others as PNG)': 'Alle Bilder des Dokuments in einer ZIP-Datei speichern (JPEGs unverändert, andere als PNG)',
+  'The document contains no images.': 'Das Dokument enthält keine Bilder.', '{n} image(s) saved.': '{n} Bild(er) gespeichert.',
+  '{n} image(s) saved; {skipped} could not be read.': '{n} Bild(er) gespeichert; {skipped} konnten nicht gelesen werden.',
+  Sanitize: 'Bereinigen', 'Sanitize document': 'Dokument bereinigen', 'Sanitizing…': 'Wird bereinigt…',
+  'Remove scripts, form submission, attachments, metadata and hidden data': 'Skripte, Formularversand, Anlagen, Metadaten und versteckte Daten entfernen',
+  'Remove what could run, send data or reveal more than the pages show. What the pages look like does not change.':
+    'Entfernt, was ausgeführt werden, Daten senden oder mehr verraten könnte, als die Seiten zeigen. Das Aussehen der Seiten ändert sich nicht.',
+  Scripts: 'Skripte',
+  'JavaScript in the document, pages, form fields and links; links that start programs; XFA forms. Form calculations stop working.':
+    'JavaScript im Dokument, in Seiten, Formularfeldern und Links; Links, die Programme starten; XFA-Formulare. Formularberechnungen funktionieren danach nicht mehr.',
+  'Form submission and remote actions': 'Formularversand und externe Aktionen',
+  'Buttons that send form data to a server or import it, and links into other files.': 'Schaltflächen, die Formulardaten an einen Server senden oder importieren, und Links in andere Dateien.',
+  'Attached files': 'Angehängte Dateien', 'Files attached to the document or as comments on the pages.': 'An das Dokument oder als Kommentar auf den Seiten angehängte Dateien.',
+  Metadata: 'Metadaten', metadata: 'Metadaten',
+  'Author, dates, producer, XMP metadata and other programs’ private data. The title is kept.': 'Autor, Datumsangaben, Hersteller, XMP-Metadaten und private Daten anderer Programme. Der Titel bleibt erhalten.',
+  'Hidden data': 'Versteckte Daten', 'Embedded page thumbnails and web capture information.': 'Eingebettete Seitenminiaturen und Web-Capture-Informationen.',
+  'Comments, form fields and web links stay. To remove comments too, flatten them first; to remove hidden text, use redaction.':
+    'Kommentare, Formularfelder und Weblinks bleiben. Um auch Kommentare zu entfernen, reduzieren Sie sie zuerst; versteckten Text entfernen Sie mit Schwärzen.',
+  'This document is digitally signed. Sanitizing it invalidates the signatures.': 'Dieses Dokument ist digital signiert. Durch das Bereinigen werden die Signaturen ungültig.',
+  '{n} script(s)': '{n} Skript(e)', '{n} form submit or remote action(s)': '{n} Formularversand- oder externe Aktion(en)', '{n} attachment(s)': '{n} Anlage(n)',
+  '{n} hidden item(s)': '{n} versteckte(s) Element(e)', Removed: 'Entfernt',
+  'The metadata was kept, because the file is PDF/A, which requires it.': 'Die Metadaten wurden behalten, weil die Datei PDF/A ist und sie dort vorgeschrieben sind.',
+  'Nothing to remove: the document has none of the chosen items.': 'Nichts zu entfernen: Das Dokument enthält keines der gewählten Elemente.',
 };
 
 export default DE;

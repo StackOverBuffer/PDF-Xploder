@@ -137,14 +137,19 @@ export async function insertClipboardImage(at = S().currentPage + 1) {
   await insertImagePages([blob], at, { size: null, margin: 0 });
 }
 
-/** Insert all pages of other PDF files before position `at`, in the given order. */
-export async function insertPdfFiles(files: File[], at: number) {
+/**
+ * Insert all pages of other PDF files before position `at`, in the given order. With
+ * `bookmarks`, each file gets a bookmark (named after it) with its own bookmarks underneath.
+ */
+export async function insertPdfFiles(files: File[], at: number, bookmarks = false) {
   if (!files.length || !requirePermission('assemble')) return;
   await run('Inserting pages…', async () => {
     let bytes = S().bytes!;
     let pos = at;
+    const currentTitle = baseName(S().fileName || tr('Document'));
     for (const f of files) {
-      const res = await ops.insertDocument(bytes, await fileBytes(f), pos);
+      const bookmark = bookmarks ? { title: baseName(f.name), currentTitle } : undefined;
+      const res = await ops.insertDocument(bytes, await fileBytes(f), pos, bookmark);
       bytes = res.bytes;
       pos += res.count;
     }

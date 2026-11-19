@@ -29,49 +29,67 @@ async function jpegOf(c: AnyCanvas, quality: number): Promise<Uint8Array | null>
   return blob && blob.type === 'image/jpeg' ? new Uint8Array(await blob.arrayBuffer()) : null;
 }
 
+/** Draw an image source at the given size on a white canvas, or null if it is too big. */
+async function drawSource(src: ImageSource, width: number, height: number): Promise<AnyCanvas | null> {
+  if (src.width * src.height > MAX_PIXELS * 4 || width * height > MAX_PIXELS) return null;
+  let source: CanvasImageSource;
+  if ('pdf' in src) {
+    // Formats only a PDF renderer reads (CMYK, JPEG 2000…): let pdf.js draw the image at the new size.
+    const { pdf } = await openPdf(src.pdf, () => null);
+    try {
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: width / src.width });
+      const c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      await page.render({ canvas: null, canvasContext: c.getContext('2d')!, viewport }).promise;
+      source = c;
+    } finally {
+      closePdf(pdf);
+    }
+  } else if ('jpeg' in src) {
+    source = await createImageBitmap(new Blob([src.jpeg as BlobPart], { type: 'image/jpeg' }));
+  } else {
+    if (src.width * src.height > MAX_PIXELS) return null;
+    const rgba = new Uint8ClampedArray(src.width * src.height * 4);
+    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+      rgba[i] = src.rgb[j];
+      rgba[i + 1] = src.rgb[j + 1];
+      rgba[i + 2] = src.rgb[j + 2];
+      rgba[i + 3] = 255;
+    }
+    const full = canvas(src.width, src.height);
+    (full.getContext('2d') as CanvasRenderingContext2D).putImageData(new ImageData(rgba, src.width, src.height), 0, 0);
+    source = full;
+  }
+  const out = canvas(width, height);
+  const g = out.getContext('2d') as CanvasRenderingContext2D;
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, width, height);
+  g.drawImage(source, 0, 0, width, height);
+  if ('close' in source && typeof source.close === 'function') source.close();
+  return out;
+}
+
 /** Decode and encode images with the browser's canvas. */
 export const canvasCodec: ImageCodec = {
   async encodeJpeg(src: ImageSource, width: number, height: number, quality: number) {
-    if (src.width * src.height > MAX_PIXELS * 4 || width * height > MAX_PIXELS) return null;
-    let source: CanvasImageSource;
-    if ('pdf' in src) {
-      // Formats only a PDF renderer reads (CMYK, JPEG 2000…): let pdf.js draw the image at the new size.
-      const { pdf } = await openPdf(src.pdf, () => null);
-      try {
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: width / src.width });
-        const c = document.createElement('canvas');
-        c.width = width;
-        c.height = height;
-        await page.render({ canvas: null, canvasContext: c.getContext('2d')!, viewport }).promise;
-        source = c;
-      } finally {
-        closePdf(pdf);
-      }
-    } else if ('jpeg' in src) {
-      source = await createImageBitmap(new Blob([src.jpeg as BlobPart], { type: 'image/jpeg' }));
-    } else {
-      if (src.width * src.height > MAX_PIXELS) return null;
-      const rgba = new Uint8ClampedArray(src.width * src.height * 4);
-      for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
-        rgba[i] = src.rgb[j];
-        rgba[i + 1] = src.rgb[j + 1];
-        rgba[i + 2] = src.rgb[j + 2];
-        rgba[i + 3] = 255;
-      }
-      const full = canvas(src.width, src.height);
-      (full.getContext('2d') as CanvasRenderingContext2D).putImageData(new ImageData(rgba, src.width, src.height), 0, 0);
-      source = full;
+    const c = await drawSource(src, width, height);
+    return c ? jpegOf(c, quality) : null;
+  },
+  async decodeRgb(src: ImageSource, width: number, height: number) {
+    const c = await drawSource(src, width, height);
+    if (!c) return null;
+    const data = (c.getContext('2d') as CanvasRenderingContext2D).getImageData(0, 0, width, height).data;
+    const rgb = new Uint8Array(width * height * 3);
+    for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+      rgb[j] = data[i];
+      rgb[j + 1] = data[i + 1];
+      rgb[j + 2] = data[i + 2];
     }
-    const out = canvas(width, height);
-    const g = out.getContext('2d') as CanvasRenderingContext2D;
-    g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'high';
-    g.fillStyle = '#fff';
-    g.fillRect(0, 0, width, height);
-    g.drawImage(source, 0, 0, width, height);
-    if ('close' in source && typeof source.close === 'function') source.close();
-    return jpegOf(out, quality);
+    return rgb;
   },
 };
 

@@ -324,3 +324,27 @@ export function pageOrderByBookmarks(nodes: OutlineNode[], pageCount: number): n
 }
 
 export const bookmarkNode = make;
+
+// ---------------------------------------------------------------- searching
+
+/** Lower case without accents, so "uber" finds "Über". */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/**
+ * The bookmarks whose titles contain `query` (ignoring case and accents), with their
+ * ancestors for context. Nodes keep their ids, so the result can be shown and acted on
+ * like the full tree; `matches` holds the ids of the nodes that matched themselves.
+ */
+export function filterBookmarks(nodes: OutlineNode[], query: string): { tree: OutlineNode[]; matches: Set<string> } {
+  const q = fold(query.trim());
+  const matches = new Set<string>();
+  if (!q) return { tree: nodes, matches };
+  const walk = (list: OutlineNode[]): OutlineNode[] =>
+    list.flatMap((n) => {
+      const children = walk(n.children);
+      const hit = fold(n.title).includes(q);
+      if (hit) matches.add(n.id);
+      return hit || children.length ? [{ ...n, children }] : [];
+    });
+  return { tree: walk(nodes), matches };
+}

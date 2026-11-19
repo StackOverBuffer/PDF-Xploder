@@ -217,13 +217,14 @@ function InsertFileDialog({ close, merge }: Close & { merge?: boolean }) {
   const [files, setFiles] = useState<File[]>([]);
   const [range, setRange] = useState(tr('all'));
   const [where, setWhere] = useState<Where>(merge ? { mode: 'end', page: 1 } : initialWhere);
+  const [bookmarks, setBookmarks] = useState(true);
   const move = (i: number, d: number) => setFiles((fs) => {
     const next = [...fs];
     [next[i], next[i + d]] = [next[i + d], next[i]];
     return next;
   });
   const ok = () => {
-    if (merge) return oc.insertPdfFiles(files, whereIndex(where));
+    if (merge) return oc.insertPdfFiles(files, whereIndex(where), bookmarks);
     if (!file) return;
     const pages = isAll(range) ? Array.from({ length: file.pages }, (_, i) => i) : parseRange(range, file.pages);
     oc.insertPagesFromFile(file.bytes, pages, whereIndex(where));
@@ -244,6 +245,7 @@ function InsertFileDialog({ close, merge }: Close & { merge?: boolean }) {
             ))}
           </ul>
           <div className="row"><button onClick={async () => setFiles([...files, ...(await pickFile('application/pdf,.pdf', true))])}>{t('Add files…')}</button></div>
+          <Check checked={bookmarks} onChange={setBookmarks} label="Add a bookmark for each file (with its own bookmarks underneath)" />
         </>
       ) : (
         <>

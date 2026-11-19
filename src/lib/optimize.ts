@@ -58,6 +58,8 @@ export type ImageSource =
 export interface ImageCodec {
   /** Encode the image as a (three-channel) JPEG of the given size, or return null if it cannot. */
   encodeJpeg(src: ImageSource, width: number, height: number, quality: number): Promise<Uint8Array | null>;
+  /** The image's pixels as 8-bit RGB at the given size, or null if it cannot decode it (used by greyscale conversion). */
+  decodeRgb?(src: ImageSource, width: number, height: number): Promise<Uint8Array | null>;
 }
 
 export interface OptimizeReport {
@@ -157,7 +159,7 @@ export function imageDisplaySizes(doc: PDFDocument): Map<string, { w: number; h:
 }
 
 /** A stream's decoded contents, or undefined if a filter is not supported. */
-function streamBytes(s: PDFStream): Uint8Array | undefined {
+export function streamBytes(s: PDFStream): Uint8Array | undefined {
   try {
     if (s instanceof PDFRawStream) return decodePDFRawStream(s).decode();
     const unencoded = (s as { getUnencodedContents?: () => Uint8Array }).getUnencodedContents;
@@ -281,7 +283,7 @@ function unpack(data: Uint8Array, width: number, height: number, comps: number, 
   return out;
 }
 
-interface ReadImage {
+export interface ReadImage {
   src: ImageSource;
   /** The colour space to write with an RGB JPEG. */
   colorSpace: PDFObject;
@@ -289,9 +291,10 @@ interface ReadImage {
 
 /**
  * A one-page PDF showing only this image, at one point per pixel, for images that
- * readImage cannot decode itself. Not for masks and 1-bit images, which stay lossless.
+ * readImage cannot decode itself. Not for masks, nor (unless `blackAndWhite`) for 1-bit
+ * images, which stay lossless when compressing.
  */
-export async function isolatedImagePdf(stream: PDFRawStream): Promise<ImageSource | undefined> {
+export async function isolatedImagePdf(stream: PDFRawStream, opts: { blackAndWhite?: boolean } = {}): Promise<ImageSource | undefined> {
   const { dict } = stream;
   if (dict.lookup(N('ImageMask'))?.toString() === 'true') return undefined;
   if (dict.has(N('Mask')) && !(dict.lookup(N('Mask')) instanceof PDFStream)) return undefined;
@@ -301,7 +304,8 @@ export async function isolatedImagePdf(stream: PDFRawStream): Promise<ImageSourc
   const bpc = num(dict.lookup(N('BitsPerComponent')));
   const filters = filtersOf(dict);
   // JBIG2 and CCITT hold black-and-white scans: JPEG would be bigger and blurred.
-  if (!width || !height || bpc === 1 || filters.some((f) => f === 'JBIG2Decode' || f === 'CCITTFaxDecode' || f === 'CCF')) return undefined;
+  if (!width || !height) return undefined;
+  if (!opts.blackAndWhite && (bpc === 1 || filters.some((f) => f === 'JBIG2Decode' || f === 'CCITTFaxDecode' || f === 'CCF'))) return undefined;
   const out = await PDFDocument.create();
   const copy = dict.clone(dict.context);
   for (const k of ['SMask', 'Mask', 'Metadata', 'OC', 'Alternates', 'StructParent', 'ID', 'OPI', 'PieceInfo']) copy.delete(N(k));
@@ -313,7 +317,7 @@ export async function isolatedImagePdf(stream: PDFRawStream): Promise<ImageSourc
 }
 
 /** An image XObject's pixels, if it is one this can re-encode faithfully. */
-function readImage(stream: PDFRawStream): ReadImage | undefined {
+export function readImage(stream: PDFRawStream): ReadImage | undefined {
   const { dict } = stream;
   const ctx = dict.context;
   if (dict.lookup(N('ImageMask'))?.toString() === 'true') return undefined;
@@ -375,7 +379,7 @@ function isGray(cs: PDFObject | undefined, ctx: PDFContext): boolean {
 // ---------------------------------------------------------------- the steps
 
 /** Images that are another image's soft mask: these stay lossless. */
-function softMasks(ctx: PDFContext): Set<string> {
+export function softMasks(ctx: PDFContext): Set<string> {
   const out = new Set<string>();
   for (const [, obj] of ctx.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFStream)) continue;
@@ -556,7 +560,7 @@ export function compressPlainStreams(doc: PDFDocument): number {
 }
 
 /** Remove the document information, XMP metadata and /PieceInfo. */
-function removeMetadata(doc: PDFDocument): void {
+export function removeMetadata(doc: PDFDocument): void {
   const ctx = doc.context;
   doc.catalog.delete(N('Metadata'));
   doc.catalog.delete(N('PieceInfo'));
@@ -576,7 +580,7 @@ function removeMetadata(doc: PDFDocument): void {
   }
 }
 
-function removeThumbnails(doc: PDFDocument): void {
+export function removeThumbnails(doc: PDFDocument): void {
   for (const page of doc.getPages()) page.node.delete(N('Thumb'));
 }
 
@@ -620,7 +624,7 @@ export async function optimizeDocument(
 }
 
 /** The file claims conformance to any part of PDF/A. */
-function isPdfA(doc: PDFDocument): boolean {
+export function isPdfA(doc: PDFDocument): boolean {
   if (isPdfA1(doc)) return true;
   const s = doc.catalog.lookup(N('Metadata'));
   const b = s instanceof PDFStream ? streamBytes(s) : undefined;

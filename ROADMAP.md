@@ -14,7 +14,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
 5. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
 6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
-7. **Whole-document outputs**: greyscale, rasterize pages, sanitize (remove metadata, scripts, hidden data), extract all images, export pages as JPEG/WebP/TIFF. Mostly reuse code that is already there.
+7. 🟡 **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize) and extract all images (Convert › Extract images, as a ZIP) are done. Still open: rasterize pages, export pages as JPEG/WebP/TIFF.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -100,7 +100,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Sort Document Pages by Bookmarks | ✅ |
 | Use Selected Text to Update Bookmark Targets | 🟡 new bookmarks take the selected text as title |
 | Validate Bookmarks | ✅ |
-| Search Bookmark Titles (filter the tree, nested matches keep their parents) | ⬜ |
+| Search Bookmark Titles (filter the tree, nested matches keep their parents) | ✅ search box in the Bookmarks pane, ignoring case and accents |
 
 ## 5. Convert documents to and from PDF
 
@@ -122,7 +122,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Feature | Status |
 |---|---|
 | Create a New PDF File | ✅ |
-| Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position; ⬜ one bookmark per merged file, with that file's own bookmarks nested underneath |
+| Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position, with a bookmark per merged file and that file's own bookmarks nested underneath |
 | Create a PDF from Clipboard Content | 🟡 insert a clipboard image as a page |
 | Create a PDF from an Image File | 🟡 insert images as pages into a new document |
 | Create a PDF from Text / Markdown / CSV / RTF | ⬜ |
@@ -206,7 +206,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Select Pages Options for Thumbnails | 🟡 multi-select with Ctrl/Shift |
 | Redact Documents | ✅ |
 | Find and Redact, Redaction Code Sets, Blurred/Pixelated Overlays | 🟡 find and redact (exact boxes around every match); ⬜ code sets, blurred/pixelated overlays |
-| Sanitize Documents | ⬜ |
+| Sanitize Documents | ✅ scripts (JavaScript, launch actions, XFA), form submission and remote actions, attachments, metadata, thumbnails and private data, each optional |
 | Compare Documents | ⬜ |
 | Layers Pane, Add/Edit/Merge/Remove/Reorder Layers, Links to Layers, Flatten Layers | 🟡 objects can be moved to existing or new layers; ⬜ layers pane |
 | Attachments, Comments, Signatures, Thumbnails, Properties Panes | ✅ |
@@ -232,7 +232,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Add Backgrounds | ✅ colour or image, removable |
 | Add Barcodes | ✅ QR code, Code 128, EAN-13 (placed like a stamp) |
 | Add JavaScript | ⬜ |
-| Convert Document Colours | ⬜ (greyscale first) |
+| Convert Document Colours | 🟡 greyscale: page content, forms, comment appearances, gradients and images; ⬜ other colour conversions, spot colours |
 | Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
 | Rasterize Pages | ⬜ |
 | Recompress Document Images | ✅ whole document (File › Compress) or one image (context menu) |
@@ -277,7 +277,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 |---|---|
 | Add Signatures to Multiple Pages | ⬜ |
 | Custom Document Properties, Advanced Metadata, Import/Export Metadata, Templates | 🟡 standard properties |
-| Fonts and Security in Document Properties (every font, embedded or not; encryption method and each permission) | ⬜ |
+| Fonts and Security in Document Properties (every font, embedded or not; encryption method and each permission) | ✅ |
 | Change Text Case Commands | ⬜ |
 | Colorize Documents | ⬜ |
 | Distribute Objects Horizontally/Vertically | ✅ |

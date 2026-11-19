@@ -211,6 +211,43 @@ export function setOutline(doc: PDFDocument, nodes: OutlineNode[]) {
   if (!doc.catalog.has(PDFName.of('PageMode'))) doc.catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
 }
 
+/**
+ * The bookmarks of a document whose pages were copied to position `at` of another one,
+ * as new items pointing at the copies. Items that do not go to a page of their own
+ * document (web links, scripts…) are left out; their children move up a level.
+ */
+export function copiedOutline(nodes: OutlineNode[], at: number): OutlineNode[] {
+  const out: OutlineNode[] = [];
+  for (const n of nodes) {
+    const children = copiedOutline(n.children, at);
+    if (n.page === undefined) {
+      out.push(...children);
+      continue;
+    }
+    out.push({ id: newNodeId(), title: n.title, page: n.page + at, y: n.y, open: n.open, bold: n.bold, italic: n.italic, color: n.color, children });
+  }
+  return out;
+}
+
+/**
+ * Add a bookmark for `count` pages inserted at `at`, titled `title`, with the inserted
+ * file's own bookmarks (`children`, already pointing at the inserted pages) underneath.
+ * It goes between the existing top-level bookmarks by page. When the document had no
+ * bookmarks yet, `currentTitle` names one for its own pages, so every part of the
+ * merged document can be reached from the bookmarks.
+ */
+export function addInsertedFileBookmark(doc: PDFDocument, o: { title: string; at: number; count: number; children: OutlineNode[]; currentTitle?: string }) {
+  const tree = outlineOf(doc);
+  const total = doc.getPageCount();
+  const node = (title: string, page: number, children: OutlineNode[] = []): OutlineNode => ({ id: newNodeId(), title, page, open: false, bold: false, italic: false, children });
+  if (!tree.length && o.currentTitle && o.count < total) tree.push(node(o.currentTitle, o.at === 0 ? o.count : 0));
+  const after = tree.findIndex((n) => n.page !== undefined && n.page >= o.at + o.count);
+  const item = node(o.title, o.at, o.children);
+  if (after < 0) tree.push(item);
+  else tree.splice(after, 0, item);
+  setOutline(doc, tree);
+}
+
 export async function writeOutline(bytes: Uint8Array, nodes: OutlineNode[]): Promise<Uint8Array> {
   const doc = await load(bytes);
   setOutline(doc, nodes);
