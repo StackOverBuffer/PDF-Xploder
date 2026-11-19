@@ -8,11 +8,13 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 Roughly in order of everyday usefulness versus effort (callouts are still open from the measure/markup group):
 
-1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing.
-2. **Compare documents**: side by side, with changed text and changed areas marked.
-3. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
-4. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
-5. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP.
+1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing; also save N-up sheets and posters (one large page tiled over several sheets) as a PDF.
+2. **Optimize / compress documents**: recompress and downsample images across the document, remove unused objects, fonts and metadata, write object streams; show the size before and after. The most-used tool on browser PDF sites.
+3. **Compare documents**: side by side, with changed text and changed areas marked.
+4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
+5. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
+6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
+7. **Whole-document outputs**: greyscale, rasterize pages, sanitize (remove metadata, scripts, hidden data), extract all images, export pages as JPEG/WebP/TIFF. Mostly reuse code that is already there.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -106,10 +108,12 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | PDF to Word / Excel / PowerPoint | ⬜ |
 | PDF to PDF/A / PDF/X | ⬜ |
 | PDF to Plain Text | ⬜ |
-| Export PDFs to WebP Images | ⬜ (PNG/JPEG export exists) |
-| Image Files to PDF | ✅ images as new pages (Organize → Insert) |
+| Export PDFs to WebP / TIFF Images | ⬜ (PNG/JPEG export exists) |
+| Image Files to PDF | ✅ images as new pages (Organize → Insert); ⬜ HEIC, TIFF (multi-page) and SVG |
 | Text, Markdown, CSV, RTF to PDF | ⬜ |
-| Word, Excel, PowerPoint, Publisher, Visio to PDF | 🚫 needs the Office applications or a server-side converter |
+| Word, Excel, PowerPoint to PDF | ⬜ possible offline with LibreOffice compiled to WebAssembly, loaded only when used (large download) |
+| Publisher, Visio to PDF | 🚫 no converter that runs in the browser |
+| EPUB, CBZ (comic archives), email (EML) to PDF | ⬜ |
 | Windows Metafiles / XPS to PDF | ⬜ |
 
 ## 6. Create documents
@@ -149,7 +153,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 |---|---|
 | Ribbon UI | ✅ PDF-XChange style tabs, groups, split buttons and menus |
 | Quick Launch / search for commands | ✅ search box beside the ribbon tabs (Ctrl+K): finds every ribbon button and menu entry in English or German, shows where it lives and its shortcut, recently used first |
-| Set the UI Language | ✅ German/English throughout, following the browser |
+| Set the UI Language | ✅ German/English throughout, following the browser; ⬜ more languages (French, Spanish, …) |
 | Dark Page Mode | ✅ dark interface (View → Theme: same as system, light, dark) and inverted page colours |
 | Page Display Options / Default Page Layouts | ✅ single page, continuous, facing, continuous facing, cover page (View → Page layout; remembered) |
 | Right-to-Left Page Layout | ⬜ |
@@ -192,7 +196,9 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Crop Pages, Partial Cropping, Crop to White Margins | ✅ |
 | Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ (also copy pages between open documents by dragging thumbnails onto another tab) |
 | Interleave Pages (combine separately scanned front and back sides) | ⬜ |
-| Booklet Imposition | ⬜ (N-up printing exists) |
+| Booklet Imposition | ⬜ (N-up printing exists; also save N-up sheets to a file) |
+| Posterize (tile a large page over several sheets), Divide Pages (cut each page in halves/quarters) | ⬜ |
+| Rotate Pages by Any Angle (straighten scans) | ⬜ (90° steps and deskew with OCR exist) |
 | Delete Empty Pages, Merge, Normalize, Overlay, Replace, Resize, Swap Pages, Set Margins, Split by Size | ✅ |
 | Normalize Media Box Offsets | ✅ |
 | Split Pages by Guide Lines | ⬜ |
@@ -225,7 +231,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Add Backgrounds | ✅ colour or image, removable |
 | Add Barcodes | ✅ QR code, Code 128, EAN-13 (placed like a stamp) |
 | Add JavaScript | ⬜ |
-| Convert Document Colours | ⬜ |
+| Convert Document Colours | ⬜ (greyscale first) |
 | Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
 | Rasterize Pages | ⬜ |
 | Recompress Document Images | 🟡 per image |
@@ -253,7 +259,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Move Content Items to a Selected Layer | ✅ |
 | Import Pages to a Layer | ⬜ |
 | Open Documents from a URL | ⬜ (works for servers that allow CORS) |
-| Optimize Documents | ⬜ |
+| Optimize Documents | ⬜ compress (see Next up), linearize for fast web view, repair damaged files |
 | Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
 | Autoscroll, Playback, Page Transitions, Full-Screen Mode | ⬜ |
 | Split the Page View, Spreadsheet Split | 🟡 split view side by side or one above the other, each pane with its own zoom and position; ⬜ spreadsheet split (four panes) |
