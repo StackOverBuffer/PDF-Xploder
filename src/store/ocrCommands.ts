@@ -3,7 +3,6 @@
  * them on several Tesseract workers in parallel and write the results back as
  * searchable, editable or "fine" page content.
  */
-import { PDFDocument } from '@cantoo/pdf-lib';
 import { useStore } from './store';
 import { requirePermission } from './permissions';
 import { pdfjs, type PDFPageProxy } from '../lib/pdfjs';
@@ -12,6 +11,7 @@ import type { Raster } from '../lib/ocr/raster';
 import type { M } from '../lib/ocr/mapping';
 import type { OutputMode, EncodedImage } from '../lib/ocr/writer';
 import { saveDoc } from '../lib/pdfSave';
+import { loadForEdit } from '../lib/pageTree';
 
 const S = () => useStore.getState();
 
@@ -156,7 +156,7 @@ export async function runOcr(o: OcrOptions, onProgress: ProgressHandler, signal:
     }
     try {
       engineState = undefined;
-      const doc = await PDFDocument.load(startBytes, { updateMetadata: false });
+      const doc = await loadForEdit(startBytes);
       const writer = createWriter(doc);
       const scale = o.dpi / 72;
       let replaced = false;

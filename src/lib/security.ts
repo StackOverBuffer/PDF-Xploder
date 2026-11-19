@@ -1,7 +1,8 @@
 /** Password protection (encryption) helpers, built on @cantoo/pdf-lib. */
-import { PDFArray, PDFDict, PDFDocument, PDFHeader, PDFHexString, PDFName, PDFNumber, PDFRef, PDFSecurity, PDFString } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHeader, PDFHexString, PDFName, PDFNull, PDFNumber, PDFRawStream, PDFRef, PDFSecurity, PDFString, type PDFObject } from '@cantoo/pdf-lib';
 import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
 import { saveDoc } from './pdfSave';
+import { loadForEdit } from './pageTree';
 
 export interface Permissions {
   printing: boolean;
@@ -114,7 +115,7 @@ export async function opensWith(bytes: Uint8Array, password: string): Promise<bo
 /** Return an unencrypted copy of the document. */
 /** Load with a password, working around the fork dropping the trailer's /Info link when decrypting. */
 export async function loadDecrypted(bytes: Uint8Array, password: string): Promise<PDFDocument> {
-  const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
+  const doc = await loadForEdit(bytes, { password });
   if (!doc.context.trailerInfo.Info) {
     const raw = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
     const info = raw.context.trailerInfo.Info;
@@ -125,8 +126,81 @@ export async function loadDecrypted(bytes: Uint8Array, password: string): Promis
 
 export async function decrypt(bytes: Uint8Array, password: string): Promise<Uint8Array> {
   const doc = await loadDecrypted(bytes, password);
+  await applyCryptFilters(doc, bytes, password);
   dropEncryptionRemnants(doc);
   return saveDoc(doc);
+}
+
+/**
+ * pdf-lib decrypts every stream with the document's string filter (/StrF). Where the default
+ * stream filter (/StmF) differs, where a stream names its own crypt filter (/Filter /Crypt,
+ * often /Identity: not encrypted at all), and for embedded files under a different /EFF or
+ * unencrypted metadata, the streams come out as garbage, and /Crypt stays in the filter list,
+ * where readers refuse it. Decrypt those streams again from the original bytes with the right
+ * filter and drop /Crypt.
+ */
+async function applyCryptFilters(doc: PDFDocument, bytes: Uint8Array, password: string): Promise<void> {
+  const raw = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  const enc = raw.context.lookup(raw.context.trailerInfo.Encrypt);
+  const ids = raw.context.lookup(raw.context.trailerInfo.ID);
+  if (!(enc instanceof PDFDict) || ((enc.lookup(PDFName.of('V')) as PDFNumber | undefined)?.asNumber() ?? 0) < 4) return;
+  const id0 = ids instanceof PDFArray ? ids.lookup(0) : undefined;
+  const factory = new CipherTransformFactory(enc, id0 instanceof PDFHexString || id0 instanceof PDFString ? id0.asBytes() : new Uint8Array(), password);
+  const identity = PDFName.of('Identity');
+  const nameOf = (key: string, fallback: PDFName) => {
+    const v = enc.lookup(PDFName.of(key));
+    return v instanceof PDFName ? v : fallback;
+  };
+  const strf = nameOf('StrF', identity);
+  const stmf = nameOf('StmF', identity);
+  const eff = nameOf('EFF', stmf);
+  const encryptMetadata = enc.lookup(PDFName.of('EncryptMetadata'))?.toString() !== 'false';
+  const decryptWith = (name: PDFName, ref: PDFRef, data: Uint8Array) => {
+    if (name === identity) return data;
+    const f = factory as unknown as { strf: PDFName };
+    const before = f.strf;
+    f.strf = name;
+    try {
+      return factory.createCipherTransform(ref.objectNumber, ref.generationNumber).decryptBytes(data);
+    } finally {
+      f.strf = before;
+    }
+  };
+
+  for (const [ref, obj] of raw.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    const target = doc.context.lookup(ref);
+    if (!(target instanceof PDFRawStream)) continue;
+    const type = obj.dict.lookup(PDFName.of('Type'));
+    if (type === PDFName.of('XRef')) continue;
+    const filter = obj.dict.lookup(PDFName.of('Filter'));
+    const filters: PDFObject[] = filter instanceof PDFArray ? filter.asArray() : filter ? [filter] : [];
+    const at = filters.findIndex((f) => f === PDFName.of('Crypt'));
+    let name: PDFName;
+    if (at === 0) {
+      const parms = obj.dict.lookup(PDFName.of('DecodeParms'));
+      const p = parms instanceof PDFArray ? parms.lookup(0) : parms;
+      const n = p instanceof PDFDict ? p.lookup(PDFName.of('Name')) : undefined;
+      name = n instanceof PDFName ? n : identity;
+    } else if (type === PDFName.of('EmbeddedFile')) name = eff;
+    else if (type === PDFName.of('Metadata') && !encryptMetadata) name = identity;
+    else name = stmf;
+    // What pdf-lib did already.
+    if (at !== 0 && name === strf) continue;
+    const dict = target.dict.clone(doc.context);
+    if (at === 0) {
+      const rest = filters.slice(1);
+      const parms = dict.lookup(PDFName.of('DecodeParms'));
+      const restParms = parms instanceof PDFArray ? parms.asArray().slice(1) : [];
+      if (rest.length) dict.set(PDFName.of('Filter'), rest.length === 1 ? rest[0] : doc.context.obj(rest));
+      else dict.delete(PDFName.of('Filter'));
+      if (restParms.length && restParms.some((x) => x !== PDFNull)) dict.set(PDFName.of('DecodeParms'), restParms.length === 1 ? restParms[0] : doc.context.obj(restParms));
+      else dict.delete(PDFName.of('DecodeParms'));
+    }
+    const data = decryptWith(name, ref, obj.contents);
+    dict.set(PDFName.of('Length'), PDFNumber.of(data.length));
+    doc.context.assign(ref, PDFRawStream.of(dict, data));
+  }
 }
 
 /**
