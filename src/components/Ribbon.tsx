@@ -8,7 +8,7 @@ import {
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
   MessageSquareText, MessageSquareOff, File as FileIcon, GalleryVertical, BookOpen, BookOpenText, Book, Columns2,
-  Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText,
+  Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText, FileArchive,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { setAllPopups } from '../store/popups';
@@ -265,6 +265,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
         <Group label="Output">
           <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
           <Btn icon={<Share2 size={L} />} label="Share file" disabled={noDoc} onClick={extra.shareFile} />
+          <Btn icon={<FileArchive size={L} />} label="Compress" title="Make the file smaller: recompress images, remove unused objects" disabled={!canModify} onClick={() => show('optimize')} />
         </Group>
         <Group label="Info">
           <Btn icon={<Info size={L} />} label="Properties" disabled={noDoc} onClick={() => show('metadata')} />
@@ -546,6 +547,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
       <>
         <Group label="Send">
           <Btn icon={<Share2 size={L} />} label="Share file" title="Send the PDF with another app (mail, messenger…)" disabled={noDoc} onClick={extra.shareFile} />
+          <Btn icon={<FileArchive size={L} />} label="Compress" title="Make the file smaller: recompress images, remove unused objects" disabled={!canModify} onClick={() => show('optimize')} />
           <Btn icon={<SaveAll size={L} />} label="Download" disabled={noDoc} onClick={cmd.saveAs} />
           <Btn icon={<Printer size={L} />} label="Print" disabled={!canPrint} onClick={cmd.print} />
         </Group>

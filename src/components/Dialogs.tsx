@@ -29,9 +29,10 @@ const OcrDialog = lazy(() => import('./OcrDialog').then((m) => ({ default: m.Ocr
 const ScaleDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default: m.ScaleDialog })));
 const CalibrateDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default: m.CalibrateDialog })));
 const BarcodeDialog = lazy(() => import('./BarcodeDialog').then((m) => ({ default: m.BarcodeDialog })));
+const OptimizeDialog = lazy(() => import('./OptimizeDialog').then((m) => ({ default: m.OptimizeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -449,6 +450,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'permissions': return <PermissionsDialog close={close} />;
     case 'accessibility': return <AccessibilityDialog close={close} />;
     case 'recompress': return <RecompressDialog close={close} />;
+    case 'optimize': return <OptimizeDialog close={close} />;
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'ocr': return <OcrDialog close={close} />;
     case 'print': return <PrintDialog close={close} />;

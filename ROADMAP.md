@@ -9,7 +9,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 Roughly in order of everyday usefulness versus effort (callouts are still open from the measure/markup group):
 
 1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing; also save N-up sheets and posters (one large page tiled over several sheets) as a PDF.
-2. **Optimize / compress documents**: recompress and downsample images across the document, remove unused objects, fonts and metadata, write object streams; show the size before and after. The most-used tool on browser PDF sites.
+2. ✅ **Optimize / compress documents**: done (File › Compress, Share › Compress): presets plus custom quality and resolution, images downsampled by their resolution on the page, CMYK/JPEG 2000 images converted through pdf.js (except for the print preset), duplicate fonts and images merged, unused objects, thumbnails and metadata removed, object streams; size before and after with Undo. Still open: subsetting fully embedded fonts.
 3. **Compare documents**: side by side, with changed text and changed areas marked.
 4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
 5. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
@@ -24,7 +24,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Enhanced 3D Plugin | ⬜ (3D/PRC rendering is a large separate project) |
 | Enhanced Open/Save File Dialog Boxes | 🟡 system open/save dialogs; Save writes back to the opened file in Chrome/Edge (download elsewhere); drag & drop to open |
 | FreeSign Tool | 🟡 signature images (drawn, typed or uploaded) as comments |
-| Optimize Document Enhancements | ⬜ |
+| Optimize Document Enhancements | 🟡 compress with presets (see Optimize Documents); no font subsetting or linearization yet |
 | Search Feature for Files in Cloud Storage | 🚫 needs cloud accounts (see section 11) |
 | Additional Improvements and Bug Fixes | — |
 
@@ -235,7 +235,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Convert Document Colours | ⬜ (greyscale first) |
 | Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
 | Rasterize Pages | ⬜ |
-| Recompress Document Images | 🟡 per image |
+| Recompress Document Images | ✅ whole document (File › Compress) or one image (context menu) |
 | View/Edit Document Properties | ✅ |
 
 ## 11. Cloud services
@@ -260,7 +260,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Move Content Items to a Selected Layer | ✅ |
 | Import Pages to a Layer | ⬜ |
 | Open Documents from a URL | ⬜ (works for servers that allow CORS) |
-| Optimize Documents | ⬜ compress (see Next up), linearize for fast web view, repair damaged files |
+| Optimize Documents | 🟡 compress: recompress and downsample images, merge duplicates, remove unused objects, thumbnails and metadata, object streams; linearize for fast web view and repair damaged files still open |
 | Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
 | Autoscroll, Playback, Page Transitions, Full-Screen Mode | ⬜ |
 | Split the Page View, Spreadsheet Split | 🟡 split view side by side or one above the other, each pane with its own zoom and position; ⬜ spreadsheet split (four panes) |
