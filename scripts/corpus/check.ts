@@ -83,13 +83,36 @@ async function render(pdf: pdfjs.PDFDocumentProxy, fail: string[], label: string
   }
 }
 
-function qpdfCheck(path: string): Promise<{ code: number; out: string }> {
+function qpdfCheck(path: string): Promise<{ code: number; lines: string[]; out: string }> {
   return new Promise((res) =>
     execFile('qpdf', ['--check', path], { maxBuffer: 16 * 1024 * 1024, timeout: 60_000 }, (err, stdout, stderr) => {
       const code = err ? (typeof err.code === 'number' ? err.code : -1) : 0;
-      res({ code, out: `${stderr}${stdout}`.split('\n').filter((l) => /error|warning|WARNING|ERROR/.test(l)).slice(0, 3).join(' | ').slice(0, 300) });
+      const lines = `${stderr}${stdout}`.split('\n').filter((l) => /error|warning/i.test(l) && !/^qpdf: operation succeeded/.test(l));
+      res({ code, lines, out: lines.slice(0, 3).join(' | ').slice(0, 300) });
     }),
   );
+}
+
+/**
+ * Whether a qpdf warning is about stream data that the saved file copied byte for byte from
+ * the original (pdf-lib never re-encodes existing streams). Newer qpdf versions decode more
+ * streams in some files than in others, so such a warning can appear for the saved file only.
+ */
+function inheritedStreamWarning(line: string, saved: Buffer, original: Buffer): boolean {
+  const m = /\(offset (\d+)\): .*(stream|inflate|decod)/i.exec(line);
+  if (!m) return false;
+  const at = Number(m[1]);
+  const start = saved.lastIndexOf('stream', at);
+  const end = saved.indexOf('endstream', at);
+  if (start < 0 || end < 0 || end - start > 64 * 1024 * 1024) return false;
+  let from = start + 'stream'.length;
+  if (saved[from] === 0x0d) from++;
+  if (saved[from] === 0x0a) from++;
+  let to = end;
+  if (saved[to - 1] === 0x0a) to--;
+  if (saved[to - 1] === 0x0d) to--;
+  const data = saved.subarray(from, to);
+  return data.length > 16 && original.indexOf(data) >= 0;
 }
 
 export async function checkFile(path: string, file: string): Promise<FileResult> {
@@ -172,8 +195,9 @@ export async function checkFile(path: string, file: string): Promise<FileResult>
       await writeFile(`${tmp}-in.pdf`, editable);
       const orig = await qpdfCheck(`${tmp}-in.pdf`);
       const msg = saved.out.replaceAll(`${tmp}-out.pdf`, 'saved file') || `exit ${saved.code}`;
+      const ours = saved.lines.filter((l) => !inheritedStreamWarning(l, Buffer.from(out), Buffer.from(editable)));
       if ((saved.code === 2 || saved.code < 0) && orig.code !== 2) fail.push(`qpdf: ${msg}`);
-      else if (saved.code === 3 && orig.code === 0) fail.push(`qpdf warning: ${msg}`);
+      else if (saved.code === 3 && orig.code === 0 && ours.length) fail.push(`qpdf warning: ${msg}`);
       else r.qpdfInherited = true;
     }
   } finally {
