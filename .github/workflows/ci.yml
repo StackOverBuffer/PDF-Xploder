@@ -17,3 +17,29 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Opens, draws, saves and qpdf-checks pdf.js's test PDFs (scripts/corpus/run.ts).
+  # Problems listed in scripts/corpus/known-issues.json are reported, new ones fail the job.
+  corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get install -y --no-install-recommends qpdf
+      - uses: actions/cache@v4
+        with:
+          path: .corpus/pdfs
+          key: pdfjs-corpus-${{ hashFiles('scripts/corpus/fetch.sh') }}
+      - run: scripts/corpus/fetch.sh
+      - run: npm run corpus
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-results
+          path: .corpus/results.json
+          if-no-files-found: ignore

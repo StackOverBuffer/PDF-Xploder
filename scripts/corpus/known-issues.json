@@ -1,0 +1,56 @@
+{
+  "Brotli-Prototype-FileA.pdf": [
+    "import"
+  ],
+  "crypt_filters.pdf": [
+    "reopen"
+  ],
+  "filled-background.pdf": [
+    "import"
+  ],
+  "issue15590.pdf": [
+    "import"
+  ],
+  "issue16263.pdf": [
+    "timeout"
+  ],
+  "issue21436.pdf": [
+    "import"
+  ],
+  "issue22011.pdf": [
+    "render"
+  ],
+  "issue22487.pdf": [
+    "render",
+    "reopen"
+  ],
+  "issue5334.pdf": [
+    "import"
+  ],
+  "operator_list_cycle.pdf": [
+    "import"
+  ],
+  "Pages-tree-refs.pdf": [
+    "import",
+    "render"
+  ],
+  "poppler-742-0-fuzzed.pdf": [
+    "import",
+    "render"
+  ],
+  "poppler-85140-0.pdf": [
+    "page count",
+    "reopen"
+  ],
+  "poppler-90-0-fuzzed.pdf": [
+    "render"
+  ],
+  "poppler-937-0-fuzzed.pdf": [
+    "import",
+    "render"
+  ],
+  "type3_glyph_error.pdf": [
+    "render",
+    "reopen"
+  ]
+}
