@@ -1,0 +1,47 @@
+{
+  "initial": {
+    "jsGzipKB": 700,
+    "cssGzipKB": 12
+  },
+  "startup": {
+    "startPageMs": 1600,
+    "firstPageMs": 5500,
+    "startupJsGzipKB": 700
+  },
+  "lazyOnly": [
+    "node_modules/tesseract.js",
+    "node_modules/node-forge",
+    "node_modules/@pdf-lib/fontkit",
+    "node_modules/harfbuzzjs",
+    "node_modules/qrcode-generator",
+    "src/lib/ocr/",
+    "src/lib/markdown",
+    "src/lib/sample",
+    "src/lib/optimize",
+    "src/lib/greyscale",
+    "src/lib/sanitize",
+    "src/lib/extractImages",
+    "src/lib/signature",
+    "src/lib/barcode",
+    "src/lib/printLayout",
+    "src/locales/de/",
+    "src/components/OcrDialog",
+    "src/components/SecurityDialogs",
+    "src/components/OrganizeDialogs",
+    "src/components/BookmarkDialogs",
+    "src/components/BarcodeDialog",
+    "src/components/OptimizeDialog",
+    "src/components/SanitizeDialog",
+    "src/components/PrintDialog",
+    "src/components/MeasureDialogs",
+    "src/components/ContentDialogs",
+    "src/components/PropertiesTabs",
+    "dictionar",
+    "node_modules/nspell",
+    "hunspell",
+    "node_modules/typo-js"
+  ],
+  "allowedWhenIdle": [
+    "src/locales/de/"
+  ]
+}

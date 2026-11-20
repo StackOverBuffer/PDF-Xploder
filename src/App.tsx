@@ -25,7 +25,6 @@ import { DocBanner, SignaturesPanel, XfaBanner } from './components/SignaturesPa
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
 import { Dialogs, useDialog } from './components/Dialogs';
-import { createSampleDocument } from './lib/sample';
 import { countFields } from './lib/pdfjs';
 import type { FieldInfo } from './lib/pdfOps';
 import { ops as opsW } from './lib/worker';
@@ -51,10 +50,11 @@ const TOOL_KEYS: Record<string, Tool> = {
   l: 'line', m: 'measureDistance', a: 'arrow', y: 'polygon', j: 'polyline', w: 'cloud', t: 'text', n: 'note', s: 'stamp',
 };
 
+/** The sample document's builder and texts load only when it is asked for. */
 async function openSample() {
   const s = useStore.getState();
   const { lang } = useLang.getState();
-  await s.run('Creating sample…', async () => s.openInNewTab(await createSampleDocument(lang), lang === 'de' ? 'beispiel.pdf' : 'sample.pdf'));
+  await s.run('Creating sample…', async () => s.openInNewTab(await (await import('./lib/sample')).createSampleDocument(lang), lang === 'de' ? 'beispiel.pdf' : 'sample.pdf'));
 }
 
 function useShortcuts() {

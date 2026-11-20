@@ -54,13 +54,18 @@ export function setupPwa(o: { onReady?: () => void; openFiles: (files: File[], h
 
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   const firstInstall = !navigator.serviceWorker.controller;
-  navigator.serviceWorker
-    .register(`${import.meta.env.BASE_URL}sw.js`)
-    .then((reg) => {
-      if (!firstInstall) return;
-      // Tell the user once the app is fully cached and works without a connection.
-      const worker = reg.installing ?? reg.waiting;
-      worker?.addEventListener('statechange', () => worker.state === 'activated' && o.onReady?.());
-    })
-    .catch((e) => console.warn('Service worker registration failed', e));
+  // After the page has loaded: on a first visit the service worker downloads the whole
+  // app for offline use, which must not compete with the files the start page needs.
+  const register = () =>
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .then((reg) => {
+        if (!firstInstall) return;
+        // Tell the user once the app is fully cached and works without a connection.
+        const worker = reg.installing ?? reg.waiting;
+        worker?.addEventListener('statechange', () => worker.state === 'activated' && o.onReady?.());
+      })
+      .catch((e) => console.warn('Service worker registration failed', e));
+  if (document.readyState === 'complete') void register();
+  else window.addEventListener('load', () => void register(), { once: true });
 }

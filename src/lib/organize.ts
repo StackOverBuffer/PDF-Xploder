@@ -27,8 +27,11 @@ import { apply, inv, mul, type M } from './content/matrix';
 import { isName, parseContent, writeContent, type Op, type Operand } from './content/syntax';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { saveDoc } from './pdfSave';
+import type * as MdT from './markdownPdf';
 
-export { markdownToPdf, textToPdf } from './markdownPdf';
+// The Markdown parser and layout engine load on the first conversion (in the worker, usually).
+export const markdownToPdf = async (...a: Parameters<typeof MdT.markdownToPdf>) => (await import('./markdownPdf')).markdownToPdf(...a);
+export const textToPdf = async (...a: Parameters<typeof MdT.textToPdf>) => (await import('./markdownPdf')).textToPdf(...a);
 
 const load = ops.load;
 const save = (doc: PDFDocument) => saveDoc(doc);

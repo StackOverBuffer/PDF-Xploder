@@ -41,7 +41,10 @@
     "preview": "vite preview",
     "typecheck": "tsc -p .",
     "test": "vitest run",
-    "corpus": "vite-node scripts/corpus/run.ts"
+    "corpus": "vite-node scripts/corpus/run.ts",
+    "perf": "npm run perf:bundle && npm run perf:startup",
+    "perf:bundle": "vite-node scripts/perf/bundle.ts",
+    "perf:startup": "vite-node scripts/perf/startup.ts"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "2.11.1",
@@ -68,6 +71,7 @@
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
     "@vitejs/plugin-react": "4.3.4",
+    "playwright": "1.63.0",
     "typescript": "5.7.3",
     "vite": "6.0.11",
     "vitest": "3.0.5"
