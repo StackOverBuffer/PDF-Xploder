@@ -169,6 +169,17 @@ export async function insertPagesFromFile(other: Uint8Array, pages: number[], at
   S().goToPage(at);
 }
 
+/** Combine the pages of this document and another file alternately (front and back sides of a scan). */
+export async function interleaveWithFile(other: Uint8Array, o: OrgT.InterleaveOptions) {
+  if (!requirePermission('assemble')) return;
+  const otherCount = await pageCountOf(other);
+  if (!otherCount) return S().notify(tr('The file could not be read.'), 'error');
+  const layout = org.interleaveLayout(S().pageIds.length, otherCount, o);
+  await arrange('Interleaving pages…', layout, [other]);
+  S().setSelectedPages([]);
+  S().goToPage(0);
+}
+
 // ---------------------------------------------------------------- deleting & extracting
 
 export async function deletePageList(pages: number[]) {

@@ -468,7 +468,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'preferences': return <PrefsDialog close={close} />;
     case 'calibrate': return <CalibrateDialog close={close} annotation={useDialog.getState().payload as Annotation} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
-    case 'orgInsertBlank': case 'orgInsertFile': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
+    case 'orgInsertBlank': case 'orgInsertFile': case 'orgInterleave': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
     case 'orgDuplicate': case 'orgReplace': case 'orgSwap': case 'orgOverlay': case 'orgNormalize': case 'orgFindDuplicates': case 'orgRotate': case 'orgCrop':
     case 'orgAutoCrop': case 'orgResize': case 'orgMargins': case 'orgWatermark': case 'orgBackground': case 'orgHeaderFooter': case 'orgBates': case 'orgPageLabels':
       return <OrganizeDialog name={open} close={close} />;
