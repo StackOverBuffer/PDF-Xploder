@@ -248,7 +248,10 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
     {tab === 'File' && (
       <>
         <Group label="Document">
-          <Btn icon={<FilePlus size={L} />} label="New" onClick={cmd.newDocument} />
+          <Btn icon={<FilePlus size={L} />} label="New" onClick={cmd.newDocument} menu={[
+            { label: 'Blank Document', icon: <FilePlus size={14} />, onClick: cmd.newDocument },
+            { label: 'From Markdown or Text File…', icon: <FileText size={14} />, onClick: cmd.newFromTextFiles },
+          ]} />
           <Btn icon={<FolderOpen size={L} />} label="Open" onClick={cmd.openFromDialog} />
           <Btn icon={<Save size={L} />} label="Save" disabled={noDoc} onClick={cmd.save} />
           <Btn icon={<SaveAll size={L} />} label="Save as" disabled={noDoc} onClick={cmd.saveAs} />
@@ -534,6 +537,9 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
       <>
         <Group label="OCR">
           <Btn icon={<ScanText size={L} />} label="OCR Pages" title="Recognise text in scanned pages (runs locally in the browser)" disabled={!canModify} onClick={() => show('ocr')} />
+        </Group>
+        <Group label="Create">
+          <Btn icon={<FileText size={L} />} label="From Markdown" title="Create a PDF from a Markdown or text file" onClick={cmd.newFromTextFiles} />
         </Group>
         <Group label="Convert">
           <Btn icon={<FileImage size={L} />} label="To image" title="Save the current page as a PNG image" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />

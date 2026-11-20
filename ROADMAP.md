@@ -111,7 +111,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | PDF to Plain Text | ⬜ |
 | Export PDFs to WebP / TIFF Images | ⬜ (PNG/JPEG export exists) |
 | Image Files to PDF | ✅ images as new pages (Organize → Insert); ⬜ HEIC, TIFF (multi-page) and SVG |
-| Text, Markdown, CSV, RTF to PDF | ⬜ |
+| Text, Markdown, CSV, RTF to PDF | 🟡 Markdown (GitHub flavour: tables, task lists, code, links, headings as bookmarks) and plain text, opened as new documents or inserted as pages; ⬜ CSV, RTF |
 | Word, Excel, PowerPoint to PDF | ⬜ possible offline with LibreOffice compiled to WebAssembly, loaded only when used (large download) |
 | Publisher, Visio to PDF | 🚫 no converter that runs in the browser |
 | EPUB, CBZ (comic archives), email (EML) to PDF | ⬜ |
@@ -125,7 +125,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Combine Existing Files into a New PDF | ✅ open several files at once, or Merge Pages at a chosen position, with a bookmark per merged file and that file's own bookmarks nested underneath |
 | Create a PDF from Clipboard Content | 🟡 insert a clipboard image as a page |
 | Create a PDF from an Image File | 🟡 insert images as pages into a new document |
-| Create a PDF from Text / Markdown / CSV / RTF | ⬜ |
+| Create a PDF from Text / Markdown / CSV / RTF | 🟡 Markdown and text files (File › New, Open, or drop them on the window); ⬜ CSV, RTF |
 | Create a PDF from Scanned Content | 🟡 insert scans as pages and run OCR; scanner access is not available in browsers |
 | Create New Documents from Web Page URLs | 🚫 cross-origin pages cannot be fetched from the browser |
 | Create PDF Portfolio Files | ⬜ |

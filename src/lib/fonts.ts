@@ -135,7 +135,9 @@ export async function createTextEngine(doc: PDFDocument, texts: string[], weight
     } catch (e) {
       console.warn('Subsetting failed; embedding the whole font', e);
     }
-    fonts[i] = await doc.embedFont(bytes, { subset: false });
+    // No ligatures: pdf-lib draws them with the wrong spacing, and text copied or searched
+    // from the page would miss their letters ("fi" in "file").
+    fonts[i] = await doc.embedFont(bytes, { subset: false, features: { liga: false, clig: false } });
   }
 
   const runs = (text: string) => {

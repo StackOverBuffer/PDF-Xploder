@@ -7,6 +7,7 @@ import * as oc from '../store/organizeCommands';
 import * as org from '../lib/organize';
 import type { Position } from '../lib/pdfOps';
 import { fileBytes, pickFile } from '../lib/download';
+import { OPEN_ACCEPT, textKind } from '../lib/textImport';
 import { tr, useT } from '../lib/i18n';
 import { Modal, parseRange, useDialog } from './Dialogs';
 
@@ -129,12 +130,19 @@ function FileRow({ label = 'File', accept, file, onChange }: { label?: string; a
   );
 }
 
-/** A picked PDF with its bytes and page count. */
-function usePdfFile() {
+/** A picked PDF with its bytes and page count. With `text`, Markdown and text files are converted (to pages the size of the current one). */
+function usePdfFile(text = false) {
   const [file, setFile] = useState<{ name: string; bytes: Uint8Array; pages: number } | null>(null);
   const choose = async (f: File) => {
-    const bytes = await fileBytes(f);
-    const pages = await S().run(tr('Opening…'), () => oc.pageCountOf(bytes));
+    let bytes: Uint8Array | undefined;
+    if (text && textKind(f)) {
+      const g = S().geoms[S().currentPage];
+      const size: [number, number] | undefined = g && !(g.rotation % 180) ? [g.view[2] - g.view[0], g.view[3] - g.view[1]] : g ? [g.view[3] - g.view[1], g.view[2] - g.view[0]] : undefined;
+      bytes = await S().run(tr('Converting…'), () => cmd.textFileToPdf(f, size));
+      if (!bytes) return;
+    } else bytes = await fileBytes(f);
+    const pdf = bytes;
+    const pages = await S().run(tr('Opening…'), () => oc.pageCountOf(pdf));
     if (pages) setFile({ name: f.name, bytes, pages });
   };
   return [file, choose] as const;
@@ -213,7 +221,7 @@ function InsertBlankDialog({ close }: Close) {
 /** Insert pages from a PDF file, or (merge) all pages of several files. */
 function InsertFileDialog({ close, merge }: Close & { merge?: boolean }) {
   const t = useT();
-  const [file, choose] = usePdfFile();
+  const [file, choose] = usePdfFile(true);
   const [files, setFiles] = useState<File[]>([]);
   const [range, setRange] = useState(tr('all'));
   const [where, setWhere] = useState<Where>(merge ? { mode: 'end', page: 1 } : initialWhere);
@@ -249,7 +257,8 @@ function InsertFileDialog({ close, merge }: Close & { merge?: boolean }) {
         </>
       ) : (
         <>
-          <FileRow accept="application/pdf,.pdf" file={file} onChange={choose} />
+          <FileRow accept={OPEN_ACCEPT} file={file} onChange={choose} />
+          <Hint>A Markdown or text file is converted to pages first.</Hint>
           <Row label="Pages of the file"><input value={range} onChange={(e) => setRange(e.target.value)} placeholder={t('all, or e.g. 1-3, 5')} /></Row>
         </>
       )}

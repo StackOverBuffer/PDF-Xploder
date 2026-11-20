@@ -37,6 +37,10 @@
       "accept": {
         "application/pdf": [
           ".pdf"
+        ],
+        "text/markdown": [
+          ".md",
+          ".markdown"
         ]
       },
       "icons": [
