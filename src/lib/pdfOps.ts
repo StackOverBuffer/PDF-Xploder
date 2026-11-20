@@ -135,12 +135,24 @@ export async function extractPages(source: Uint8Array | PDFDocument, indices: nu
   return save(out);
 }
 
-/** Insert every page of `other` before position `at` (use page count to append). */
-export async function insertDocument(bytes: Uint8Array, other: Uint8Array, at: number): Promise<{ bytes: Uint8Array; count: number }> {
+export interface InsertBookmark {
+  /** Title of the bookmark for the inserted file (its file name). */
+  title: string;
+  /** Title of a bookmark for the document's own pages, added if it had no bookmarks yet. */
+  currentTitle?: string;
+}
+
+/**
+ * Insert every page of `other` before position `at` (use page count to append). With
+ * `bookmark`, the inserted pages get a bookmark with the file's own bookmarks under it.
+ */
+export async function insertDocument(bytes: Uint8Array, other: Uint8Array, at: number, bookmark?: InsertBookmark): Promise<{ bytes: Uint8Array; count: number }> {
   const doc = await load(bytes);
   const src = await load(other);
+  const own = bookmark ? outlineOf(src) : [];
   const pages = await copyPages(doc, src, src.getPageIndices());
   pages.forEach((p, i) => doc.insertPage(at + i, p));
+  if (bookmark && pages.length) addInsertedFileBookmark(doc, { ...bookmark, at, count: pages.length, children: copiedOutline(own, at) });
   return { bytes: await save(doc), count: pages.length };
 }
 
@@ -338,6 +350,7 @@ export async function setMetadata(bytes: Uint8Array, m: Metadata): Promise<Uint8
 export { getFormFields, type FieldInfo } from './forms';
 import type { FieldValue } from './forms';
 import { saveDoc } from './pdfSave';
+import { addInsertedFileBookmark, copiedOutline, outlineOf } from './outline';
 import { loadForEdit } from './pageTree';
 export type { FieldValue };
 

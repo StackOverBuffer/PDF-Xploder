@@ -30,9 +30,12 @@ const ScaleDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default
 const CalibrateDialog = lazy(() => import('./MeasureDialogs').then((m) => ({ default: m.CalibrateDialog })));
 const BarcodeDialog = lazy(() => import('./BarcodeDialog').then((m) => ({ default: m.BarcodeDialog })));
 const OptimizeDialog = lazy(() => import('./OptimizeDialog').then((m) => ({ default: m.OptimizeDialog })));
+const FontsTab = lazy(() => import('./PropertiesTabs').then((m) => ({ default: m.FontsTab })));
+const SecurityTab = lazy(() => import('./PropertiesTabs').then((m) => ({ default: m.SecurityTab })));
+const SanitizeDialog = lazy(() => import('./SanitizeDialog').then((m) => ({ default: m.SanitizeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'sanitize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -204,12 +207,17 @@ function MetadataDialog({ close }: { close: () => void }) {
   const editable = useCan('modify');
   const t = useT();
   const lang = useLang((l) => l.lang);
+  const [tab, setTab] = useState<'description' | 'fonts' | 'security'>('description');
   return (
     <Modal title={t('Document properties')} onClose={close} footer={<><button onClick={close}>{t('Cancel')}</button><button className="primary" disabled={!m || !editable} onClick={() => { close(); cmd.setMetadata(m!); }}>{t('Save')}</button></>}>
+      <div className="tabs">
+        {(['description', 'fonts', 'security'] as const).map((k) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{t(k[0].toUpperCase() + k.slice(1))}</button>)}
+      </div>
       <p className="muted small">{name} · {tf('{n} page(s)', { n: pages })} · {(size / 1024).toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB</p>
-      {!m ? <p>{t('Loading…')}</p> : (Object.keys(m) as (keyof Metadata)[]).map((k) => (
+      {tab === 'description' && (!m ? <p>{t('Loading…')}</p> : (Object.keys(m) as (keyof Metadata)[]).map((k) => (
         <label className="row" key={k}><span>{t(k[0].toUpperCase() + k.slice(1))}</span><input value={m[k]} onChange={(e) => setM({ ...m, [k]: e.target.value })} /></label>
-      ))}
+      )))}
+      {tab !== 'description' && <Suspense fallback={<p>{t('Loading…')}</p>}>{tab === 'fonts' ? <FontsTab /> : <SecurityTab />}</Suspense>}
     </Modal>
   );
 }
@@ -451,6 +459,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'accessibility': return <AccessibilityDialog close={close} />;
     case 'recompress': return <RecompressDialog close={close} />;
     case 'optimize': return <OptimizeDialog close={close} />;
+    case 'sanitize': return <SanitizeDialog close={close} />;
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'ocr': return <OcrDialog close={close} />;
     case 'print': return <PrintDialog close={close} />;

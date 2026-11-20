@@ -65,7 +65,7 @@ function LiftWithoutPassword({ onDone }: { onDone: () => void }) {
 const SUMMARY: Action[] = ['print', 'modify', 'assemble', 'annotate', 'fillForms', 'designForms', 'copy', 'security'];
 
 /** What the current session may do, as derived from the document's permissions. */
-function RestrictionsSummary() {
+export function RestrictionsSummary() {
   const state = usePermState();
   const t = useT();
   return (

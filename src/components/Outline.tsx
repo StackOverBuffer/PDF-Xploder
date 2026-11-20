@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronRight, ChevronDown, BookmarkPlus, CornerDownRight, Trash2, Crosshair, ChevronsDownUp, ChevronsUpDown, IndentIncrease,
-  IndentDecrease, ArrowUp, ArrowDown, Pencil, Bold, Italic, Palette, ExternalLink, FileX2,
+  IndentDecrease, ArrowUp, ArrowDown, Pencil, Bold, Italic, Palette, ExternalLink, FileX2, Search, X,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -17,6 +17,7 @@ import {
 } from '../lib/outline';
 import { currentViewTarget } from '../store/viewActions';
 import { deleteBookmarkPages } from '../store/bookmarkCommands';
+import { filterBookmarks } from '../lib/bookmarkTools';
 import { useTextBox } from './TextBoxSelect';
 import { useContextMenu, type MenuItem } from './Menu';
 import { ask, openLinkAfterAsking } from '../lib/ask';
@@ -48,6 +49,7 @@ export function Outline() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [drop, setDrop] = useState<Drop>(null);
+  const [query, setQuery] = useState('');
   const dragId = useRef<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const menu = useContextMenu();
@@ -73,8 +75,12 @@ export function Outline() {
 
   if (!tree) return <div className="panel"><div className="panel-title">{t('Bookmarks')}</div><p className="muted pad">{t('Loading…')}</p></div>;
 
-  const expanded = (n: OutlineNode) => !collapsed.has(n.id);
-  const rows = flatten(tree, expanded);
+  // While searching, the matches are shown with their ancestors, all expanded; the
+  // nodes keep their ids, so every command still acts on the full tree.
+  const filtering = query.trim() !== '';
+  const view = filterBookmarks(tree, query);
+  const expanded = (n: OutlineNode) => filtering || !collapsed.has(n.id);
+  const rows = flatten(view.tree, expanded);
   const sel = selected ? findNode(tree, selected) : undefined;
 
   const change = (next: OutlineNode[], keepSelection = selected) => {
@@ -202,8 +208,34 @@ export function Outline() {
         <button title={t('Expand all')} onClick={() => setAll(true)}><ChevronsUpDown size={16} /></button>
         <button title={t('Collapse all')} onClick={() => setAll(false)}><ChevronsDownUp size={16} /></button>
       </div>
+      {tree.length > 0 && (
+        <div className="outline-search">
+          <Search size={14} aria-hidden />
+          <input
+            type="text"
+            value={query}
+            placeholder={t('Search bookmarks')}
+            aria-label={t('Search bookmarks')}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Escape') setQuery('');
+              if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                e.preventDefault();
+                const first = rows.find((r) => view.matches.has(r.node.id)) ?? rows[0];
+                if (first) setSelected(first.node.id);
+                if (e.key === 'Enter' && first) go(first.node);
+                listRef.current?.focus();
+              }
+            }}
+          />
+          {filtering && <button className="icon-btn" title={t('Clear search')} onClick={() => setQuery('')}><X size={14} /></button>}
+        </div>
+      )}
       {tree.length === 0 ? (
         <p className="muted pad">{t('This document has no bookmarks.')}{canEdit && <><br />{t('Use + to add one for the current view.')}</>}</p>
+      ) : filtering && rows.length === 0 ? (
+        <p className="muted pad">{t('No bookmarks match.')}</p>
       ) : (
         <ul className="outline" ref={listRef} tabIndex={0} role="tree" aria-label={t('Bookmarks')} onKeyDown={onKeyDown}>
           {rows.map(({ node: n, depth }) => (
@@ -213,9 +245,9 @@ export function Outline() {
               role="treeitem"
               aria-selected={selected === n.id}
               aria-expanded={n.children.length ? expanded(n) : undefined}
-              className={`outline-row ${selected === n.id ? 'selected' : ''} ${drop?.id === n.id ? `drop-${drop.where}` : ''}`}
+              className={`outline-row ${selected === n.id ? 'selected' : ''} ${drop?.id === n.id ? `drop-${drop.where}` : ''} ${filtering && view.matches.has(n.id) ? 'match' : ''}`}
               style={{ paddingLeft: 4 + depth * 14 }}
-              draggable={canEdit && renaming !== n.id}
+              draggable={canEdit && renaming !== n.id && !filtering}
               onDragStart={(e) => {
                 dragId.current = n.id;
                 e.dataTransfer.effectAllowed = 'move';
@@ -245,7 +277,7 @@ export function Outline() {
               }}
             >
               {n.children.length ? (
-                <button className="twisty" tabIndex={-1} onClick={() => toggle(n.id)}>{expanded(n) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</button>
+                <button className="twisty" tabIndex={-1} disabled={filtering} onClick={() => toggle(n.id)}>{expanded(n) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</button>
               ) : (
                 <span className="twisty" />
               )}

@@ -120,7 +120,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Hand (pan), Select Text and Edit Comments tools, text selection & copy
 - Snapshot tool: drag a box to copy that part of the page (with comments) to the clipboard as an image; copy/save a whole page as an image
 - Attachments pane: list, save, add and remove embedded files
-- Page thumbnails, bookmarks (outline) pane, comments pane
+- Page thumbnails, bookmarks (outline) pane with a search box (matches keep their parent bookmarks), comments pane
 - Find text with match list, next/previous, match case, whole words, highlight all matches
 - Find and replace in the page text (Home → Find → Find and replace…): replace the current match or all of them; the line is rewritten in its own font where it has the characters (Noto Sans otherwise). Matches within one line of text; text in comments, form fields or embedded graphics is not replaced
 - Go to page, first/previous/next/last, keyboard shortcuts
@@ -148,7 +148,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 
 ### Organize pages
 The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page commands act on the thumbnail selection (or the current page), and every dialog accepts ranges like `1-3, 5`.
-- Insert blank pages (count, size, position), pages from another PDF (any range of it), images as pages, a page from a clipboard image; merge several files at a chosen position
+- Insert blank pages (count, size, position), pages from another PDF (any range of it), images as pages, a page from a clipboard image; merge several files at a chosen position, each with a bookmark named after the file and its own bookmarks underneath
 - Delete pages (with odd/even subsets) and delete blank pages; extract pages (one file or one per page, optionally deleting them); move pages to a position
 - Split by number of pages, into single pages, by page ranges, by top-level bookmarks or by maximum file size
 - Duplicate pages (copies, collated or not, after each page / after the range / start / end), replace pages with pages of another file, swap two groups of pages, reverse the order of the selection or the document
@@ -195,6 +195,7 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - Signature validation: integrity, signature (RSA and ECDSA) and coverage; signer, issuer, time, reason
 - *Limitation:* Signer identity is not checked against trusted certificates (no trust list, revocation or timestamp checks yet)
 - Search & redact (Protect → Redaction): mark every match of a search for redaction, with boxes that fit the words exactly, then apply
+- Sanitize (Protect → Sanitize): remove scripts (JavaScript, launch actions, XFA), form submission and remote actions, attachments, metadata and hidden data (thumbnails, private application data), each optional; web links, comments and form fields stay
 
 ### Document & output
 - New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
@@ -203,8 +204,9 @@ How it works: `src/lib/content/` parses the content stream, interprets it with a
 - Install as an app (File → Install app, in Chrome and Edge): own window, works fully offline, and appears under "Open with…" for PDF files; files opened that way arrive as tabs in the running window
 - Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
 - Saved files are made to open the same way in other readers: the XMP metadata follows the document properties, comments carry their own appearance and a popup for their text, and AES-256 files declare the extension level Acrobat expects (checked against Poppler and PDFium)
-- Document properties (title, author, subject, keywords, creator, producer)
-- Export the current page as PNG
+- Document properties: title, author, subject, keywords, creator, producer; the fonts the pages use (type, embedded or not, pages); encryption and what the session may do
+- Export the current page as PNG; extract every image of the document into a ZIP file (JPEGs as stored, others as PNG)
+- Convert to greyscale (Convert › Greyscale): page content, form XObjects, comment appearances, gradients and images; spot colours are left as they are
 - OCR for scanned documents (see below)
 - Share the PDF via the system share sheet (where the browser supports it)
 - Accessibility: quick check (tags, language, title, text, field tooltips, permissions) with one-click fixes; read aloud; inverted page colours
