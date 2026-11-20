@@ -6,6 +6,10 @@ const PRECACHE = `pdf-xploder-${VERSION}`;
 // Fonts and OCR data loaded on demand from versioned CDN URLs: they never change, so this cache is kept across versions.
 const CDN_CACHE = 'pdf-xploder-cdn';
 const CDN = 'https://cdn.jsdelivr.net/';
+// Spelling dictionaries: not cached at install (they are large and many people never check spelling),
+// but kept once fetched, across versions too (their names carry a hash of their content).
+const DICT_CACHE = 'pdf-xploder-dictionaries';
+const isDictionary = (url) => /\/assets\/dict-[\w-]+\.js$/.test(new URL(url).pathname);
 /** The app shell; everything else (character maps, fonts) is cached best-effort so one failure does not stop the install. */
 const isCore = (f) => f === './' || f === 'index.html' || /^assets\//.test(f) || f === 'manifest.webmanifest';
 
@@ -23,7 +27,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     (async () => {
       for (const key of await caches.keys()) {
-        if (key.startsWith('pdf-xploder-') && key !== PRECACHE && key !== CDN_CACHE) await caches.delete(key);
+        if (key.startsWith('pdf-xploder-') && key !== PRECACHE && key !== CDN_CACHE && key !== DICT_CACHE) await caches.delete(key);
       }
       await self.clients.claim();
     })(),
@@ -60,6 +64,7 @@ self.addEventListener('fetch', (e) => {
   const url = req.url;
   if (req.mode === 'navigate') e.respondWith(navigate(req));
   // Same-origin files belong to this version (precached, or added to its cache when fetched).
+  else if (url.startsWith(self.registration.scope) && isDictionary(url)) e.respondWith(cacheFirst(req, DICT_CACHE));
   else if (url.startsWith(self.registration.scope)) e.respondWith(cacheFirst(req, PRECACHE));
   else if (url.startsWith(CDN)) e.respondWith(cacheFirst(req, CDN_CACHE));
 });

@@ -6,10 +6,10 @@
 import { createChecker, type Checker, type SpellLang } from './checker';
 import type { SpellReply, SpellRequest } from './protocol';
 
-const FILES: Record<SpellLang, () => Promise<[{ default: string }, { default: string }]>> = {
-  'en-US': () => Promise.all([import('spell-dictionaries/dictionary-en/index.aff?raw'), import('spell-dictionaries/dictionary-en/index.dic?raw')]),
-  'en-GB': () => Promise.all([import('spell-dictionaries/dictionary-en-gb/index.aff?raw'), import('spell-dictionaries/dictionary-en-gb/index.dic?raw')]),
-  de: () => Promise.all([import('spell-dictionaries/dictionary-de/index.aff?raw'), import('spell-dictionaries/dictionary-de/index.dic?raw')]),
+const FILES: Record<SpellLang, () => Promise<{ aff: string; dic: string }>> = {
+  'en-US': () => import('./dict/dict-en-US'),
+  'en-GB': () => import('./dict/dict-en-GB'),
+  de: () => import('./dict/dict-de'),
 };
 
 const checkers = new Map<SpellLang, Promise<Checker>>();
@@ -18,7 +18,7 @@ let personal: string[] = [];
 function checker(lang: SpellLang): Promise<Checker> {
   let c = checkers.get(lang);
   if (!c) {
-    c = FILES[lang]().then(([aff, dic]) => createChecker(lang, aff.default, dic.default, personal));
+    c = FILES[lang]().then(({ aff, dic }) => createChecker(lang, aff, dic, personal));
     checkers.set(lang, c);
     c.catch(() => checkers.get(lang) === c && checkers.delete(lang));
   }

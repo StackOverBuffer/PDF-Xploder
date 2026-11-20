@@ -187,7 +187,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Select Base Content Text, Multiple Word Selection Options | ✅ rectangle text selection like PDF-XChange |
 | Select Highlighted Text | ⬜ |
 | Find and Replace Text | ✅ replace the current match or all, match case, whole words; within one line of text, in the line's own font where possible |
-| Spell Check | ⬜ |
+| Spell Check | ✅ Spelling pane (F7) for the page text and comments: English (US/UK) and German, suggestions, change/change all, ignore, personal dictionary; the browser checks text while typing |
 | Correct Text with the Text Correction Tool | 🟡 inline text editing |
 | Font Replacement | 🟡 change the font of text objects |
 | Enhanced Colour Options for Objects | 🟡 fill/stroke colours |

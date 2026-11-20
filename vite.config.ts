@@ -53,6 +53,8 @@ function pwa(): Plugin {
       const files = list(outDir)
         .map((f) => relative(outDir, f).split(sep).join('/'))
         // Files for search engines, link previews and the install dialog are not needed offline.
+        // The spell checker and its dictionaries (MBs) are cached when first used, not at install (see sw.js).
+        .filter((f) => !/^assets\/(spellWorker|dict-)/.test(f))
         .filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)(LICENSE|OFL)[^/]*$/.test(f) && !/^(og-image\.jpg|screenshot-wide\.jpg|sitemap\.xml|robots\.txt)$/.test(f))
         .sort();
       const hash = createHash('sha256');

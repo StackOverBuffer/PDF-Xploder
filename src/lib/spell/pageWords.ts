@@ -4,7 +4,7 @@
  * and words hyphenated at the end of a line are checked whole.
  */
 import type { Rect } from '../types';
-import { words } from './checker';
+import { excerpt, words } from './text';
 
 export interface Run {
   str: string;
@@ -66,7 +66,7 @@ function boxOf(line: Line, at: number, len: number, measure: Measure): Rect {
   return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
 }
 
-const context = (s: string, at: number, len: number) => s.slice(Math.max(0, at - 30), at + len + 30).trim();
+const context = excerpt;
 
 export function pageWords(runs: Run[], measure: Measure): PageWord[] {
   const out: PageWord[] = [];

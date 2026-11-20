@@ -5,7 +5,7 @@
  * The dictionaries load in a worker on first use (lib/spell).
  */
 import { allRuns, measure } from '../components/SearchPanel';
-import { guessLanguage, spellLangFor, words, type SpellLang } from '../lib/spell/text';
+import { excerpt, guessLanguage, spellLangFor, words, type SpellLang } from '../lib/spell/text';
 import { pageWords } from '../lib/spell/pageWords';
 import { addWord, checkWords, suggestions, type WordAt } from '../lib/spell';
 import { useLang, tf, tr } from '../lib/i18n';
@@ -80,7 +80,7 @@ export async function checkDocument(lang?: SpellLang): Promise<void> {
               word: w.word,
               next: f.text[w.start + w.word.length] ?? '',
               page: p,
-              context: f.text.slice(Math.max(0, w.start - 30), w.start + w.word.length + 30).trim(),
+              context: excerpt(f.text, w.start, w.word.length),
               source: { kind: 'comment', pageId, annotId: a.id, field: f.field, replyId: f.replyId, start: w.start },
             });
           }

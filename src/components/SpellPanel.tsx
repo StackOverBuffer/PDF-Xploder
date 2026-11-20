@@ -1,5 +1,5 @@
 /** The Spelling pane (Home › Spelling, F7): unknown words of the page text and the comments. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -21,6 +21,16 @@ export function SpellPanel() {
   const [busy, setBusy] = useState(false);
   const first = useRef(true);
   const issue = issues[index];
+  // The list shows each word once, where it first occurs; Previous and Next go through every place.
+  const groups = useMemo(() => {
+    const m = new Map<string, { word: string; first: number; count: number }>();
+    issues.forEach((x, i) => {
+      const g = m.get(x.word);
+      if (g) g.count++;
+      else m.set(x.word, { word: x.word, first: i, count: 1 });
+    });
+    return [...m.values()];
+  }, [issues]);
 
   // Check when the pane opens, and again after the document or its comments change.
   useEffect(() => {
@@ -116,15 +126,17 @@ export function SpellPanel() {
             <div className="search-replace-buttons">
               <button type="button" disabled={!ready} onClick={ignoreIssue}>{t('Ignore')}</button>
               <button type="button" disabled={!ready} onClick={ignoreAll}>{t('Ignore all')}</button>
+            </div>
+            <div className="search-replace-buttons">
               <button type="button" disabled={!ready} onClick={() => void act(addToDictionary)} title={t('Accept this word from now on, in every document (kept in this browser)')}>{t('Add to dictionary')}</button>
             </div>
           </form>
         </div>
       )}
       <div className="search-results">
-        {issues.slice(0, 500).map((h, i) => (
-          <button key={h.key} className={`search-result ${i === index ? 'current' : ''}`} onClick={() => showIssue(i)}>
-            <span className="muted small">{tf('p.{n}', { n: h.page + 1 })}</span> <b>{h.word}</b> <span className="muted">{h.context}</span>
+        {groups.map((g) => (
+          <button key={g.word} className={`search-result ${g.word === issue?.word ? 'current' : ''}`} onClick={() => showIssue(g.first)}>
+            <b>{g.word}</b> {g.count > 1 && <span className="muted small">×{g.count}</span>} <span className="muted small">{tf('p.{n}', { n: issues[g.first].page + 1 })}</span>
           </button>
         ))}
       </div>

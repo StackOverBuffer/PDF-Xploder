@@ -48,6 +48,15 @@ export function words(text: string): WordToken[] {
   return out;
 }
 
+/** The text around [at, at + len), cut at whole words. */
+export function excerpt(text: string, at: number, len: number, room = 32): string {
+  let a = Math.max(0, at - room);
+  let b = Math.min(text.length, at + len + room);
+  if (a > 0) a = text.indexOf(' ', a) + 1 || a;
+  if (b < text.length) b = Math.max(at + len, text.lastIndexOf(' ', b));
+  return `${a > 0 ? '…' : ''}${text.slice(a, b).trim()}${b < text.length ? '…' : ''}`.replace(/\s+/g, ' ');
+}
+
 /** Short words that only occur in one of the languages, to guess a text's language. */
 const COMMON: Record<'en' | 'de', Set<string>> = {
   en: new Set('the and of to is are you your with for this that be on it not have was from by we will can at or'.split(' ')),
