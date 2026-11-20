@@ -152,8 +152,8 @@ export async function createSampleDocument(lang: Lang = 'en', loadAsset: SampleA
     const page = start;
     const { width, height } = page.getSize();
     page.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: C.green });
-    text(page, t.kicker.toUpperCase(), MARGIN, height - 66, { font: f.sansBold, size: 9, color: C.rust });
-    let y = para(page, t.title, MARGIN, height - 100, width - 2 * MARGIN, { font: f.serifBold, size: 28, color: C.ink, leading: 32 }).y;
+    text(page, t.kicker.toUpperCase(), MARGIN, height - 58, { font: f.sansBold, size: 9, color: C.rust });
+    let y = para(page, t.title, MARGIN, height - 90, width - 2 * MARGIN, { font: f.serifBold, size: 28, color: C.ink, leading: 32 }).y;
     y = para(page, t.intro, MARGIN, y - 8, width - 2 * MARGIN - 40, { font: f.sans, size: 11.5, leading: 17 }).y;
 
     y -= 22;
@@ -163,10 +163,10 @@ export async function createSampleDocument(lang: Lang = 'en', loadAsset: SampleA
     t.tour.forEach((row, i) => {
       const top = y;
       const pageNo = String(i + 2);
-      text(page, pageNo, MARGIN + 2, top - 26, { font: f.serifBold, size: 22, color: C.green });
-      text(page, row.title, MARGIN + 40, top - 20, { font: f.sansBold, size: 11.5, color: C.ink });
-      const body = para(page, row.text, MARGIN + 40, top - 37, width - 2 * MARGIN - 40, { font: f.sans, size: 10, leading: 14.5 });
-      y = body.y - 8;
+      text(page, pageNo, MARGIN + 2, top - 24, { font: f.serifBold, size: 22, color: C.green });
+      text(page, row.title, MARGIN + 40, top - 18, { font: f.sansBold, size: 11.5, color: C.ink });
+      const body = para(page, row.text, MARGIN + 40, top - 33, width - 2 * MARGIN - 40, { font: f.sans, size: 10, leading: 14.5 });
+      y = body.y - 3;
       rule(page, MARGIN, width - MARGIN, y);
       // The whole row jumps to its page.
       page.node.addAnnot(
@@ -176,9 +176,11 @@ export async function createSampleDocument(lang: Lang = 'en', loadAsset: SampleA
       );
     });
 
-    y -= 30;
+    y -= 24;
     text(page, t.alsoHeading, MARGIN, y, { font: f.serifBold, size: 13, color: C.ink });
     y = para(page, t.also, MARGIN, y - 18, width - 2 * MARGIN - 40, { font: f.sans, size: 10, leading: 14.5 }).y;
+    // The source link sits at y = 52: the text above must end clear of it (German runs longer).
+    if (y < 72) throw new Error(`Sample start page (${lang}) runs into its footer`);
 
     // Source link at the bottom.
     const label = SOURCE_URL.replace(/^https:\/\//, '');
