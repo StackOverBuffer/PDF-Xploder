@@ -201,7 +201,7 @@ function posterSheets(o: PrintOptions, sizes: { width: number; height: number }[
           width,
           height,
           borders: false,
-          items: [{ page, scale, w: tileW, h: tileH, x: col ? -col * advanceX : 0, y: scaledH - tileH - row * advanceY, cell: { x: margin, y: margin, w: tileW, h: tileH } }],
+          items: [{ page, scale, w: tileW, h: tileH, x: col ? -col * advanceX : 0, y: tileH - scaledH + row * advanceY, cell: { x: margin, y: margin, w: tileW, h: tileH } }],
         });
       }
     }

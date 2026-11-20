@@ -75,7 +75,11 @@ describe('print layout', () => {
     const [a, b, c] = sheets.map((s) => s.items[0]);
     expect(a).toMatchObject({ page: 0, scale: 2, x: 0 });
     expect(b).toMatchObject({ x: -a.cell.w });
-    expect(c.y).toBeLessThan(a.y); // second row shows a lower part of the page
+    // Sheet 1 shows the top-left of the page: its top edge sits at the top of the tile,
+    // later rows move the page down so each shows the next band (no gaps, nothing cropped).
+    expect(a.y).toBeCloseTo(-A4.height);
+    expect(b.y).toBeCloseTo(-A4.height);
+    expect(c.y).toBe(0);
     expect(sheets.every((s) => !s.borders)).toBe(true);
   });
 
