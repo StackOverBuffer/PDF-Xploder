@@ -47,7 +47,7 @@ export interface OpenOptions {
   handle?: FileSystemFileHandle | null;
 }
 
-export type SidebarTab = 'pages' | 'outline' | 'comments' | 'attachments' | 'forms' | 'search' | 'signatures';
+export type SidebarTab = 'pages' | 'outline' | 'comments' | 'attachments' | 'forms' | 'search' | 'spelling' | 'signatures';
 
 export interface ScrollRequest {
   page: number;

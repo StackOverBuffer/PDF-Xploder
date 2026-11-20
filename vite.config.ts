@@ -73,6 +73,8 @@ export default defineConfig({
     alias: {
       // Internal module of @cantoo/pdf-lib (not in its package exports) used to
       // derive a file's encryption key from a password. See src/lib/security.ts.
+      // The spelling dictionaries' files (their packages only export a Node.js loader). See src/lib/spell/.
+      'spell-dictionaries': fileURLToPath(new URL('./node_modules/', import.meta.url)),
       'pdf-lib-internal/crypto': fileURLToPath(new URL('./node_modules/@cantoo/pdf-lib/es/core/crypto.js', import.meta.url)),
     },
   },

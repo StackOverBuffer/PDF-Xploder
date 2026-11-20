@@ -323,6 +323,15 @@ code, kbd { font-family: ui-monospace, monospace; background: var(--panel-2); bo
 .search-results { overflow-y: auto; flex: 1; }
 .search-result { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--border); border-radius: 0; padding: 6px 12px; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-result.current { background: var(--accent-soft); }
+.spell-current { display: flex; flex-direction: column; gap: 6px; padding: 4px 12px 10px; border-bottom: 1px solid var(--border); }
+.spell-word { font-size: 14px; }
+.spell-context { overflow-wrap: anywhere; }
+.spell-suggestions { display: flex; flex-wrap: wrap; gap: 4px; }
+.spell-suggestions button { padding: 2px 8px; }
+.spell-suggestions button.current { background: var(--accent-soft); border-color: var(--accent); }
+.spell-current .search-replace { padding: 0; }
+.spell-mark { fill: none; stroke: #d32f2f; stroke-width: 1.5; stroke-dasharray: 3 2; pointer-events: none; }
+.spell-hit { fill: rgba(211, 47, 47, 0.15); stroke: #d32f2f; stroke-width: 1.5; pointer-events: none; }
 
 /* properties */
 .props-body { display: flex; flex-direction: column; gap: 12px; padding: 12px; border: none; margin: 0; }
