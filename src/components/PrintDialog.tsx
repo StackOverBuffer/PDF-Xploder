@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Modal, parseRange } from './Dialogs';
 import { useStore } from '../store/store';
-import { printPreviewSheet, printWithOptions, releasePrintCache } from '../store/printCommands';
+import { printPreviewSheet, printWithOptions, releasePrintCache, savePrintPdf } from '../store/printCommands';
 import { DEFAULT_PRINT, PAPERS, type Paper, type PerSheet, type PrintOptions } from '../lib/printLayout';
 import { closePdf, openPdf, renderToCanvas } from '../lib/pdfjs';
 import { tf, useT } from '../lib/i18n';
@@ -120,7 +120,7 @@ export function PrintDialog({ close }: { close: () => void }) {
       title={t('Print')}
       wide
       onClose={close}
-      footer={<><span className="muted small print-hint">{t('Printer, copies and two-sided printing are chosen in the browser’s print dialog.')}</span><button onClick={close}>{t('Cancel')}</button><button className="primary" disabled={!pages.length} onClick={ok}>{t('Print…')}</button></>}
+      footer={<><span className="muted small print-hint">{t('Printer, copies and two-sided printing are chosen in the browser’s print dialog.')}</span><button onClick={close}>{t('Cancel')}</button><button disabled={!pages.length} onClick={() => savePrintPdf(options)}>{t('Save as PDF…')}</button><button className="primary" disabled={!pages.length} onClick={ok}>{t('Print…')}</button></>}
     >
       <div className="print-layout">
         <div className="print-options">
@@ -166,6 +166,13 @@ export function PrintDialog({ close }: { close: () => void }) {
             </select>
           </label>
           {o.imposition === 'booklet' && <p className="muted small">{t('Two pages per sheet, ordered so two-sided printing folds the stack into a booklet. Missing pages are padded blank.')}</p>}
+          {o.imposition === 'poster' && (
+            <>
+              <label className="row"><span>{t('Columns')}</span><input aria-label={t('Columns')} type="number" min={1} max={10} value={o.posterColumns} onChange={(e) => set({ posterColumns: Math.max(1, Math.round(Number(e.target.value)) || 1) })} /></label>
+              <label className="row"><span>{t('Overlap (mm)')}</span><input aria-label={t('Overlap (mm)')} type="number" min={0} max={30} value={o.posterOverlap} onChange={(e) => set({ posterOverlap: Math.max(0, Number(e.target.value) || 0) })} /></label>
+              <p className="muted small">{t('The page is enlarged to cover the chosen number of sheet columns; the rows follow. Neighbouring tiles overlap so they can be glued.')}</p>
+            </>
+          )}
           {o.imposition === 'none' && (
             <label className="row"><span>{t('Pages per sheet')}</span>
               <select aria-label={t('Pages per sheet')} value={o.perSheet} onChange={(e) => set({ perSheet: Number(e.target.value) as PerSheet })}>

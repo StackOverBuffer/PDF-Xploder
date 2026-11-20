@@ -4,6 +4,7 @@
  * PDF with one page per printed sheet, handed to the browser's print dialog.
  */
 import { PDFDocument, PDFRef, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath } from '@cantoo/pdf-lib';
+import { baseName } from './download';
 import { load } from './pdfOps';
 import { uprightMatrix } from './organize';
 import { inv, mul, type M } from './content/matrix';
@@ -168,15 +169,56 @@ export function planSheets(o: PrintOptions, sizes: { width: number; height: numb
   return gridSheets(o, printedPages(o).filter((i) => sizes[i]), sizes);
 }
 
-/** Poster tiles (Task 3 of the plan): until then poster imposition produces nothing. */
-function posterSheets(_o: PrintOptions, _sizes: { width: number; height: number }[]): Sheet[] {
-  return [];
+/**
+ * Poster imposition: every page is enlarged to cover `posterColumns` sheets across, with as many
+ * rows as the scaled height needs, so nothing is cropped and no gap appears. Neighbouring tiles
+ * overlap by the chosen amount so they can be glued; `buildPrintPdf` clips each drawing to its
+ * tile's cell.
+ */
+function posterSheets(o: PrintOptions, sizes: { width: number; height: number }[]): Sheet[] {
+  const pages = printedPages(o).filter((i) => sizes[i]);
+  if (!pages.length) return [];
+  const margin = Math.max(0, o.margin) * MM;
+  const overlap = Math.max(0, o.posterOverlap) * MM;
+  // Poster sheets stand portrait unless landscape is picked (auto follows the paper, not the page).
+  const base: readonly [number, number] = o.paper === 'document' ? [sizes[pages[0]].width, sizes[pages[0]].height] : PAPERS[o.paper];
+  const [width, height] = o.orientation === 'landscape' ? [Math.max(base[0], base[1]), Math.min(base[0], base[1])] : [Math.min(base[0], base[1]), Math.max(base[0], base[1])];
+  const tileW = width - 2 * margin;
+  const tileH = height - 2 * margin;
+  const advanceX = tileW - overlap;
+  const advanceY = tileH - overlap;
+  if (tileW <= 0 || tileH <= 0 || advanceX <= 0 || advanceY <= 0) return [];
+  const columns = Math.max(1, Math.round(o.posterColumns));
+  const sheets: Sheet[] = [];
+  for (const page of pages) {
+    const s = sizes[page];
+    const scale = (columns * tileW - (columns - 1) * overlap) / s.width;
+    const scaledH = s.height * scale;
+    const rows = scaledH <= tileH ? 1 : Math.ceil((scaledH - tileH) / advanceY) + 1;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        sheets.push({
+          width,
+          height,
+          borders: false,
+          items: [{ page, scale, w: tileW, h: tileH, x: col ? -col * advanceX : 0, y: scaledH - tileH - row * advanceY, cell: { x: margin, y: margin, w: tileW, h: tileH } }],
+        });
+      }
+    }
+  }
+  return sheets;
 }
 
 /** Whether printing the prepared document as is gives the same result (no re-layout needed). */
 export function isPlain(o: PrintOptions, count: number): boolean {
   const all = o.pages.length === count && o.pages.every((p, i) => p === i);
   return all && o.imposition === 'none' && o.subset === 'all' && !o.reverse && o.paper === 'document' && o.perSheet === 1 && o.orientation === 'auto' && o.margin === 0 && (o.scaling === 'fit' || o.scaling === 'shrink' || o.scaling === 'actual' || o.customScale === 100);
+}
+
+/** Name for saving the printed layout: the document's name plus what was imposed on it. */
+export function printFileName(o: Pick<PrintOptions, 'imposition' | 'perSheet'>, fileName: string): string {
+  const suffix = o.imposition === 'booklet' ? ' (booklet)' : o.imposition === 'poster' ? ' (poster)' : o.perSheet > 1 ? ` (${o.perSheet}-up)` : '';
+  return `${baseName(fileName)}${suffix}.pdf`;
 }
 
 /** Build the sheets as a PDF from the prepared document (comments and form fields already in the page content). */

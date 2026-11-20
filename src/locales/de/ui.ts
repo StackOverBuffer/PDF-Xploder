@@ -294,7 +294,7 @@ const DE: Record<string, string> = {
   'This page uses content the editor cannot reproduce exactly ({pct}% of the page would look different{ops}). Edit it anyway?':
     'Diese Seite enthält Inhalte, die der Editor nicht exakt wiedergeben kann ({pct} % der Seite würden anders aussehen{ops}). Trotzdem bearbeiten?',
   '; unsupported operators: {ops}': '; nicht unterstützte Operatoren: {ops}',
-  'Opening…': 'Wird geöffnet…', 'Saving…': 'Wird gespeichert…', 'Preparing to print…': 'Druck wird vorbereitet…', 'Rotating…': 'Wird gedreht…',
+  'Opening…': 'Wird geöffnet…', 'Saving…': 'Wird gespeichert…', 'Preparing to print…': 'Druck wird vorbereitet…', 'Preparing the file…': 'Datei wird vorbereitet…', 'Rotating…': 'Wird gedreht…',
   'Deleting…': 'Wird gelöscht…', 'Inserting…': 'Wird eingefügt…', 'Duplicating…': 'Wird dupliziert…', 'Moving pages…': 'Seiten werden verschoben…',
   'Reversing…': 'Reihenfolge wird umgekehrt…', 'Inserting pages…': 'Seiten werden eingefügt…', 'Extracting…': 'Wird extrahiert…', 'Splitting…': 'Wird aufgeteilt…',
   'Cropping…': 'Wird zugeschnitten…', 'Rendering image…': 'Bild wird erzeugt…', 'Adding watermark…': 'Wasserzeichen wird hinzugefügt…',
@@ -369,6 +369,8 @@ const DE: Record<string, string> = {
   'Layout': 'Layout',
   'Imposition': 'Ausschießen', 'Booklet': 'Heftchen', 'Poster': 'Poster',
   'Two pages per sheet, ordered so two-sided printing folds the stack into a booklet. Missing pages are padded blank.': 'Zwei Seiten pro Blatt, so angeordnet, dass der beidseitige Druck den Stapel zu einem Heft faltet. Fehlende Seiten werden durch leere ergänzt.',
+  'The page is enlarged to cover the chosen number of sheet columns; the rows follow. Neighbouring tiles overlap so they can be glued.': 'Die Seite wird so vergrößert, dass sie die gewählte Anzahl an Blattspalten abdeckt; die Zeilen ergeben sich daraus. Benachbarte Kacheln überlappen, damit sie verklebt werden können.',
+  'Save as PDF…': 'Als PDF speichern…', 'Columns': 'Spalten', 'Overlap (mm)': 'Überlappung (mm)',
   'Pages per sheet': 'Seiten pro Blatt',
   'Page order': 'Seitenreihenfolge',
   'Horizontal': 'Horizontal',

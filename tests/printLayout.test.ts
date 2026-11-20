@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDict, PDFDocument, PDFName, degrees } from '@cantoo/pdf-lib';
-import { DEFAULT_PRINT, PAPERS, bookletSequence, buildPrintPdf, isPlain, planSheets, printedPages, type PrintOptions } from '../src/lib/printLayout';
+import { DEFAULT_PRINT, PAPERS, bookletSequence, buildPrintPdf, isPlain, planSheets, printFileName, printedPages, type PrintOptions } from '../src/lib/printLayout';
 
 const A4 = { width: 595.28, height: 841.89 };
 const LAND = { width: 841.89, height: 595.28 };
@@ -66,6 +66,24 @@ describe('print layout', () => {
     expect(sheets[0].items).toHaveLength(1); // left half blank, right half page 0
     expect(sheets[0].items[0]).toMatchObject({ page: 0 });
     expect(sheets[0].items[0].x).toBeGreaterThan(sheets[0].width / 2);
+  });
+
+  it('tiles a page over poster sheets without gaps or crops', () => {
+    const sheets = planSheets(opts({ imposition: 'poster', paper: 'A4', posterColumns: 2, posterOverlap: 0 }), [A4]);
+    // scale 2: two columns cover 1190.56 pt; height 1683.78 → 2 rows → 4 sheets
+    expect(sheets).toHaveLength(4);
+    const [a, b, c] = sheets.map((s) => s.items[0]);
+    expect(a).toMatchObject({ page: 0, scale: 2, x: 0 });
+    expect(b).toMatchObject({ x: -a.cell.w });
+    expect(c.y).toBeLessThan(a.y); // second row shows a lower part of the page
+    expect(sheets.every((s) => !s.borders)).toBe(true);
+  });
+
+  it('names saved print files after the layout', () => {
+    expect(printFileName({ imposition: 'booklet', perSheet: 1 }, 'Report.pdf')).toBe('Report (booklet).pdf');
+    expect(printFileName({ imposition: 'poster', perSheet: 1 }, 'Report')).toBe('Report (poster).pdf');
+    expect(printFileName({ imposition: 'none', perSheet: 2 }, 'Report.pdf')).toBe('Report (2-up).pdf');
+    expect(printFileName({ imposition: 'none', perSheet: 1 }, 'Report.pdf')).toBe('Report.pdf');
   });
 
   it('builds one PDF page per sheet, with rotated pages upright', async () => {
