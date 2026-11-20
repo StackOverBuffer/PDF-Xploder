@@ -54,7 +54,7 @@ npm test           # unit tests (geometry, PDF operations, …)
 npm run build      # production build in dist/
 ```
 
-Click **Try a sample** on the start screen for a document with text, a form and bookmarks.
+Click **Try a sample** on the start screen for a seven-page repair order from a made-up bike workshop (in English or German, following the interface language). Each page has something to try: a letter with a typo and a comment thread, an estimate to stamp and sign, a form, a 1:50 floor plan to measure, a scanned receipt for OCR and a customer record to redact. It is built in `src/lib/sample.ts` (words in `src/lib/sampleText.ts`); the receipt scans in `public/sample/` come from `scripts/sample/receipts.py`.
 
 ### Offline and installation (service worker)
 

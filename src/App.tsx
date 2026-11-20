@@ -30,7 +30,7 @@ import { countFields } from './lib/pdfjs';
 import type { FieldInfo } from './lib/pdfOps';
 import { ops as opsW } from './lib/worker';
 import type { Tool } from './lib/types';
-import { useT } from './lib/i18n';
+import { useLang, useT } from './lib/i18n';
 import { setPrefs, usePrefs } from './lib/prefs';
 import { PaneResizer } from './components/PaneResizer';
 import { LICENSE_URL, SOURCE_URL } from './lib/project';
@@ -53,7 +53,8 @@ const TOOL_KEYS: Record<string, Tool> = {
 
 async function openSample() {
   const s = useStore.getState();
-  await s.run('Creating sample…', async () => s.openInNewTab(await createSampleDocument(), 'sample.pdf'));
+  const { lang } = useLang.getState();
+  await s.run('Creating sample…', async () => s.openInNewTab(await createSampleDocument(lang), lang === 'de' ? 'beispiel.pdf' : 'sample.pdf'));
 }
 
 function useShortcuts() {
