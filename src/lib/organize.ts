@@ -185,6 +185,29 @@ export function reverseLayout(n: number, pages: number[]): number[] {
   return out;
 }
 
+export interface InterleaveOptions {
+  /** Which document contributes the first page. */
+  first: 'current' | 'file';
+  /** The other file was scanned back to front (typical when a stack is re-fed for the back sides). */
+  reverseOther: boolean;
+}
+
+/**
+ * Layout that combines the pages of this document with the pages of one other file
+ * alternately, for merging separately scanned front and back sides. Leftover pages
+ * of the longer document are appended at the end; file 0 is the other file.
+ */
+export function interleaveLayout(currentCount: number, otherCount: number, o: InterleaveOptions): PageSource[] {
+  if (otherCount < 1) throw new Error('The file has no pages.');
+  const other = (k: number): PageSource => ({ file: 0, page: o.reverseOther ? otherCount - 1 - k : k });
+  const pairs = Math.min(currentCount, otherCount);
+  const out: PageSource[] = [];
+  for (let k = 0; k < pairs; k++) out.push(...(o.first === 'file' ? [other(k), k] : [k, other(k)]));
+  for (let k = pairs; k < currentCount; k++) out.push(k);
+  for (let k = pairs; k < otherCount; k++) out.push(other(k));
+  return out;
+}
+
 /** Insert `count` blank pages before position `at`, sized like the neighbouring page as displayed unless `size` is given. */
 export async function insertBlankPages(bytes: Uint8Array, at: number, count: number, size?: [number, number]): Promise<Uint8Array> {
   const doc = await load(bytes);

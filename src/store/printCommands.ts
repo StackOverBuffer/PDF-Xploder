@@ -1,9 +1,11 @@
 /** Printing with options (page range, paper, scaling, pages per sheet), via the browser's print dialog. */
 import { ops } from '../lib/worker';
-import { buildPrintPdf, isPlain, planSheets, type PrintOptions, type Sheet } from '../lib/printLayout';
+import { buildPrintPdf, isPlain, planSheets, printFileName, type PrintOptions, type Sheet } from '../lib/printLayout';
 import { useStore } from './store';
 import { buildOutput, currentBytes } from './commands';
 import { viewSize } from '../lib/geometry';
+import { downloadBlob } from '../lib/download';
+import { tr } from '../lib/i18n';
 import type { PDFDocument } from '@cantoo/pdf-lib';
 
 const S = () => useStore.getState();
@@ -83,6 +85,17 @@ export async function printWithOptions(o: PrintOptions) {
     const sheets = planSheets(o, p.sizes);
     if (!sheets.length) throw new Error('There are no pages to print.');
     printBytes(await buildPrintPdf(p.doc, sheets));
+  });
+}
+
+/** Save the printed layout (N-up, booklet, poster) as a PDF file instead of handing it to a printer. */
+export async function savePrintPdf(o: PrintOptions) {
+  if (!o.pages.length) return S().notify(tr('There are no pages to print.'), 'error');
+  await S().run('Preparing the file…', async () => {
+    const name = printFileName(o, S().fileName || tr('Document'));
+    if (o.imposition === 'none' && isPlain(o, S().pageIds.length)) return downloadBlob(o.comments ? await buildOutput() : await currentBytes(), name);
+    const p = await prepared(o.comments);
+    downloadBlob(await buildPrintPdf(p.doc, planSheets(o, p.sizes)), name);
   });
 }
 

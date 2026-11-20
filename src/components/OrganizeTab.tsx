@@ -2,7 +2,7 @@ import {
   Hand, TextSelect, Wrench, MousePointer2, Camera, ZoomIn, SquareDashedMousePointer, FilePlus2, FileInput, ImagePlus, ClipboardPaste,
   Trash2, FileX2, FileOutput, ArrowRightLeft, Combine, Split, Copy, Replace, Repeat2, Layers, Shrink, CopyCheck, ArrowDownUp, RotateCcw,
   RotateCw, RefreshCcw, Crop, ScanLine, Scaling, Frame, Droplets, Eraser, PaintBucket, PanelTop, Hash, ListOrdered, Files, Bookmark,
-  FileStack, SquareSplitVertical,
+  FileStack, SquareSplitVertical, Shuffle,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
@@ -73,6 +73,7 @@ export function OrganizeTab() {
         <Stack>
           <Btn size="small" icon={<Replace size={I} />} label="Replace Pages" disabled={!canAssemble} onClick={open('orgReplace')} />
           <Btn size="small" icon={<Repeat2 size={I} />} label="Swap Pages" disabled={!canAssemble} onClick={open('orgSwap')} />
+          <Btn size="small" icon={<Shuffle size={I} />} label="Interleave Pages" disabled={!canAssemble} onClick={open('orgInterleave')} />
           <Btn size="small" icon={<Layers size={I} />} label="Overlay Pages" disabled={!canModify} onClick={open('orgOverlay')} />
         </Stack>
         <Stack>
