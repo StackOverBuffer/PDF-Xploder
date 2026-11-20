@@ -10,6 +10,7 @@ import type { PageGeom, Rect } from '../lib/types';
 import { fieldValue } from './FormsPanel';
 import { fillBlockers } from '../lib/forms';
 import { tf, useT } from '../lib/i18n';
+import { useDocLang } from '../lib/docLang';
 import { KIND_LABEL } from './FieldProperties';
 import { openLinkAfterAsking } from '../lib/ask';
 
@@ -36,6 +37,8 @@ interface AnnotData {
   combo?: boolean;
   multiSelect?: boolean;
   maxLen?: number;
+  /** /Ff: bit 23 is DoNotSpellCheck. */
+  fieldFlags?: number;
   textAlignment?: number;
   defaultAppearanceData?: { fontSize?: number };
   // links
@@ -162,13 +165,16 @@ function Widget({ a, f, value, disabled, reason, style, scale }: { a: AnnotData;
   // The field's own background and border (/MK), which the HTML control stands in for.
   const border = a.borderStyle?.width ? css(a.borderColor) : undefined;
   const textStyle = { ...style, '--field-bg': css(a.backgroundColor), ...(border && { borderColor: border, borderWidth: a.borderStyle!.width * scale }), fontSize, textAlign: (['left', 'center', 'right'] as const)[a.textAlignment ?? 0] } as React.CSSProperties;
+  const lang = useDocLang();
+  // The field's own setting (Field properties › Check spelling).
+  const spellCheck = !((a.fieldFlags ?? 0) & (1 << 22));
   const common = { className: 'widget', disabled, title: reason ?? f.name, onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
 
   if (f.kind === 'text') {
     return a.multiLine ? (
-      <textarea {...common} style={textStyle} value={String(value ?? '')} maxLength={a.maxLen || undefined} onFocus={checkpoint} onChange={(e) => set(e.target.value, false)} />
+      <textarea {...common} spellCheck={spellCheck} lang={lang} style={textStyle} value={String(value ?? '')} maxLength={a.maxLen || undefined} onFocus={checkpoint} onChange={(e) => set(e.target.value, false)} />
     ) : (
-      <input {...common} style={textStyle} value={String(value ?? '')} maxLength={a.maxLen || undefined} onFocus={checkpoint} onChange={(e) => set(e.target.value, false)} />
+      <input {...common} spellCheck={spellCheck} lang={lang} style={textStyle} value={String(value ?? '')} maxLength={a.maxLen || undefined} onFocus={checkpoint} onChange={(e) => set(e.target.value, false)} />
     );
   }
   if (f.kind === 'checkbox') {

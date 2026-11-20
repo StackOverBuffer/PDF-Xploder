@@ -10,6 +10,7 @@ import { FieldProperties } from './FieldProperties';
 import { ContentProperties } from './ContentProperties';
 import { makeAllFieldsEditable, setAllFieldsLocked } from '../store/commands';
 import { tf, useLang, useT } from '../lib/i18n';
+import { useDocLang } from '../lib/docLang';
 
 /** `t(key)`, or `en` while `key` has no translation: for words whose plain key ("Fill") means something else in the ribbon. */
 const tOr = (t: (s: string) => string, key: string, en: string) => (t(key) === key ? en : t(key));
@@ -186,6 +187,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
   const update = (patch: Partial<Annotation>, history = true) => useStore.getState().updateAnnotation(pageId, a.id, patch, { history });
   const editable = useCan('annotate');
   const t = useT();
+  const lang = useDocLang();
   const style: Partial<ToolStyle> = {
     color: a.color,
     opacity: a.opacity,
@@ -216,7 +218,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
         <>
           <label className="prop">
             <span className="prop-label">{t('Text')}</span>
-            <textarea id="prop-text" rows={4} value={a.text} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
+            <textarea id="prop-text" rows={4} spellCheck lang={lang} value={a.text} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
           </label>
           <label className="prop inline"><input type="checkbox" checked={a.border} onChange={(e) => update({ border: e.target.checked })} /> {t('Border')}</label>
         </>
@@ -224,13 +226,13 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
       {a.type === 'note' && (
         <label className="prop">
           <span className="prop-label">{t('Note')}</span>
-          <textarea id="prop-text" rows={6} value={a.text} placeholder={t('Type your note…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
+          <textarea id="prop-text" rows={6} spellCheck lang={lang} value={a.text} placeholder={t('Type your note…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ text: e.target.value }, false)} />
         </label>
       )}
       {a.type !== 'note' && (
         <label className="prop">
           <span className="prop-label">{tOr(t, 'Comment text', 'Comment')}</span>
-          <textarea rows={3} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
+          <textarea rows={3} spellCheck lang={lang} value={a.comment ?? ''} placeholder={t('Add a comment…')} onFocus={() => useStore.getState().armCheckpoint()} onChange={(e) => update({ comment: e.target.value }, false)} />
         </label>
       )}
       <Replies a={a} pageId={pageId} />
@@ -243,6 +245,7 @@ function AnnotationProps({ pageId, a }: { pageId: string; a: Annotation }) {
 /** The thread of answers to a comment, and a box to add one. */
 function Replies({ a, pageId }: { a: Annotation; pageId: string }) {
   const t = useT();
+  const lang = useDocLang();
   const author = useStore((s) => s.author);
   const [text, setText] = useState('');
   const replies = a.replies ?? [];
@@ -265,7 +268,7 @@ function Replies({ a, pageId }: { a: Annotation; pageId: string }) {
           <div className="reply-text">{r.text}</div>
         </div>
       ))}
-      <textarea rows={2} value={text} placeholder={t('Write a reply…')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => {
+      <textarea rows={2} spellCheck lang={lang} value={text} placeholder={t('Write a reply…')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           send();

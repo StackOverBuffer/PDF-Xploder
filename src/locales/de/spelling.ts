@@ -1,0 +1,33 @@
+/** German strings of the spell check (Start › Rechtschreibung). */
+const DE_SPELLING: Record<string, string> = {
+  Proofing: 'Korrektur',
+  Spelling: 'Rechtschreibung',
+  'Check the spelling of the page text and the comments': 'Rechtschreibung des Seitentexts und der Kommentare prüfen',
+  'Check again': 'Neu prüfen',
+  'Check the document again': 'Das Dokument erneut prüfen',
+  Language: 'Sprache',
+  'English (US)': 'Englisch (USA)',
+  'English (UK)': 'Englisch (GB)',
+  German: 'Deutsch',
+  'Loading the dictionary and checking…': 'Wörterbuch wird geladen und geprüft…',
+  'Checking…': 'Wird geprüft…',
+  'No spelling mistakes found.': 'Keine Rechtschreibfehler gefunden.',
+  '{n} unknown word(s)': '{n} unbekannte(s) Wort/Wörter',
+  'in a comment': 'in einem Kommentar',
+  Suggestions: 'Vorschläge',
+  'Looking for suggestions…': 'Vorschläge werden gesucht…',
+  'No suggestions': 'Keine Vorschläge',
+  'Change to': 'Ändern in',
+  'Change to…': 'Ändern in…',
+  Change: 'Ändern',
+  'Change all': 'Alle ändern',
+  Ignore: 'Ignorieren',
+  'Ignore all': 'Alle ignorieren',
+  'Add to dictionary': 'Zum Wörterbuch hinzufügen',
+  'Accept this word from now on, in every document (kept in this browser)': 'Dieses Wort ab jetzt in allen Dokumenten akzeptieren (in diesem Browser gespeichert)',
+  'The spell checker could not start.': 'Die Rechtschreibprüfung konnte nicht starten.',
+  'This word is hyphenated across two lines: change it with Edit Text.': 'Dieses Wort ist über zwei Zeilen getrennt: Ändern Sie es mit Text bearbeiten.',
+  'Replaced {n} occurrence(s).': '{n} Vorkommen ersetzt.',
+};
+
+export default DE_SPELLING;

@@ -53,6 +53,8 @@ function pwa(): Plugin {
       const files = list(outDir)
         .map((f) => relative(outDir, f).split(sep).join('/'))
         // Files for search engines, link previews and the install dialog are not needed offline.
+        // The spell checker and its dictionaries (MBs) are cached when first used, not at install (see sw.js).
+        .filter((f) => !/^assets\/(spellWorker|dict-)/.test(f))
         .filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)(LICENSE|OFL)[^/]*$/.test(f) && !/^(og-image\.jpg|screenshot-wide\.jpg|sitemap\.xml|robots\.txt)$/.test(f))
         .sort();
       const hash = createHash('sha256');
@@ -73,6 +75,8 @@ export default defineConfig({
     alias: {
       // Internal module of @cantoo/pdf-lib (not in its package exports) used to
       // derive a file's encryption key from a password. See src/lib/security.ts.
+      // The spelling dictionaries' files (their packages only export a Node.js loader). See src/lib/spell/.
+      'spell-dictionaries': fileURLToPath(new URL('./node_modules/', import.meta.url)),
       'pdf-lib-internal/crypto': fileURLToPath(new URL('./node_modules/@cantoo/pdf-lib/es/core/crypto.js', import.meta.url)),
     },
   },

@@ -8,7 +8,7 @@
  * in sentence case, and nothing that praises the app.
  *
  * The letter on page 2 has one spelling mistake on purpose ("recieve" / "könen"):
- * the start page asks people to find and fix it.
+ * the start page names it, so people can search for it and fix it.
  */
 import type { Lang } from './i18n';
 
@@ -141,7 +141,7 @@ const en: SampleText = {
   tour: [
     {
       title: 'Letter to the customer',
-      text: 'The second paragraph has a spelling mistake. Find it with Ctrl+F and fix it with Home › Edit Text. Mara left a comment on the yellow sentence: answer it in the Comments pane.',
+      text: 'The second paragraph has a typo. Find it with Home › Spelling (F7) and fix it there with Change. Mara left a comment on the yellow sentence: answer it in the Comments pane.',
     },
     {
       title: 'Estimate',
@@ -289,7 +289,7 @@ const de: SampleText = {
   tour: [
     {
       title: 'Brief an die Kundin',
-      text: 'Im zweiten Absatz steckt ein Tippfehler. Finden Sie ihn mit Strg+F und korrigieren Sie ihn mit Start › Text bearbeiten. Mara hat den gelben Satz kommentiert: Antworten Sie ihr im Bereich Kommentare.',
+      text: 'Im zweiten Absatz steckt ein Tippfehler. Finden Sie ihn mit Start › Rechtschreibung (F7) und korrigieren Sie ihn dort mit Ändern. Mara hat den gelben Satz kommentiert: Antworten Sie ihr im Bereich Kommentare.',
     },
     {
       title: 'Kostenvoranschlag',

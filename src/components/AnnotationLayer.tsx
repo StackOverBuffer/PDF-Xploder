@@ -20,6 +20,8 @@ import { annotationsAt } from '../lib/annotHit';
 import { hasPopup } from '../lib/popups';
 import { inActivePane } from '../lib/activeViewer';
 import { setPopupOpen } from '../store/popups';
+import { useSpell } from '../store/spellState';
+import { useDocLang } from '../lib/docLang';
 
 interface Props {
   index: number;
@@ -61,6 +63,8 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
   const canCopy = useCan('copy');
   const hits = useStore((s) => s.search.hits);
   const hitIndex = useStore((s) => s.search.index);
+  const spellIssues = useSpell((s) => s.issues);
+  const spellIndex = useSpell((s) => s.index);
   const svgRef = useRef<SVGSVGElement>(null);
   const [draft, setDraft] = useState<Draft>(null);
   const drag = useRef<Drag>(null);
@@ -474,6 +478,13 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
         const v = pdfRectToView(geom, h.rect);
         return <rect key={`hit${i}`} className={`search-hit ${i === hitIndex ? 'current' : ''}`} x={v.left * S} y={v.top * S} width={v.width * S} height={v.height * S} />;
       })}
+      {spellIssues.map((h, i) => {
+        if (h.page !== index || !h.rect) return null;
+        const v = pdfRectToView(geom, h.rect);
+        return i === spellIndex
+          ? <rect key={`spell${h.key}`} className="spell-hit" x={v.left * S} y={v.top * S} width={v.width * S} height={v.height * S} />
+          : <line key={`spell${h.key}`} className="spell-mark" x1={v.left * S} x2={(v.left + v.width) * S} y1={(v.top + v.height) * S - 1} y2={(v.top + v.height) * S - 1} />;
+      })}
       {annots.map((a) => (
         <g
           key={a.id}
@@ -832,6 +843,7 @@ function ForeignStamp({ a, geom, scale }: { a: Extract<Annotation, { type: 'stam
 
 function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type: 'text' }>; pageId: string; scale: number; editing: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const lang = useDocLang();
   const t = useT();
   const style = {
     fontSize: a.fontSize * scale,
@@ -861,6 +873,8 @@ function TextBox({ a, pageId, scale, editing }: { a: Extract<Annotation, { type:
       className="textbox editing"
       style={style}
       value={a.text}
+      spellCheck
+      lang={lang}
       onPointerDown={(e) => e.stopPropagation()}
       onChange={(e) => {
         useStore.getState().updateAnnotation(pageId, a.id, { text: e.target.value }, { history: false });

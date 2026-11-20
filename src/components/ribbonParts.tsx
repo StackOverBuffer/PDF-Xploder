@@ -228,10 +228,10 @@ export function ToolBtn({ tool, icon, label, size, menu, title, keys }: { tool: 
   return <Btn icon={icon} label={label} size={size} menu={menu} title={title} keys={keys} active={st.active} disabled={st.disabled} onClick={st.activate} />;
 }
 
-export function SidebarBtn({ tab, icon, label, size }: { tab: SidebarTab; icon: ReactNode; label: string; size?: BtnProps['size'] }) {
+export function SidebarBtn({ tab, icon, label, size, keys, title }: { tab: SidebarTab; icon: ReactNode; label: string; size?: BtnProps['size']; keys?: string; title?: string }) {
   const sidebar = useStore((s) => s.sidebar);
   const hasDoc = useStore((s) => !!s.pdf);
-  return <Btn icon={icon} label={label} size={size} active={sidebar === tab} disabled={!hasDoc} onClick={() => S().setSidebar(sidebar === tab ? null : tab)} />;
+  return <Btn icon={icon} label={label} size={size} keys={keys} title={title} active={sidebar === tab} disabled={!hasDoc} onClick={() => S().setSidebar(sidebar === tab ? null : tab)} />;
 }
 
 /** Editable zoom level with a preset list, between zoom out and zoom in. */

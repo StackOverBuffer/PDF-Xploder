@@ -1,7 +1,7 @@
 import { AskHost } from './components/AskHost';
 import { can } from './store/permissions';
-import { useEffect, useState } from 'react';
-import { FileText, FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip } from 'lucide-react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { FileText, FolderOpen, FilePlus, Sparkles, LayoutGrid, ListTree, MessageSquare, FormInput, Search, FileSignature, Paperclip, SpellCheck } from 'lucide-react';
 import { anyUnsavedUnprotected, useStore, type SidebarTab } from './store/store';
 import { useSession } from './store/session';
 import * as cmd from './store/commands';
@@ -21,6 +21,8 @@ import { CommentsPanel } from './components/CommentsPanel';
 import { AttachmentsPanel } from './components/AttachmentsPanel';
 import { FormsPanel } from './components/FormsPanel';
 import { SearchPanel } from './components/SearchPanel';
+/** Loaded with the pane: the spell checker is not needed to open documents. */
+const SpellPanel = lazy(() => import('./components/SpellPanel').then((m) => ({ default: m.SpellPanel })));
 import { DocBanner, SignaturesPanel, XfaBanner } from './components/SignaturesPanel';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { StatusBar } from './components/StatusBar';
@@ -42,6 +44,7 @@ const SIDEBAR: { tab: SidebarTab; icon: typeof LayoutGrid; label: string }[] = [
   { tab: 'attachments', icon: Paperclip, label: 'Attachments' },
   { tab: 'forms', icon: FormInput, label: 'Form fields' },
   { tab: 'search', icon: Search, label: 'Search' },
+  { tab: 'spelling', icon: SpellCheck, label: 'Spelling' },
   { tab: 'signatures', icon: FileSignature, label: 'Signatures' },
 ];
 
@@ -99,6 +102,11 @@ function useShortcuts() {
         if (k === 'b' && e.shiftKey) return run(() => addBookmarkAt(box?.page ?? s.currentPage, undefined, box?.text.split('\n')[0] ?? ''));
         if (k === 'z' && !e.shiftKey) return run(() => s.run('Undoing…', () => s.undo()));
         if (k === 'y' || (k === 'z' && e.shiftKey)) return run(() => s.run('Redoing…', () => s.redo()));
+        return;
+      }
+      if (e.key === 'F7' && s.pdf) {
+        e.preventDefault();
+        s.setSidebar(s.sidebar === 'spelling' ? null : 'spelling');
         return;
       }
       if (typing || !s.pdf) return;
@@ -375,6 +383,7 @@ export function App() {
             {sidebar === 'attachments' && <AttachmentsPanel />}
             {sidebar === 'forms' && <FormsPanel />}
             {sidebar === 'search' && <SearchPanel />}
+            {sidebar === 'spelling' && <Suspense fallback={null}><SpellPanel /></Suspense>}
             {sidebar === 'signatures' && <SignaturesPanel />}
           </aside>
         )}
