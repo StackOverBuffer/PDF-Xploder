@@ -57,10 +57,34 @@ npm run build      # production build in dist/
 
 Click **Try a sample** on the start screen for a seven-page repair order from a made-up bike workshop (in English or German, following the interface language). Each page has something to try: a letter with a typo and a comment thread, an estimate to stamp and sign, a form, a 1:50 floor plan to measure, a scanned receipt for OCR and a customer record to redact. It is built in `src/lib/sample.ts` (words in `src/lib/sampleText.ts`); the receipt scans in `public/sample/` come from `scripts/sample/receipts.py`.
 
+### Keeping it fast (performance budgets)
+
+The start page should not get slower as features land. CI's `perf` job (scripts in `scripts/perf/`,
+limits in `scripts/perf/budget.json`) fails a pull request when:
+
+- the JavaScript needed before the start page shows (the entry chunk and its static imports) grows
+  past its gzipped budget, or the stylesheet does;
+- a feature that should load on demand ends up in that startup code: OCR, signatures, fonts, the
+  Markdown importer, the sample, Compress, Greyscale, the dialogs, the German texts, spell-check
+  dictionaries and the like (`lazyOnly`), or such a chunk is fetched while the app sits idle;
+- with the CPU slowed down 4×, the start page takes longer than its budget to show, or the sample's
+  first page to draw (median of five fresh loads).
+
+The job summary lists every startup file and the biggest modules in them. A new feature belongs in
+a dynamic `import()` (dialogs: `lazy()` in `src/components/Dialogs.tsx`; libraries: like
+`loadFontkit` in `src/lib/fonts.ts`; ribbon commands: like `cleanup` in `src/components/Ribbon.tsx`).
+If growth is intended, raise the budget in the same pull request and say why.
+
+```bash
+npm run perf:bundle    # build into .perf/dist, check the startup code
+npm run perf:startup   # time it in Chromium (npx playwright install chromium, once)
+```
+
 ### Offline and installation (service worker)
 
 The production build includes a service worker (`pwa/sw.js`, filled in by the `pwa` plugin in
-`vite.config.ts`) that caches every built file on the first visit, plus fonts and OCR data from
+`vite.config.ts`) that caches every built file on the first visit
+(registered once the page has loaded, so it does not compete with the start page's files), plus fonts and OCR data from
 jsDelivr once they are used. The spell checker and its dictionaries (`assets/spellWorker-*`, `assets/dict-*`)
 are left out of that first download and cached when spelling is first checked, so they work offline from then on. A new version installs in the background and takes over once every
 PDF-Xploder window has been closed. `public/manifest.webmanifest` makes the app installable and

@@ -18,6 +18,23 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Keeps the app fast as features land (scripts/perf/): the JavaScript needed for the start
+  # page stays within budget, on-demand features stay out of it, and the start page and the
+  # sample's first page show within their time budgets. Budgets: scripts/perf/budget.json.
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run perf:bundle
+      - run: npx playwright install --with-deps chromium
+      - run: npm run perf:startup
+
   # Opens, draws, saves and qpdf-checks pdf.js's test PDFs (scripts/corpus/run.ts).
   # Problems listed in scripts/corpus/known-issues.json are reported, new ones fail the job.
   corpus:

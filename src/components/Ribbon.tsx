@@ -18,7 +18,6 @@ import { isFacing } from '../lib/viewLayout';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import * as extra from '../store/extras';
-import * as cleanup from '../store/cleanupCommands';
 import { selectContent, type ContentFilter } from '../store/content';
 import { useDialog } from './Dialogs';
 import { STAMPS } from './PropertiesPanel';
@@ -37,6 +36,12 @@ import { ask } from '../lib/ask';
 import { Btn, Group, I, L, Row, SidebarBtn, Stack, ToolBtn, ZoomBox, type MenuItem } from './ribbonParts';
 import { setPrefs, usePrefs } from '../lib/prefs';
 import { SOURCE_URL } from '../lib/project';
+
+// Greyscale and image extraction (with the image codecs they share with Compress) load on first use.
+const cleanup = {
+  extractAllImages: () => import('../store/cleanupCommands').then((m) => m.extractAllImages()),
+  greyscale: () => import('../store/cleanupCommands').then((m) => m.greyscale()),
+};
 
 export type TabName = 'File' | 'Home' | 'View' | 'Comment' | 'Protect' | 'Form' | 'Organize' | 'Convert' | 'Share' | 'Review' | 'Accessibility' | 'Bookmarks' | 'Help';
 export const TABS: TabName[] = ['File', 'Home', 'View', 'Comment', 'Protect', 'Form', 'Organize', 'Convert', 'Share', 'Review', 'Accessibility', 'Bookmarks', 'Help'];
