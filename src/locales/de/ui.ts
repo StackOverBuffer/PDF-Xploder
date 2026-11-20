@@ -367,7 +367,7 @@ const DE: Record<string, string> = {
   'Landscape': 'Querformat',
   'Margins (mm)': 'Ränder (mm)',
   'Layout': 'Layout',
-  'Imposition': 'Ausschießen', 'Booklet': 'Heftchen', 'Poster': 'Poster',
+  'Imposition': 'Anordnung', 'Booklet': 'Heftchen', 'Poster': 'Poster',
   'Two pages per sheet, ordered so two-sided printing folds the stack into a booklet. Missing pages are padded blank.': 'Zwei Seiten pro Blatt, so angeordnet, dass der beidseitige Druck den Stapel zu einem Heft faltet. Fehlende Seiten werden durch leere ergänzt.',
   'The page is enlarged to cover the chosen number of sheet columns; the rows follow. Neighbouring tiles overlap so they can be glued.': 'Die Seite wird so vergrößert, dass sie die gewählte Anzahl an Blattspalten abdeckt; die Zeilen ergeben sich daraus. Benachbarte Kacheln überlappen, damit sie verklebt werden können.',
   'Save as PDF…': 'Als PDF speichern…', 'Columns': 'Spalten', 'Overlap (mm)': 'Überlappung (mm)',
