@@ -367,6 +367,8 @@ const DE: Record<string, string> = {
   'Landscape': 'Querformat',
   'Margins (mm)': 'Ränder (mm)',
   'Layout': 'Layout',
+  'Imposition': 'Ausschießen', 'Booklet': 'Heftchen', 'Poster': 'Poster',
+  'Two pages per sheet, ordered so two-sided printing folds the stack into a booklet. Missing pages are padded blank.': 'Zwei Seiten pro Blatt, so angeordnet, dass der beidseitige Druck den Stapel zu einem Heft faltet. Fehlende Seiten werden durch leere ergänzt.',
   'Pages per sheet': 'Seiten pro Blatt',
   'Page order': 'Seitenreihenfolge',
   'Horizontal': 'Horizontal',

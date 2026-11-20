@@ -139,7 +139,7 @@ export function PrintDialog({ close }: { close: () => void }) {
               <option value="even">{t('Even pages only')}</option>
             </select>
           </label>
-          <label className="row"><input type="checkbox" style={NOFLEX} checked={o.reverse} onChange={(e) => set({ reverse: e.target.checked })} /> {t('Reverse order')}</label>
+          {o.imposition !== 'booklet' && <label className="row"><input type="checkbox" style={NOFLEX} checked={o.reverse} onChange={(e) => set({ reverse: e.target.checked })} /> {t('Reverse order')}</label>}
           <label className="row"><input type="checkbox" style={NOFLEX} checked={o.comments} onChange={(e) => set({ comments: e.target.checked })} /> {t('Print comments')}</label>
 
           <h3 className="section">{t('Paper')}</h3>
@@ -158,31 +158,41 @@ export function PrintDialog({ close }: { close: () => void }) {
           <label className="row"><span>{t('Margins (mm)')}</span><input aria-label={t('Margins (mm)')} type="number" min={0} max={50} value={o.margin} onChange={(e) => set({ margin: Math.max(0, Number(e.target.value) || 0) })} /></label>
 
           <h3 className="section">{t('Layout')}</h3>
-          <label className="row"><span>{t('Pages per sheet')}</span>
-            <select aria-label={t('Pages per sheet')} value={o.perSheet} onChange={(e) => set({ perSheet: Number(e.target.value) as PerSheet })}>
-              {[1, 2, 4, 6, 9, 16].map((n) => <option key={n} value={n}>{n}</option>)}
+          <label className="row"><span>{t('Imposition')}</span>
+            <select aria-label={t('Imposition')} value={o.imposition} onChange={(e) => set({ imposition: e.target.value as Settings['imposition'] })}>
+              <option value="none">{t('None')}</option>
+              <option value="booklet">{t('Booklet')}</option>
+              <option value="poster">{t('Poster')}</option>
             </select>
           </label>
-          {o.perSheet > 1 && (
-            <>
-              <label className="row"><span>{t('Page order')}</span>
-                <select aria-label={t('Page order')} value={o.order} onChange={(e) => set({ order: e.target.value as Settings['order'] })}>
-                  <option value="horizontal">{t('Horizontal')}</option>
-                  <option value="vertical">{t('Vertical')}</option>
-                </select>
-              </label>
-              <label className="row"><input type="checkbox" style={NOFLEX} checked={o.borders} onChange={(e) => set({ borders: e.target.checked })} /> {t('Page borders')}</label>
-            </>
+          {o.imposition === 'booklet' && <p className="muted small">{t('Two pages per sheet, ordered so two-sided printing folds the stack into a booklet. Missing pages are padded blank.')}</p>}
+          {o.imposition === 'none' && (
+            <label className="row"><span>{t('Pages per sheet')}</span>
+              <select aria-label={t('Pages per sheet')} value={o.perSheet} onChange={(e) => set({ perSheet: Number(e.target.value) as PerSheet })}>
+                {[1, 2, 4, 6, 9, 16].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
           )}
-          <label className="row"><span>{t('Scaling')}</span>
+          {o.imposition === 'none' && o.perSheet > 1 && (
+            <label className="row"><span>{t('Page order')}</span>
+              <select aria-label={t('Page order')} value={o.order} onChange={(e) => set({ order: e.target.value as Settings['order'] })}>
+                <option value="horizontal">{t('Horizontal')}</option>
+                <option value="vertical">{t('Vertical')}</option>
+              </select>
+            </label>
+          )}
+          {(o.imposition === 'booklet' || (o.imposition === 'none' && o.perSheet > 1)) && (
+            <label className="row"><input type="checkbox" style={NOFLEX} checked={o.borders} onChange={(e) => set({ borders: e.target.checked })} /> {t('Page borders')}</label>
+          )}
+          {o.imposition !== 'poster' && <label className="row"><span>{t('Scaling')}</span>
             <select aria-label={t('Scaling')} value={o.scaling} onChange={(e) => set({ scaling: e.target.value as Settings['scaling'] })}>
               <option value="fit">{t('Fit to paper')}</option>
               <option value="shrink">{t('Shrink oversized pages')}</option>
               <option value="actual">{t('Actual size')}</option>
               <option value="custom">{t('Custom scale')}</option>
             </select>
-          </label>
-          {o.scaling === 'custom' && <label className="row"><span>{t('Scale (%)')}</span><input aria-label={t('Scale (%)')} type="number" min={1} max={800} value={o.customScale} onChange={(e) => set({ customScale: Math.max(1, Number(e.target.value) || 100) })} /></label>}
+          </label>}
+          {o.imposition !== 'poster' && o.scaling === 'custom' && <label className="row"><span>{t('Scale (%)')}</span><input aria-label={t('Scale (%)')} type="number" min={1} max={800} value={o.customScale} onChange={(e) => set({ customScale: Math.max(1, Number(e.target.value) || 100) })} /></label>}
         </div>
         <Preview o={options} />
       </div>

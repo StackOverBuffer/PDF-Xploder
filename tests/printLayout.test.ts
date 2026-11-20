@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDict, PDFDocument, PDFName, degrees } from '@cantoo/pdf-lib';
-import { DEFAULT_PRINT, PAPERS, buildPrintPdf, isPlain, planSheets, printedPages, type PrintOptions } from '../src/lib/printLayout';
+import { DEFAULT_PRINT, PAPERS, bookletSequence, buildPrintPdf, isPlain, planSheets, printedPages, type PrintOptions } from '../src/lib/printLayout';
 
 const A4 = { width: 595.28, height: 841.89 };
 const LAND = { width: 841.89, height: 595.28 };
@@ -52,6 +52,20 @@ describe('print layout', () => {
     expect(one('shrink')).toBe(1);
     expect(one('actual')).toBe(1);
     expect(one('custom', 50)).toBe(0.5);
+  });
+
+  it('orders booklet sheets for saddle-stitch folding, padding with blanks', () => {
+    expect(bookletSequence(8)).toEqual([7, 0, 1, 6, 5, 2, 3, 4]);
+    expect(bookletSequence(6)).toEqual([-1, 0, 1, -1, 5, 2, 3, 4]);
+    expect(bookletSequence(1)).toEqual([-1, 0, -1, -1]);
+  });
+
+  it('lays a booklet out two pages per sheet with blanks skipped', () => {
+    const sheets = planSheets(opts({ imposition: 'booklet', paper: 'A4' }), [A4, A4, A4, A4, A4]);
+    expect(sheets).toHaveLength(4); // ceil(5/4) half-sheets … 8 positions → 4 sheets
+    expect(sheets[0].items).toHaveLength(1); // left half blank, right half page 0
+    expect(sheets[0].items[0]).toMatchObject({ page: 0 });
+    expect(sheets[0].items[0].x).toBeGreaterThan(sheets[0].width / 2);
   });
 
   it('builds one PDF page per sheet, with rotated pages upright', async () => {
