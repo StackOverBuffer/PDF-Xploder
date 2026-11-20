@@ -83,6 +83,18 @@ describe('print layout', () => {
     expect(sheets.every((s) => !s.borders)).toBe(true);
   });
 
+  it('keeps the whole page on poster tiles when the sheet has a margin', () => {
+    const sheets = planSheets(opts({ imposition: 'poster', paper: 'A4', posterColumns: 2, posterOverlap: 0, margin: 10 }), [A4]);
+    const first = sheets[0].items[0];
+    // The page's left and top edges sit at the tile's left and top edges, not inside the margin.
+    expect(first.x).toBeCloseTo(first.cell.x);
+    expect(first.y + A4.height * first.scale).toBeCloseTo(first.cell.y + first.cell.h);
+    // The last tile reaches the page's right edge and shows its bottom edge (nothing cropped).
+    const last = sheets[sheets.length - 1].items[0];
+    expect(last.x + A4.width * last.scale).toBeCloseTo(last.cell.x + last.cell.w);
+    expect(last.y).toBeGreaterThanOrEqual(last.cell.y - 1e-6);
+  });
+
   it('names saved print files after the layout', () => {
     expect(printFileName({ imposition: 'booklet', perSheet: 1 }, 'Report.pdf')).toBe('Report (booklet).pdf');
     expect(printFileName({ imposition: 'poster', perSheet: 1 }, 'Report')).toBe('Report (poster).pdf');
