@@ -132,13 +132,13 @@ export function PrintDialog({ close }: { close: () => void }) {
             <input type="radio" style={NOFLEX} checked={scope === 'range'} onChange={() => setScope('range')} />
             <input aria-label={t('Page range')} value={range} placeholder={t('e.g. 1-3, 5')} onFocus={() => setScope('range')} onChange={(e) => setRange(e.target.value)} />
           </label>
-          <label className="row"><span>{t('Subset')}</span>
+          {o.imposition !== 'booklet' && <label className="row"><span>{t('Subset')}</span>
             <select aria-label={t('Subset')} value={o.subset} onChange={(e) => set({ subset: e.target.value as Settings['subset'] })}>
               <option value="all">{t('All pages in range')}</option>
               <option value="odd">{t('Odd pages only')}</option>
               <option value="even">{t('Even pages only')}</option>
             </select>
-          </label>
+          </label>}
           {o.imposition !== 'booklet' && <label className="row"><input type="checkbox" style={NOFLEX} checked={o.reverse} onChange={(e) => set({ reverse: e.target.checked })} /> {t('Reverse order')}</label>}
           <label className="row"><input type="checkbox" style={NOFLEX} checked={o.comments} onChange={(e) => set({ comments: e.target.checked })} /> {t('Print comments')}</label>
 
