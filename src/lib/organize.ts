@@ -28,6 +28,8 @@ import { isName, parseContent, writeContent, type Op, type Operand } from './con
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { saveDoc } from './pdfSave';
 
+export { markdownToPdf, textToPdf } from './markdownPdf';
+
 const load = ops.load;
 const save = (doc: PDFDocument) => saveDoc(doc);
 const N = (k: string) => PDFName.of(k);

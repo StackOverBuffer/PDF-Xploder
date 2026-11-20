@@ -5,7 +5,8 @@ import { annotationsByPage, reportProgress, uid, useStore, whenIdle } from './st
 import { rememberRecent, type RecentFile } from './session';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { viewRectToPdf, viewSize } from '../lib/geometry';
-import { ops, sec } from '../lib/worker';
+import { ops, org, sec } from '../lib/worker';
+import { OPEN_ACCEPT, TEXT_ACCEPT, isPdfFile, pdfNameFor, textKind } from '../lib/textImport';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
 import { ask, askText } from '../lib/ask';
@@ -22,13 +23,25 @@ export function targetPages(): number[] {
   return s.selectedPages.length ? [...s.selectedPages].sort((a, b) => a - b) : [s.currentPage];
 }
 
-/** Open PDF files, each in its own tab (like PDF-XChange). */
+/** A Markdown or text file as a new PDF document (pages of `pageSize`, A4 by default). */
+export async function textFileToPdf(f: File, pageSize?: [number, number]): Promise<Uint8Array> {
+  const text = await f.text();
+  const title = f.name.replace(/\.[^.]+$/, '');
+  return textKind(f) === 'markdown' ? org.markdownToPdf(text, { pageSize }) : org.textToPdf(text, { pageSize, title });
+}
+
+/** Open PDF files, each in its own tab (like PDF-XChange). Markdown and text files are converted to new PDFs. */
 export async function openFiles(files: File[], handles: (FileSystemFileHandle | null)[] = []) {
-  const pdfs = files.map((file, i) => ({ file, handle: handles[i] ?? null })).filter(({ file: f }) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
-  if (!pdfs.length) return S().notify('Please choose a PDF file.', 'error');
-  for (const { file: f, handle } of pdfs) {
+  const usable = files.map((file, i) => ({ file, handle: handles[i] ?? null })).filter(({ file: f }) => isPdfFile(f) || textKind(f));
+  if (!usable.length) return S().notify('Please choose a PDF, Markdown or text file.', 'error');
+  for (const { file: f, handle } of usable) {
     // Files can arrive while a command runs (dropped, or opened from the system): wait for it.
     await whenIdle();
+    if (!isPdfFile(f)) {
+      // A new document: Save must not write the PDF into the Markdown file, so no handle.
+      await S().run('Converting…', async () => S().openInNewTab(await textFileToPdf(f), pdfNameFor(f.name)));
+      continue;
+    }
     await S().run('Opening…', async () => S().openInNewTab(await fileBytes(f), f.name, { handle }));
     if (S().fileName === f.name && S().pdf) rememberRecent(f.name, handle);
   }
@@ -61,7 +74,13 @@ export async function openFromDialog() {
     if (picked.length) await openFiles(picked.map((p) => p.file), picked.map((p) => p.handle));
     return;
   }
-  const files = await pickFile('application/pdf,.pdf', true);
+  const files = await pickFile(OPEN_ACCEPT, true);
+  if (files.length) await openFiles(files);
+}
+
+/** File › New › From Markdown or Text: convert files into new documents. */
+export async function newFromTextFiles() {
+  const files = await pickFile(TEXT_ACCEPT, true);
   if (files.length) await openFiles(files);
 }
 

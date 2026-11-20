@@ -4,6 +4,8 @@
  * the file input and downloads.
  */
 
+import { TEXT_PICKER_ACCEPT } from './textImport';
+
 type Mode = { mode: 'read' | 'readwrite' };
 type PickerType = { description: string; accept: Record<string, string[]> };
 
@@ -18,6 +20,8 @@ interface PermissionHandle {
 }
 
 const PDF_TYPES: PickerType[] = [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }];
+/** Opening also takes Markdown and text files (converted to PDF). */
+const OPEN_TYPES: PickerType[] = [{ description: 'PDF, Markdown, Text', accept: { 'application/pdf': ['.pdf'], ...TEXT_PICKER_ACCEPT } }];
 
 const pickers = () => (typeof window === 'undefined' ? {} : (window as unknown as Pickers));
 
@@ -37,7 +41,7 @@ export async function pickPdfHandles(): Promise<PickedFile[] | null> {
   const open = pickers().showOpenFilePicker;
   if (!open) return null;
   try {
-    const handles = await open.call(window, { types: PDF_TYPES, multiple: true });
+    const handles = await open.call(window, { types: OPEN_TYPES, multiple: true });
     return Promise.all(handles.map(async (handle) => ({ file: await handle.getFile(), handle })));
   } catch (e) {
     if (isAbort(e)) return [];

@@ -23,7 +23,7 @@ const IN_WORKER: Record<WorkerModule, Set<string>> = {
   org: new Set([
     'assemblePages', 'splitBySize', 'splitByRanges', 'splitByBookmarks', 'setPageLabels', 'getPageLabels', 'resizePages', 'removePageMarks',
     'overlayPages', 'normalizePages', 'insertImagePages', 'insertBlankPages', 'findDuplicatePages', 'findBlankPages', 'addWatermarkMark',
-    'addMargins', 'addHeadersFooters', 'addBates', 'addBackground',
+    'addMargins', 'addHeadersFooters', 'addBates', 'addBackground', 'markdownToPdf', 'textToPdf',
   ]),
   sec: new Set(['encrypt', 'reencryptLike', 'decrypt', 'inspectEncryption']),
   content: new Set(['objectsOnPage', 'findMatches', 'rewriteForCheck', 'editPageContent', 'replaceInPages']),

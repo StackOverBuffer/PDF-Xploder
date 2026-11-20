@@ -463,6 +463,14 @@ const DE: Record<string, string> = {
   '3D model': '3D-Modell', 'Rich media': 'Rich Media',
   'PDF-Xploder cannot display this content. It stays in the file; open the file in Adobe Acrobat Reader to view it.':
     'PDF-Xploder kann diesen Inhalt nicht anzeigen. Er bleibt in der Datei erhalten; öffnen Sie die Datei in Adobe Acrobat Reader, um ihn anzusehen.',
+  // Markdown and text import
+  'Please choose a PDF, Markdown or text file.': 'Bitte wählen Sie eine PDF-, Markdown- oder Textdatei.',
+  'Converting…': 'Wird umgewandelt…',
+  'From Markdown': 'Aus Markdown',
+  'Create a PDF from a Markdown or text file': 'Ein PDF aus einer Markdown- oder Textdatei erstellen',
+  'Blank Document': 'Leeres Dokument',
+  'From Markdown or Text File…': 'Aus Markdown- oder Textdatei…',
+  'A Markdown or text file is converted to pages first.': 'Eine Markdown- oder Textdatei wird zuerst in Seiten umgewandelt.',
 };
 
 export default DE;

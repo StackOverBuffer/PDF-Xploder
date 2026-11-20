@@ -27,6 +27,7 @@ feels familiar if you know desktop PDF editors like PDF-XChange or Adobe Acrobat
 - **Sign and protect**: digital signatures with certificates (.p12/.pfx) and validation, AES-256 passwords and permissions, secure redaction (also search & redact)
 - **OCR**: make scanned PDFs searchable or editable (German, English, French, Italian, Spanish, Dutch, Polish), with table and style recognition
 - **Measure** distances, perimeters and areas on plans and drawings; add **QR codes and barcodes**
+- **Markdown and text to PDF**: open or drop a .md or .txt file and get a formatted PDF with bookmarks and working links
 - **Compress PDFs**: recompress and downsample images, merge duplicate fonts and images, remove unused objects and metadata; see the size before and after
 - **Comfortable**: tabs for several documents, command search (Ctrl+K), print dialog with N-up, dark theme, English and German, session restore, installable as an app that opens PDFs from your desktop
 
