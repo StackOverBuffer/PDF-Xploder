@@ -8,7 +8,7 @@ The feature list of PDF-XChange Editor (and Editor Plus), and where PDF-Xploder 
 
 Roughly in order of everyday usefulness versus effort (callouts are still open from the measure/markup group):
 
-1. **Interleave duplex scans and booklet printing**: merge a front-sides and a back-sides scan into one document; impose folded booklets for two-sided printing; also save N-up sheets and posters (one large page tiled over several sheets) as a PDF.
+1. ✅ **Interleave duplex scans and booklet printing**: done (Organize › Interleave Pages… combines a front-sides and a back-sides scan, in reverse order too, for stacks that were re-fed; Print › Imposition: Booklet orders the pages so two-sided printing folds them into a saddle-stitched booklet; Poster tiles a page over several sheets with an overlap for gluing; Save as PDF stores every print layout — N-up, booklet, poster — as a file).
 2. ✅ **Optimize / compress documents**: done (File › Compress, Share › Compress): presets plus custom quality and resolution, images downsampled by their resolution on the page, CMYK/JPEG 2000 images converted through pdf.js (except for the print preset), duplicate fonts and images merged, unused objects, thumbnails and metadata removed, object streams; size before and after with Undo. Still open: subsetting fully embedded fonts.
 3. **Compare documents**: side by side, with changed text and changed areas marked.
 4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
@@ -196,9 +196,9 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Paste Copied Text as Plain Text / Paste Options | 🟡 paste objects, paste in place |
 | Crop Pages, Partial Cropping, Crop to White Margins | ✅ |
 | Delete, Duplicate, Extract, Insert, Move, Rotate, Reverse, Split Pages | ✅ (also copy pages between open documents by dragging thumbnails onto another tab) |
-| Interleave Pages (combine separately scanned front and back sides) | ⬜ |
-| Booklet Imposition | ⬜ (N-up printing exists; also save N-up sheets to a file) |
-| Posterize (tile a large page over several sheets), Divide Pages (cut each page in halves/quarters) | ⬜ |
+| Interleave Pages (combine separately scanned front and back sides) | ✅ with a file, in reverse order too; leftover pages of the longer document are appended |
+| Booklet Imposition | ✅ saddle-stitch in the print dialog (two pages per sheet, blanks padded to a multiple of 4); saved as a file too |
+| Posterize (tile a large page over several sheets), Divide Pages (cut each page in halves/quarters) | 🟡 poster: the page enlarged over a chosen number of sheet columns, rows as needed, overlap for gluing, printed or saved; ⬜ divide pages |
 | Rotate Pages by Any Angle (straighten scans) | ⬜ (90° steps and deskew with OCR exist) |
 | Delete Empty Pages, Merge, Normalize, Overlay, Replace, Resize, Swap Pages, Set Margins, Split by Size | ✅ |
 | Normalize Media Box Offsets | ✅ |
@@ -261,7 +261,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Import Pages to a Layer | ⬜ |
 | Open Documents from a URL | ⬜ (works for servers that allow CORS) |
 | Optimize Documents | 🟡 compress: recompress and downsample images, merge duplicates, remove unused objects, thumbnails and metadata, object streams; linearize for fast web view and repair damaged files still open |
-| Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders); printer, copies and duplex in the browser's dialog |
+| Print Documents | ✅ print dialog with preview: all / current / selected pages or a range, odd/even subset, reverse order, with or without comments, paper size and orientation, margins, fit / shrink / actual size / custom scale, 1–16 pages per sheet (horizontal or vertical order, page borders), booklet imposition for two-sided printing, poster tiling with overlap, Save as PDF for every layout; printer, copies and duplex in the browser's dialog |
 | Autoscroll, Playback, Page Transitions, Full-Screen Mode | ⬜ |
 | Split the Page View, Spreadsheet Split | 🟡 split view side by side or one above the other, each pane with its own zoom and position; ⬜ spreadsheet split (four panes) |
 | Loupe Tool, Pan and Zoom Pane | ⬜ |

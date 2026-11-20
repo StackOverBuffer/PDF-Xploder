@@ -29,7 +29,7 @@ feels familiar if you know desktop PDF editors like PDF-XChange or Adobe Acrobat
 - **Measure** distances, perimeters and areas on plans and drawings; add **QR codes and barcodes**
 - **Markdown and text to PDF**: open or drop a .md or .txt file and get a formatted PDF with bookmarks and working links
 - **Compress PDFs**: recompress and downsample images, merge duplicate fonts and images, remove unused objects and metadata; see the size before and after
-- **Comfortable**: tabs for several documents, command search (Ctrl+K), print dialog with N-up, dark theme, English and German, session restore, installable as an app that opens PDFs from your desktop
+- **Comfortable**: tabs for several documents, command search (Ctrl+K), print dialog with N-up, booklets and posters, dark theme, English and German, session restore, installable as an app that opens PDFs from your desktop
 
 The full feature list, compared with PDF-XChange Editor, is in [ROADMAP.md](ROADMAP.md).
 
@@ -234,7 +234,7 @@ How it works: the dictionaries are the Hunspell dictionaries of the `dictionary-
 
 ### Document & output
 - New blank document, open (picker or drag & drop), save, save as, save flattened copy, print
-- Print dialog with preview: page range, odd/even pages, reverse order, with or without comments, paper size and orientation, margins, fit/shrink/actual/custom scaling, 2–16 pages per sheet with page borders
+- Print dialog with preview: page range, odd/even pages, reverse order, with or without comments, paper size and orientation, margins, fit/shrink/actual/custom scaling, 2–16 pages per sheet with page borders, booklet imposition for two-sided printing, poster tiling over several sheets — and Save as PDF for every layout
 - Save writes back to the opened file in Chrome and Edge (File System Access API; the browser asks once for write access), Save As shows a save dialog there; other browsers download the file
 - Install as an app (File → Install app, in Chrome and Edge): own window, works fully offline, and appears under "Open with…" for PDF files; files opened that way arrive as tabs in the running window
 - Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
