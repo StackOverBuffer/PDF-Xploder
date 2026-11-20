@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(npm install:*)",
+      "Bash(npm i:*)",
+      "Bash(npm add:*)",
+      "Bash(npm update:*)",
+      "Bash(npm upgrade:*)",
+      "Bash(npm exec:*)",
+      "Bash(npm audit fix:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm i:*)",
+      "Bash(pnpm update:*)",
+      "Bash(pnpm dlx:*)",
+      "Bash(yarn add:*)",
+      "Bash(yarn install:*)",
+      "Bash(yarn up:*)",
+      "Bash(yarn dlx:*)",
+      "Bash(bun add:*)",
+      "Bash(bun install:*)",
+      "Bash(bunx:*)",
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python -m pip install:*)",
+      "Bash(python3 -m pip install:*)",
+      "Bash(pipx:*)",
+      "Bash(uv add:*)",
+      "Bash(uv pip install:*)",
+      "Bash(uvx:*)",
+      "Bash(poetry add:*)",
+      "Bash(cargo add:*)",
+      "Bash(cargo install:*)",
+      "Bash(go get:*)",
+      "Bash(go install:*)"
+    ],
+    "ask": [
+      "Bash(npm ci:*)",
+      "Edit(package.json)",
+      "Edit(package-lock.json)",
+      "Edit(.npmrc)",
+      "Edit(scripts/supply-chain/allowlist.json)",
+      "Edit(osv-scanner.toml)",
+      "Write(package.json)",
+      "Write(package-lock.json)",
+      "Write(.npmrc)",
+      "Write(scripts/supply-chain/allowlist.json)",
+      "Write(osv-scanner.toml)"
+    ]
+  }
+}
