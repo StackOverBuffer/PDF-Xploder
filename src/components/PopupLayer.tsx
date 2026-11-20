@@ -11,6 +11,7 @@ import { ANNOT_LABELS, viewBounds } from '../lib/annotGeom';
 import { POPUP_MIN_H, POPUP_MIN_W, popupBox, popupText, toRect } from '../lib/popups';
 import { placePopup, setPopupOpen } from '../store/popups';
 import { useT } from '../lib/i18n';
+import { useDocLang } from '../lib/docLang';
 import type { Annotation, PageGeom } from '../lib/types';
 
 interface Props {
@@ -59,6 +60,7 @@ type Drag = { mode: 'move' | 'resize'; x: number; y: number; left: number; top: 
 
 function Popup({ a, pageId, geom, scale: S, selected, onHover }: { a: Annotation; pageId: string; geom: PageGeom; scale: number; selected: boolean; onHover: (h: boolean) => void }) {
   const t = useT();
+  const lang = useDocLang();
   const editable = useCan('annotate');
   const author = useStore((s) => s.author);
   const [reply, setReply] = useState('');
@@ -134,6 +136,8 @@ function Popup({ a, pageId, geom, scale: S, selected, onHover }: { a: Annotation
       <textarea
         className="popup-text"
         value={text}
+        spellCheck
+        lang={lang}
         readOnly={!editable}
         placeholder={editable ? t('Add a comment…') : ''}
         aria-label={t('Comment text')}
@@ -157,6 +161,8 @@ function Popup({ a, pageId, geom, scale: S, selected, onHover }: { a: Annotation
         <input
           className="popup-reply-input"
           value={reply}
+          spellCheck
+          lang={lang}
           placeholder={t('Write a reply…')}
           aria-label={t('Reply')}
           onChange={(e) => setReply(e.target.value)}

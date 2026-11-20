@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { useDocLang } from '../lib/docLang';
 import { useStore } from '../store/store';
 import { applyContentEdits, matchesFilter, pageObjects, ungroupForms } from '../store/content';
 import { useCan } from '../store/permissions';
@@ -452,6 +453,7 @@ function InlineTextEditor({ index, geom, scale: S, objects, editing }: { index: 
   const obj = editing.id !== undefined ? objects.find((o) => o.id === editing.id) : undefined;
   const [value, setValue] = useState(obj?.text ?? '');
   const ref = useRef<HTMLInputElement>(null);
+  const lang = useDocLang();
   const done = useRef(false);
   useEffect(() => {
     ref.current?.focus();
@@ -481,6 +483,8 @@ function InlineTextEditor({ index, geom, scale: S, objects, editing }: { index: 
       ref={ref}
       className="content-text-editor"
       value={value}
+      spellCheck
+      lang={lang}
       style={{ left: box.left * S - 2, top: box.top * S - 2, minWidth: Math.max(80, box.width * S + 24), height: Math.max(18, box.height * S + 4), fontSize: size * S * 0.92, color: obj?.fill ?? style.color }}
       onChange={(e) => setValue(e.target.value)}
       onPointerDown={(e) => e.stopPropagation()}

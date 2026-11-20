@@ -21,7 +21,7 @@ export function openSearch(mode: 'find' | 'replace' | 'redact' = 'find') {
 
 let ctx2d: CanvasRenderingContext2D | null | undefined;
 /** Width of text in a generic sans-serif font (relative widths are what matters). */
-function measure(text: string): number {
+export function measure(text: string): number {
   if (ctx2d === undefined) {
     ctx2d = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
     if (ctx2d) ctx2d.font = '100px Arial, Helvetica, sans-serif';
@@ -35,7 +35,7 @@ const isWordChar = (c: string | undefined) => !!c && /[\p{L}\p{N}_]/u.test(c);
 const texts = new WeakMap<PDFDocumentProxy, Promise<TextRun[][]>>();
 
 /** All pages' text runs, fetched in parallel batches (one page at a time took seconds for long documents). */
-function allRuns(): Promise<TextRun[][]> {
+export function allRuns(): Promise<TextRun[][]> {
   const { pdf } = useStore.getState();
   if (!pdf) return Promise.resolve([]);
   let p = texts.get(pdf);

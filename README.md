@@ -22,7 +22,7 @@ feels familiar if you know desktop PDF editors like PDF-XChange or Adobe Acrobat
 
 - **Annotate PDFs**: highlight, underline, strikeout, pencil, shapes, arrows, clouds, text boxes, sticky notes, stamps, images and signatures – saved as standard PDF annotations that Acrobat and other viewers show and edit
 - **Organise pages**: merge PDFs, split, insert, delete, extract, rotate, crop, reorder by drag and drop, drag pages between documents; watermarks, headers/footers, Bates numbering, page labels
-- **Edit PDF content**: change existing text and images, add text, images and shapes, find and replace
+- **Edit PDF content**: change existing text and images, add text, images and shapes, find and replace, check spelling (English and German)
 - **Forms**: fill any PDF form, create and edit form fields
 - **Sign and protect**: digital signatures with certificates (.p12/.pfx) and validation, AES-256 passwords and permissions, secure redaction (also search & redact)
 - **OCR**: make scanned PDFs searchable or editable (German, English, French, Italian, Spanish, Dutch, Polish), with table and style recognition
@@ -61,7 +61,8 @@ Click **Try a sample** on the start screen for a seven-page repair order from a 
 
 The production build includes a service worker (`pwa/sw.js`, filled in by the `pwa` plugin in
 `vite.config.ts`) that caches every built file on the first visit, plus fonts and OCR data from
-jsDelivr once they are used. A new version installs in the background and takes over once every
+jsDelivr once they are used. The spell checker and its dictionaries (`assets/spellWorker-*`, `assets/dict-*`)
+are left out of that first download and cached when spelling is first checked, so they work offline from then on. A new version installs in the background and takes over once every
 PDF-Xploder window has been closed. `public/manifest.webmanifest` makes the app installable and
 registers it as a handler for PDF files. The service worker is not used by `npm run dev`.
 
@@ -180,6 +181,15 @@ The **Organize** tab follows PDF-XChange Editor's *Dokumentaufbau* tab. Page com
 
 How it works: `src/lib/content/` parses the content stream, interprets it with a full graphics state and cuts it into objects (text lines, paths, images, form XObjects, shadings). Each object is written back as a self-contained `q … Q` block carrying its own CTM, clipping paths, graphics state and marked content, so it can be changed independently. Before the first edit of a page the app rewrites it without changes and compares renderings; if it cannot reproduce the page exactly it asks before editing.
 
+### Spell check
+- **Home › Spelling** (F7) opens the Spelling pane: every unknown word of the page text and of the comments (text boxes, notes, comment text and replies), underlined in red on the page
+- Dictionaries for English (US), English (UK) and German; the document's language (`/Lang`) picks one, otherwise the text's language is guessed. German compounds ("Werkstattrechnung"), separable verbs with "zu" ("abzunutzen") and abbreviations ("Kundennr.") are understood
+- For each word: suggestions, *Change* (this place), *Change all*, *Ignore*, *Ignore all* and *Add to dictionary* (kept in this browser). Changes in the page text go through the same editing as find and replace, so the line keeps its font
+- Words in capitals, words with digits, web and e-mail addresses are skipped
+- While typing in text boxes, comments, replies, form fields (unless the field turns spelling off) and when editing page text, the browser underlines mistakes in the document's language
+
+How it works: the dictionaries are the Hunspell dictionaries of the `dictionary-en`, `dictionary-en-gb` and `dictionary-de` packages, read by nspell in a worker (`src/lib/spell/`). Nothing of it loads until the Spelling pane is opened; then only the one language's dictionary (190 to 340 KB compressed) is fetched.
+
 ### Forms
 - Fill text fields, checkboxes, radio buttons, dropdowns and list boxes directly on the page or in the Form fields pane (undoable, saved with the document; Unicode values supported)
 - Highlight fillable fields, flatten forms
@@ -233,7 +243,7 @@ How it works: tesseract.js 7 (LSTM engine, WebAssembly) is loaded on demand; its
 
 ## Keyboard shortcuts
 
-`Ctrl+K` search commands · `Ctrl+O` open · `Ctrl+Alt+PgDn`/`Ctrl+Alt+PgUp` next/previous tab · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find ·
+`Ctrl+K` search commands · `Ctrl+O` open · `Ctrl+Alt+PgDn`/`Ctrl+Alt+PgUp` next/previous tab · `Ctrl+S` save · `Ctrl+P` print · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+F` find · `F7` spelling ·
 `Ctrl+G` go to page · `Ctrl +/-/0` zoom · `Del` delete selection · `Esc` select tool ·
 `Alt+PgDn`/`Alt+PgUp` next/previous bookmark · `V` edit comments · `X` select text · `G` snapshot · `H` hand · `Shift+H` highlight · `U` underline · `K` strikeout · `P` pencil ·
 `R` rectangle · `O` ellipse · `L` line · `A` arrow · `T` text box · `N` note · `S` stamp
@@ -256,4 +266,6 @@ Help → Source code) to your modified source.
 
 Bundled and loaded third-party components keep their own licenses: pdf.js and tesseract.js
 (Apache-2.0), pdf-lib, fontkit, HarfBuzz.js, qrcode-generator, React and zustand (MIT), Lucide (ISC),
-node-forge (used under BSD-3-Clause) and the Noto fonts (SIL Open Font License, `public/fonts/OFL.txt`).
+node-forge (used under BSD-3-Clause), the Noto fonts (SIL Open Font License, `public/fonts/OFL.txt`),
+nspell (MIT) and the spelling dictionaries: English from SCOWL (MIT and BSD) and German from igerman98
+(GPL-2.0 or GPL-3.0, used under GPL-3.0).

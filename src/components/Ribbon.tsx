@@ -9,7 +9,7 @@ import {
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
   MessageSquareText, MessageSquareOff, File as FileIcon, GalleryVertical, BookOpen, BookOpenText, Book, Columns2,
   Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText, FileArchive,
-  Images, SprayCan, Blend,
+  Images, SprayCan, Blend, SpellCheck,
 } from 'lucide-react';
 import { useStore } from '../store/store';
 import { setAllPopups } from '../store/popups';
@@ -344,6 +344,9 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Btn icon={<SquarePlus size={L} />} label="Add" active={tool === 'contentText' || tool === 'contentRect' || tool === 'contentEllipse' || tool === 'contentLine'} disabled={!canModify} menu={addMenu} />
           <Btn icon={<BoxSelect size={L} />} label="Select" disabled={noDoc} menu={selectMenu} />
         </Group>
+        <Group label="Proofing">
+          <SidebarBtn tab="spelling" icon={<SpellCheck size={L} />} label="Spelling" keys="F7" title="Check the spelling of the page text and the comments" />
+        </Group>
       </>
     )}
     {tab === 'View' && (
@@ -354,6 +357,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments" />
           <SidebarBtn tab="attachments" icon={<Paperclip size={L} />} label="Attachments" />
           <SidebarBtn tab="search" icon={<Search size={L} />} label="Search" />
+          <SidebarBtn tab="spelling" icon={<SpellCheck size={L} />} label="Spelling" />
           <Stack>
             <Btn size="small" icon={<PanelLeft size={I} />} label="Sidebar" disabled={noDoc} onClick={() => S().setSidebar(S().sidebar ? null : 'pages')} />
             <Btn size="small" icon={<PanelRight size={I} />} label="Properties" active={showProps} onClick={toggleProps} />
