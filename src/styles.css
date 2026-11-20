@@ -629,8 +629,9 @@ button.primary.danger-fill:hover:not(:disabled) { filter: brightness(1.08); back
 .cmdsearch { position: relative; flex: 1 1 240px; max-width: 240px; min-width: 34px; margin-left: auto; container-type: inline-size; }
 /* Squeezed to its icon by the ribbon tabs: no truncated placeholder. */
 @container (max-width: 110px) { .cmdsearch input::placeholder { color: transparent; } }
-.tabs-bar .cmdsearch input[type=search] { width: 100%; padding: 3px 8px 3px 26px; font-size: 12.5px; border-radius: 4px; }
-.cmdsearch-icon { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+/* :not(.widget) matches the global input rule's specificity, so this padding (room for the icon) wins. */
+.tabs-bar .cmdsearch input[type=search]:not(.widget) { width: 100%; padding: 3px 8px; padding-inline-start: 26px; font-size: 12.5px; border-radius: 4px; }
+.cmdsearch-icon { position: absolute; inset-inline-start: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .cmdsearch-pop { position: fixed; z-index: 1000; width: min(440px, calc(100vw - 16px)); max-height: min(480px, 70vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(20, 30, 50, 0.22); padding: 4px; }
 .cmdsearch-pop ul { list-style: none; margin: 0; padding: 0; }
 .cmdsearch-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 6px 8px 2px; }
