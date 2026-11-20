@@ -138,7 +138,9 @@ button.icon-btn { border: none; background: none; padding: 4px; }
 button.icon-btn:hover:not(:disabled) { background: var(--panel-2); }
 button.link { border: none; background: none; padding: 2px 4px; text-align: left; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.link:hover { color: var(--accent); background: none; }
-input:not([type=checkbox]):not([type=range]):not([type=color]):not(.widget), select:not(.widget), textarea:not(.widget) {
+/* :where() keeps this base style at zero specificity, so any component rule (".rzoom input", ".popup-text", ...)
+   overrides it. Without it this selector (0,4,1) silently beat most of them. */
+:where(input:not([type=checkbox]):not([type=range]):not([type=color]):not(.widget), select:not(.widget), textarea:not(.widget)) {
   border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; background: var(--input-bg); min-width: 0;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
@@ -629,8 +631,8 @@ button.primary.danger-fill:hover:not(:disabled) { filter: brightness(1.08); back
 .cmdsearch { position: relative; flex: 1 1 240px; max-width: 240px; min-width: 34px; margin-left: auto; container-type: inline-size; }
 /* Squeezed to its icon by the ribbon tabs: no truncated placeholder. */
 @container (max-width: 110px) { .cmdsearch input::placeholder { color: transparent; } }
-.tabs-bar .cmdsearch input[type=search] { width: 100%; padding: 3px 8px 3px 26px; font-size: 12.5px; border-radius: 4px; }
-.cmdsearch-icon { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.tabs-bar .cmdsearch input[type=search] { width: 100%; padding: 3px 8px; padding-inline-start: 26px; font-size: 12.5px; border-radius: 4px; }
+.cmdsearch-icon { position: absolute; inset-inline-start: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .cmdsearch-pop { position: fixed; z-index: 1000; width: min(440px, calc(100vw - 16px)); max-height: min(480px, 70vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(20, 30, 50, 0.22); padding: 4px; }
 .cmdsearch-pop ul { list-style: none; margin: 0; padding: 0; }
 .cmdsearch-heading { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 6px 8px 2px; }
