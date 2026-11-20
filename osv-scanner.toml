@@ -1,0 +1,30 @@
+# Advisories OSV-Scanner may ignore, each with a reason and an expiry date (see SECURITY.md).
+# When ignoreUntil passes, the scan fails again and the entry has to be re-checked.
+
+# vitest 3.2.7 (dev dependency, test runner only). Fixed only in vitest 5, a major upgrade
+# still to do. They affect a running Vitest UI/browser-mode server or mock registration,
+# neither of which the app ships or CI exposes.
+[[IgnoredVulns]]
+id = "GHSA-5xrq-8626-4rwp"
+ignoreUntil = 2027-02-20
+reason = "vitest UI server, dev only; fix needs vitest 5"
+
+[[IgnoredVulns]]
+id = "GHSA-82fw-gwwq-j7x9"
+ignoreUntil = 2027-02-20
+reason = "@vitest/mocker, dev only; fix needs vitest 5"
+
+[[IgnoredVulns]]
+id = "GHSA-qxg6-89mg-rqv8"
+ignoreUntil = 2027-02-20
+reason = "@vitest/mocker, dev only; fix needs vitest 5"
+
+[[IgnoredVulns]]
+id = "GHSA-5gmw-xhrv-c9v3"
+ignoreUntil = 2027-02-20
+reason = "tinypool via vitest, dev only; fix needs vitest 5"
+
+[[IgnoredVulns]]
+id = "GHSA-85c8-ppgw-ccpr"
+ignoreUntil = 2027-02-20
+reason = "tinypool via vitest, dev only; fix needs vitest 5"

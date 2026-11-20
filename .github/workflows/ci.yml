@@ -4,12 +4,16 @@ on:
   push:
   pull_request:
 
+# Read-only token for every job unless a job asks for more.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -25,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -41,22 +45,75 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: sudo apt-get install -y --no-install-recommends qpdf
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .corpus/pdfs
           key: pdfjs-corpus-${{ hashFiles('scripts/corpus/fetch.sh') }}
       - run: scripts/corpus/fetch.sh
       - run: npm run corpus
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: corpus-results
           path: .corpus/results.json
           if-no-files-found: ignore
+
+  # Supply-chain checks (see SECURITY.md).
+  supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # the new-dependency check compares against the PR's base branch
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Every installed package carries a valid npm registry signature (and provenance where published).
+      - run: npm audit signatures
+      # Known vulnerabilities in what ships to users: high or critical fails the job.
+      - run: npm audit --omit=dev --audit-level=high
+      # Dev tools (vite, vitest, ...): reported, not blocking, until the open vitest advisories are fixed.
+      - name: npm audit (all, report only)
+        run: npm audit --audit-level=high || echo "::warning::npm audit found high/critical advisories in dev dependencies"
+      # Registry vetting of every package a PR adds or changes in package-lock.json.
+      - name: Vet new dependencies
+        if: github.event_name == 'pull_request'
+        run: node scripts/supply-chain/check-new-deps.mjs "origin/${{ github.base_ref }}"
+
+  # Flags newly introduced dependencies with known vulnerabilities in the PR's diff.
+  # Needs the dependency graph, which is on by default for public repositories.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development
+          # Dev-only vitest/tinypool advisories, fixed only in vitest 5. Same list as osv-scanner.toml.
+          allow-ghsas: GHSA-5xrq-8626-4rwp, GHSA-82fw-gwwq-j7x9, GHSA-qxg6-89mg-rqv8, GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr
+          # Show OpenSSF Scorecard data for each new dependency in the job summary.
+          show-openssf-scorecard: true
+
+  # OSV-Scanner: vulnerabilities and known-malicious packages (OpenSSF malicious-packages data)
+  # in the lockfile. Ignored advisories, each with a reason and an expiry: osv-scanner.toml.
+  osv-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: google/osv-scanner-action/osv-scanner-action@6bc832ee85d316ab9aeccf71929026841bd0e1ee # v2.7.1
+        with:
+          scan-args: |-
+            --config=osv-scanner.toml
+            --lockfile=package-lock.json
