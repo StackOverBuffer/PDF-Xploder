@@ -4,5 +4,7 @@ declare module 'pdf-lib-internal/crypto' {
   export class CipherTransformFactory {
     constructor(dict: PDFDict, fileId: Uint8Array, password?: string);
     encryptionKey: Uint8Array;
+    /** Decrypts one object's strings (and, with /StrF swapped, a stream's bytes). */
+    createCipherTransform(num: number, gen: number): { decryptBytes(d: Uint8Array): Uint8Array };
   }
 }

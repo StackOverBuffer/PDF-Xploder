@@ -27,7 +27,7 @@ import { createTextEngine, loadFontBytes, loadFontkit } from './fonts';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
-  return PDFDocument.load(bytes, { updateMetadata: false });
+  return loadForEdit(bytes);
 }
 
 /**
@@ -351,6 +351,7 @@ export { getFormFields, type FieldInfo } from './forms';
 import type { FieldValue } from './forms';
 import { saveDoc } from './pdfSave';
 import { addInsertedFileBookmark, copiedOutline, outlineOf } from './outline';
+import { loadForEdit } from './pageTree';
 export type { FieldValue };
 
 export async function setFormValues(

@@ -20,6 +20,7 @@ import {
 } from '@cantoo/pdf-lib';
 import type { Rect } from './types';
 import { saveDoc } from './pdfSave';
+import { loadForEdit } from './pageTree';
 
 // Annotation flags (ISO 32000-1, table 165).
 const F_HIDDEN = 1 << 1;
@@ -202,7 +203,7 @@ export function describeField(doc: PDFDocument, f: PDFField, maps: PageMaps = pa
 }
 
 async function load(bytes: Uint8Array) {
-  return PDFDocument.load(bytes, { updateMetadata: false });
+  return loadForEdit(bytes);
 }
 
 export async function getFormFields(bytes: Uint8Array): Promise<FieldInfo[]> {

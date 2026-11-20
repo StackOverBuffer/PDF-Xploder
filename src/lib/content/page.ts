@@ -23,6 +23,7 @@ import { IDENTITY, isIdentity, maxScale, mul, translate, type M } from './matrix
 import { isName, name as nm, parseContent, writeContent, type Op } from './syntax';
 import { hexToRgbTuple } from '../color';
 import type { Rect } from '../types';
+import { loadForEdit } from '../pageTree';
 
 // ---------------------------------------------------------------- reading
 
@@ -783,6 +784,6 @@ export function describeObjects(pc: PageContent): ObjectInfo[] {
 }
 
 export async function loadForEditing(bytes: Uint8Array): Promise<PDFDocument> {
-  return PDFDocument.load(bytes, { updateMetadata: false });
+  return loadForEdit(bytes);
 }
 
