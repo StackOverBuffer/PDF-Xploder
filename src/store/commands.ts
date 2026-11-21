@@ -9,7 +9,6 @@ import { ops, org, sec } from '../lib/worker';
 import { OPEN_ACCEPT, TEXT_ACCEPT, isPdfFile, pdfNameFor, textKind } from '../lib/textImport';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
-import { cleanImageDataUrl } from '../lib/imageMeta';
 import { ask, askText } from '../lib/ask';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import type { SignOptions } from '../lib/signature';
@@ -523,6 +522,7 @@ export async function normaliseImage(src: string): Promise<{ src: string; width:
   // PNG and JPEG are kept as they are, without their metadata (EXIF with GPS, XMP…).
   let rotated = false;
   if (/^data:image\/(png|jpe?g)/.test(src)) {
+    const { cleanImageDataUrl } = await import('../lib/imageMeta');
     const clean = cleanImageDataUrl(src);
     if (!clean.rotated) return { src: clean.src, width: img.naturalWidth, height: img.naturalHeight };
     rotated = true;
