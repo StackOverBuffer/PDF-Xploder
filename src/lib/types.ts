@@ -144,6 +144,8 @@ export interface StampAnnot extends AnnotBase, Oriented {
   type: 'stamp';
   rect: Rect;
   label: string;
+  /** Fill & Sign mark drawn as a vector glyph instead of the boxed label. */
+  kind?: 'check' | 'cross';
   /**
    * A stamp made by another program: its own drawing, as a one-page PDF (base64)
    * that is drawn into the rect, on screen and when saving. Without it the label is drawn.
