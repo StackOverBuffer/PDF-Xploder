@@ -9,6 +9,7 @@ import { ops, org, sec } from '../lib/worker';
 import { OPEN_ACCEPT, TEXT_ACCEPT, isPdfFile, pdfNameFor, textKind } from '../lib/textImport';
 import { requirePermission } from './permissions';
 import { tf, tr } from '../lib/i18n';
+import { cleanImageDataUrl } from '../lib/imageMeta';
 import { ask, askText } from '../lib/ask';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import type { SignOptions } from '../lib/signature';
@@ -516,12 +517,19 @@ export async function normaliseImage(src: string): Promise<{ src: string; width:
   const img = new Image();
   img.src = src;
   await img.decode();
-  if (/^data:image\/(png|jpe?g)/.test(src)) return { src, width: img.naturalWidth, height: img.naturalHeight };
+  // PNG and JPEG are kept as they are, without their metadata (EXIF with GPS, XMP…).
+  let rotated = false;
+  if (/^data:image\/(png|jpe?g)/.test(src)) {
+    const clean = cleanImageDataUrl(src);
+    if (!clean.rotated) return { src: clean.src, width: img.naturalWidth, height: img.naturalHeight };
+    rotated = true;
+  }
+  // Other formats, and photos stored sideways (the browser draws them upright): re-encoded.
   const c = document.createElement('canvas');
   c.width = img.naturalWidth;
   c.height = img.naturalHeight;
   c.getContext('2d')!.drawImage(img, 0, 0);
-  return { src: c.toDataURL('image/png'), width: c.width, height: c.height };
+  return { src: rotated ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png'), width: c.width, height: c.height };
 }
 
 /** Place an image centred on the current page, fitted within `maxW` x `maxH` points. */

@@ -247,8 +247,12 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     case 'image': {
       set('Name', a.signature ? 'Signature' : 'Image');
       set('Rotate', a.rot ?? 0);
-      const { bytes } = dataUrlToBytes(a.src);
-      if (priv) dict.set(PRIVATE_SRC, pdf.register(pdf.stream(bytes)));
+      if (priv) {
+        // A JPEG is embedded as it is: the appearance's image is the original, stored once.
+        const { bytes, mime } = dataUrlToBytes(a.src);
+        const shown = /jpe?g/.test(mime) ? ctx.images.get(a.src) : undefined;
+        dict.set(PRIVATE_SRC, shown ? shown.ref : pdf.register(pdf.stream(bytes)));
+      }
       break;
     }
     case 'redact':
