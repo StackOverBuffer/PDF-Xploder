@@ -24,7 +24,9 @@ describe('zip', () => {
       try {
         execFileSync('python3', ['-c', 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; z.extractall(sys.argv[2])', file, dir]);
       } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === 'ENOENT') python = false;
+        // Windows answers for a missing python3 with the Store alias, which fails
+        // differently from a missing command: skip the check there too.
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT' || (e as NodeJS.ErrnoException).code === '9009' || /Python was not found/.test(String((e as { stderr?: unknown }).stderr))) python = false;
         else throw e;
       }
       if (python) {
