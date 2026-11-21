@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import type { Plugin } from 'vite';
 
 /**
@@ -96,6 +96,12 @@ export default defineConfig({
   // The PDF worker loads fonts and other parts on demand: it has to be a module.
   worker: { format: 'es' },
   optimizeDeps: { esbuildOptions: { target: 'es2022' } },
+  // Parallel checkouts of this repository (git worktrees) share one node_modules through
+  // a junction: give each checkout its own vite cache, so concurrent test or build runs
+  // cannot race on the same cache directory, and the parent directory (where the real
+  // node_modules lives) is allowed, so tests may load packages through the junction.
+  server: { fs: { allow: [process.cwd(), resolve(process.cwd(), '..')] } },
+  cacheDir: `node_modules/.vite-${basename(process.cwd())}`,
   // RSA key generation and full-document round trips can take a while on slow disks.
   test: { environment: 'node', include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup.ts'], testTimeout: 120_000 },
 });
