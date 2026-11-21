@@ -14,7 +14,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 4. ✅ **Fill & Sign and dynamic stamps**: done (Comment › Fill & Sign: check, cross, date and initials tools for forms without fields; Stamp menu: dynamic variants of Approved, Reviewed and Received that fill in author and date when placed).
 5. 🟡 **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (review status, comment summary and CSV export done; FDF/XFDF still open).
 6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
-7. 🟡 **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize) and extract all images (Convert › Extract images, as a ZIP) are done. Still open: rasterize pages, export pages as JPEG/WebP/TIFF.
+7. ✅ **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize), extract all images (Convert › Extract images, as a ZIP), rasterize pages (Convert › Rasterize) and export pages as PNG/JPEG/WebP/TIFF (Convert › To image) are done.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -109,7 +109,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | PDF to Word / Excel / PowerPoint | ⬜ |
 | PDF to PDF/A / PDF/X | ⬜ |
 | PDF to Plain Text | ⬜ |
-| Export PDFs to WebP / TIFF Images | ⬜ (PNG/JPEG export exists) |
+| Export PDFs to WebP / TIFF Images | ✅ Convert › To image: PNG, JPEG, WebP or TIFF, one page or a ZIP of several |
 | Image Files to PDF | ✅ images as new pages (Organize → Insert); ⬜ HEIC, TIFF (multi-page) and SVG |
 | Text, Markdown, CSV, RTF to PDF | 🟡 Markdown (GitHub flavour: tables, task lists, code, links, headings as bookmarks) and plain text, opened as new documents or inserted as pages; ⬜ CSV, RTF |
 | Word, Excel, PowerPoint to PDF | ⬜ possible offline with LibreOffice compiled to WebAssembly, loaded only when used (large download) |
@@ -234,7 +234,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Add JavaScript | ⬜ |
 | Convert Document Colours | 🟡 greyscale: page content, forms, comment appearances, gradients and images; ⬜ other colour conversions, spot colours |
 | Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
-| Rasterize Pages | ⬜ |
+| Rasterize Pages | ✅ Convert › Rasterize (comments are burnt into the image first) |
 | Recompress Document Images | ✅ whole document (File › Compress) or one image (context menu) |
 | View/Edit Document Properties | ✅ |
 
@@ -254,7 +254,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Crop Documents | ✅ |
 | Digitally Sign | ✅ PKCS#12 certificates, visible or invisible |
 | Email Documents | 🟡 system share sheet where supported |
-| Export Documents to Images | ✅ PNG |
+| Export Documents to Images | ✅ PNG, JPEG, WebP or TIFF (Convert › To image) |
 | Export Links to CSV | ⬜ |
 | Find / Search Text | ✅ |
 | Move Content Items to a Selected Layer | ✅ |
