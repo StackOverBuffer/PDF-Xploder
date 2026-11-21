@@ -240,7 +240,8 @@ How it works: the dictionaries are the Hunspell dictionaries of the `dictionary-
 - Unchanged documents are saved byte-for-byte (signatures and encryption stay intact)
 - Saved files are made to open the same way in other readers: the XMP metadata follows the document properties, comments carry their own appearance and a popup for their text, and AES-256 files declare the extension level Acrobat expects (checked against Poppler and PDFium)
 - Document properties: title, author, subject, keywords, creator, producer; the fonts the pages use (type, embedded or not, pages); encryption and what the session may do
-- Export the current page as PNG; extract every image of the document into a ZIP file (JPEGs as stored, others as PNG)
+- Export pages as PNG, JPEG, WebP or TIFF (Convert › To image): the current page, the thumbnail selection or all pages, as one file or a ZIP of several; WebP appears only where the browser can encode it. Rasterize (Convert › Rasterize) replaces the selected pages with pictures of themselves, comments burnt in first — their text is no longer selectable or searchable, and form fields on them are removed
+- Extract every image of the document into a ZIP file (JPEGs as stored, others as PNG)
 - Convert to greyscale (Convert › Greyscale): page content, form XObjects, comment appearances, gradients and images; spot colours are left as they are
 - OCR for scanned documents (see below)
 - Share the PDF via the system share sheet (where the browser supports it)
