@@ -42,8 +42,9 @@
   - `export function encodeTiff(width: number, height: number, rgba: Uint8Array | Uint8ClampedArray, o: TiffOptions = {}): Uint8Array`
   - Baseline TIFF, little-endian (`II`, 42), single uncompressed strip, tags in ascending order: 256 ImageWidth, 257 ImageLength, 258 BitsPerSample (SHORT×3 external for RGB, inline for grey), 259 Compression=1, 262 Photometric (2 RGB / 1 BlackIsZero), 273 StripOffsets, 277 SamplesPerPixel, 278 RowsPerStrip=height, 279 StripByteCounts, 282/283 X/YResolution (RATIONAL dpi/1), 296 ResolutionUnit=2.
   - Grey: luma `Math.round(0.299 r + 0.587 g + 0.114 b)`; if `src/lib/greyscale.ts` exports a luma helper, reuse it instead of a private copy (check first).
+  - Note (builder): `greyscale.ts` does export `luma`, but only over 0–1 components, and importing it would pull the whole greyscale/optimize graph (pdf-lib, image codecs) into the eagerly loaded bundle — `greyscale` is deliberately lazy-loaded today (Ribbon imports `cleanupCommands` on first use). So the encoder keeps the three weights local, with a comment pointing at `greyscale.ts`, to honour the "Consumes: nothing (pure module)" contract above.
 
-- [ ] **Step 1: Write the failing tests** in `tests/tiff.test.ts` with a small reader that walks the IFD:
+- [x] **Step 1: Write the failing tests** in `tests/tiff.test.ts` with a small reader that walks the IFD:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -101,13 +102,13 @@ it('orders tags ascending and sizes one strip', () => {
 
 (If your tag set differs from the pinned 12, adjust the test to the implementation — but Photometric, Compression=1, SamplesPerPixel, StripByteCounts and the resolution tags must hold, and tags must be ascending as the spec requires.)
 
-- [ ] **Step 2: Run `npm test -- tests/tiff.test.ts` — expect FAIL** (module does not exist).
+- [x] **Step 2: Run `npm test -- tests/tiff.test.ts` — expect FAIL** (module does not exist).
 
-- [ ] **Step 3: Implement `encodeTiff`** exactly per the interface above. Layout: 8-byte header, IFD (2-byte count, 12-byte entries, 4-byte next-IFD offset 0), then the external `BitsPerSample` array (RGB only), then the RATIONALs for X/YResolution if they do not fit inline (they never do: 8 bytes), then the pixel strip. Compute offsets; keep the code small and commented.
+- [x] **Step 3: Implement `encodeTiff`** exactly per the interface above. Layout: 8-byte header, IFD (2-byte count, 12-byte entries, 4-byte next-IFD offset 0), then the external `BitsPerSample` array (RGB only), then the RATIONALs for X/YResolution if they do not fit inline (they never do: 8 bytes), then the pixel strip. Compute offsets; keep the code small and commented.
 
-- [ ] **Step 4: Run `npm test -- tests/tiff.test.ts` — expect PASS.**
+- [x] **Step 4: Run `npm test -- tests/tiff.test.ts` — expect PASS.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/tiff.ts tests/tiff.test.ts
