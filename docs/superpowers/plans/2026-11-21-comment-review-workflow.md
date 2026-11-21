@@ -68,7 +68,7 @@ git commit -m "Comment review status: choose and filter it in the comments panel
 - Consumes: `replyDict` and the reply loop in `importAnnotations` (annotIO.ts ~577-604); the private-model serialization at annotIO.ts:248 (`const { replies, ...rest } = a;`).
 - Produces: `AppearanceOptions`/export options gain `author?: string` (the acting user, used as the state annotation's `/T`); import maps state dicts to `status` (and removes them from the file, exactly like replies).
 
-- [ ] **Step 1: Write the failing tests** in `tests/commentWorkflow.test.ts`:
+- [x] **Step 1: Write the failing tests** in `tests/commentWorkflow.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -127,23 +127,23 @@ it('keeps a comment without status state-free', async () => {
 
 (Complete the two sketched tests in the same style; `PDFName`, `PDFHexString`, `PDFString` are imported from `@cantoo/pdf-lib` as in other test files. To check the saved bytes for a missing `StateModel`, `expect(new TextDecoder().decode(bytes)).not.toContain('StateModel')` is enough.)
 
-- [ ] **Step 2: Run `npm test -- tests/commentWorkflow.test.ts` — expect FAIL.**
+- [x] **Step 2: Run `npm test -- tests/commentWorkflow.test.ts` — expect FAIL.**
 
-- [ ] **Step 3: Export** in `writeNativeAnnotation` (annotIO.ts):
+- [x] **Step 3: Export** in `writeNativeAnnotation` (annotIO.ts):
   - Strip status from the private model exactly like replies: `const { replies, status, ...rest } = a;`
   - After the reply loop, when `status` is set and `!opts.flatten`, register and add a state dict mirroring `replyDict` but with `State: a.status`, `StateModel: 'Review'`, `Contents` omitted, `NM: PDFHexString.fromText('state-' + a.id)`, `T: PDFHexString.fromText(opts.author ?? a.author)`, `M: PDFString.fromDate(new Date())`, same `Name`/`F` flags as replies.
 
-- [ ] **Step 4: Options plumbing** — `AppearanceOptions` (annotIO.ts) and the `exportWithAnnotations` options (`pdfOps.ts:425`) gain `author?: string`. In `src/store`, pass `author: S().author` at every `exportWithAnnotations` call site that is not a pure flatten (grep them; the save path matters most).
+- [x] **Step 4: Options plumbing** — `AppearanceOptions` (annotIO.ts) and the `exportWithAnnotations` options (`pdfOps.ts:425`) gain `author?: string`. In `src/store`, pass `author: S().author` at every `exportWithAnnotations` call site that is not a pure flatten (grep them; the save path matters most).
 
-- [ ] **Step 5: Import** in the reply processing of `importAnnotations` (annotIO.ts, the `for (const { dict, entry } of replies)` loop): before the "reply to a missing root" check, read `const state = text(dict.lookup(PDFName.of('State'))); const model = text(dict.lookup(PDFName.of('StateModel')));`
+- [x] **Step 5: Import** in the reply processing of `importAnnotations` (annotIO.ts, the `for (const { dict, entry } of replies)` loop): before the "reply to a missing root" check, read `const state = text(dict.lookup(PDFName.of('State'))); const model = text(dict.lookup(PDFName.of('StateModel')));`
   - `state && model === 'Review'` and the root exists: `'None'` → `delete root.status`, otherwise one of the five values → `root.status = state`; remove the entry (and its popup ref) from the file and `continue`.
   - `state && model === 'Review'` but no root: remove the entry too (an orphaned state says nothing).
   - `state && model === 'Marked'`: `continue` without removing and without adding a reply.
   - Everything else: existing reply behaviour, unchanged.
 
-- [ ] **Step 6: Run `npm test -- tests/commentWorkflow.test.ts` — expect PASS.** Then `npm test` (the corpus-backed save tests and the rest must stay green).
+- [x] **Step 6: Run `npm test -- tests/commentWorkflow.test.ts` — expect PASS.** Then `npm test` (the corpus-backed save tests and the rest must stay green).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/annotIO.ts src/lib/pdfOps.ts src/store tests/commentWorkflow.test.ts
