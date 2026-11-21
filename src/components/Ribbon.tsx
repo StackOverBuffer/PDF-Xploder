@@ -8,7 +8,7 @@ import {
   CircleDot, ChevronDownSquare, List, KeyRound, FileSignature, FileKey2, PanelLeft, PanelRight, Keyboard, Search, ListTree,
   LayoutGrid, ChevronDown, TextSelect, Camera, Clipboard, ClipboardCopy, ClipboardPaste, Bookmark, Paperclip, SquarePlus,
   MessageSquareText, MessageSquareOff, File as FileIcon, GalleryVertical, BookOpen, BookOpenText, Book, Columns2,
-  Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText, FileArchive,
+  Code, Settings, Sun, Moon, SunMoon, ChevronsRight, BoxSelect, Share2, Accessibility, Volume2, VolumeX, Contrast, Languages, FileImage, ChevronUp, ScanText, FileArchive, Frame,
   Images, SprayCan, Blend, SpellCheck,
 } from 'lucide-react';
 import { useStore } from '../store/store';
@@ -554,6 +554,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Btn icon={<FileImage size={L} />} label="To image" title="Save pages as PNG, JPEG, WebP or TIFF images" disabled={!canCopy} onClick={() => show('exportImage')} />
           <ToolBtn tool="snapshot" icon={<Camera size={L} />} label="Region to image" title="Drag a box to copy that part of the page as an image" />
           <Btn icon={<Images size={L} />} label="Extract images" title="Save every image of the document in a ZIP file (JPEGs unchanged, others as PNG)" disabled={!canCopy} onClick={cleanup.extractAllImages} />
+          <Btn icon={<Frame size={L} />} label="Rasterize" title="Turn the selected pages into images (text, fields and comments become part of the picture)" disabled={!canModify} onClick={() => cmd.rasterizePages()} />
           <Btn icon={<Blend size={L} />} label="Greyscale" title="Convert pages, images and comments to shades of grey" disabled={!canModify} onClick={cleanup.greyscale} />
         </Group>
         <Group label="Flatten">

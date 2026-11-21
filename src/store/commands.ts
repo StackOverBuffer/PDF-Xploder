@@ -458,6 +458,44 @@ export async function applyRedactions() {
   });
 }
 
+/**
+ * Turn the given pages into pictures of themselves: content, form fields and comments
+ * become one image each (the machinery of Apply redactions, minus the marks), so nothing
+ * on them can be selected, searched or filled in any more.
+ */
+export async function rasterizePages(indices: number[] = targetPages(), dpi = 200) {
+  if (!requirePermission('modify')) return;
+  const s = S();
+  if (!(await ask({ title: 'Rasterize pages', message: tf('Rasterize {n} page(s)? They become images: their text will no longer be selectable or searchable, and form fields on them are removed. Comments on those pages are burnt into the image.', { n: indices.length }), ok: 'Rasterize', danger: true }))) return;
+  await s.run('Rasterizing…', async () => {
+    // The comments of the rasterised pages are burnt into the picture first: the replaced
+    // pages keep none of their annotations, and losing them silently would be worse.
+    const byPage = annotationsByPage(S());
+    const flat = await ops.exportWithAnnotations(await currentBytes(), byPage.map((l, i) => (indices.includes(i) ? l : [])), { flatten: true });
+    const { pdf } = await openPdf(flat, () => null);
+    const images: { index: number; png: Uint8Array }[] = [];
+    try {
+      for (const [k, i] of indices.entries()) {
+        reportProgress(k, indices.length);
+        // A blank page rasterises to a blank image, so pages without content need no special case.
+        const page = await pdf.getPage(i + 1);
+        const canvas = await renderToCanvas(page, scaleFor(page, dpi));
+        const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
+        images.push({ index: i, png: new Uint8Array(await blob.arrayBuffer()) });
+      }
+    } finally {
+      closePdf(pdf);
+    }
+    const { bytes: out, removedFields } = await ops.replacePagesWithImages(s.bytes!, images);
+    const annotations = { ...s.annotations };
+    for (const i of indices) delete annotations[s.pageIds[i]];
+    // Pending values of removed fields must not be written back on save.
+    const formValues = Object.fromEntries(Object.entries(S().formValues).filter(([k]) => !removedFields.includes(k)));
+    await S().commitBytes(out, undefined, annotations, formValues);
+    s.notify(tf('Rasterized {n} page(s).', { n: indices.length }));
+  });
+}
+
 // ---------------------------------------------------------------- images & signatures
 
 /** Load any browser-decodable image as a PNG/JPEG data URL plus its natural size. */

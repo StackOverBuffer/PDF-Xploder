@@ -172,7 +172,7 @@ git commit -m "Export pages as PNG, JPEG, WebP or TIFF, one file or a ZIP"
 - Consumes: `applyRedactions` (commands.ts:381) as the blueprint; `ops.replacePagesWithImages` (`src/lib/pdfOps.ts:467`); `targetPages()`.
 - Produces: `export async function rasterizePages(indices: number[] = targetPages(), dpi = 200)`.
 
-- [ ] **Step 1: Command.** Guard `requirePermission('modify')`; if any target page has no content the command still works (rasterizing a blank page yields a blank image — no special case). Confirm first:
+- [x] **Step 1: Command.** Guard `requirePermission('modify')`; if any target page has no content the command still works (rasterizing a blank page yields a blank image — no special case). Confirm first:
 
 ```ts
 if (!(await ask({ title: 'Rasterize pages', message: tf('Rasterize {n} page(s)? They become images: their text will no longer be selectable or searchable, and form fields on them are removed. Comments on those pages are burnt into the image.', { n: indices.length }), ok: 'Rasterize', danger: true }))) return;
@@ -180,11 +180,13 @@ if (!(await ask({ title: 'Rasterize pages', message: tf('Rasterize {n} page(s)? 
 
 Then mirror `applyRedactions`: flatten the pages' annotations into the render (`exportWithAnnotations` with `flatten: true` for the target pages' lists only), render each at `dpi / 72`, collect `{ index, png }`, `replacePagesWithImages`, drop the target pages from the model's annotations, filter `formValues` by `removedFields`, `commitBytes`, notify `Rasterized {n} page(s).`.
 
-- [ ] **Step 2: Ribbon** — Convert tab, next to "Extract images": `<Btn icon={<Frame size={L} />} label="Rasterize" title="Turn the selected pages into images (text, fields and comments become part of the picture)" disabled={!canModify} onClick={() => cmd.rasterizePages()} />` (pick `Frame` or another unused lucide icon; add it to the import list).
+- [x] **Step 2: Ribbon** — Convert tab, next to "Extract images": `<Btn icon={<Frame size={L} />} label="Rasterize" title="Turn the selected pages into images (text, fields and comments become part of the picture)" disabled={!canModify} onClick={() => cmd.rasterizePages()} />` (pick `Frame` or another unused lucide icon; add it to the import list).
 
-- [ ] **Step 3: German strings**: `'Rasterize': 'Zu Bild umwandeln'`, `'Rasterize pages': 'Seiten in Bilder umwandeln'`, and the confirmation string above.
+- [x] **Step 3: German strings**: `'Rasterize': 'Zu Bild umwandeln'`, `'Rasterize pages': 'Seiten in Bilder umwandeln'`, and the confirmation string above.
 
-- [ ] **Step 4: `npm run typecheck` and `npm test` — green. Commit:**
+- [x] **Step 4: `npm run typecheck` and `npm test` — green. Commit:**
+
+  Note (builder): the render reuses Task 2's `scaleFor` clamp, so a large `dpi` argument cannot overshoot the browser's canvas limit either.
 
 ```bash
 git add src/store/commands.ts src/components/Ribbon.tsx src/locales/de/ui.ts

@@ -485,6 +485,14 @@ const DE: Record<string, string> = {
   'Quality': 'Qualität',
   'Save pages as PNG, JPEG, WebP or TIFF images': 'Seiten als PNG-, JPEG-, WebP- oder TIFF-Bilder speichern',
   'The resolution was reduced to {n} dpi: the browser limits the size of an image.': 'Die Auflösung wurde auf {n} dpi reduziert: Der Browser begrenzt die Größe eines Bildes.',
+
+  // rasterize pages (Convert › Rasterize)
+  Rasterize: 'Zu Bild umwandeln', 'Rasterize pages': 'Seiten in Bilder umwandeln',
+  'Turn the selected pages into images (text, fields and comments become part of the picture)': 'Die ausgewählten Seiten in Bilder umwandeln (Text, Felder und Kommentare werden Teil des Bildes)',
+  'Rasterize {n} page(s)? They become images: their text will no longer be selectable or searchable, and form fields on them are removed. Comments on those pages are burnt into the image.':
+    '{n} Seite(n) in Bilder umwandeln? Sie werden zu Bildern: Ihr Text ist danach nicht mehr auswählbar oder durchsuchbar, und Formularfelder auf ihnen werden entfernt. Kommentare auf diesen Seiten werden ins Bild eingebrannt.',
+  'Rasterizing…': 'Wird in Bilder umgewandelt…',
+  'Rasterized {n} page(s).': '{n} Seite(n) in Bilder umgewandelt.',
 };
 
 export default DE;
