@@ -22,6 +22,7 @@ import {
   PDFString,
 } from '@cantoo/pdf-lib';
 import { hexToRgbTuple } from './color';
+import { SIGN_MARK_NAMES } from './fillSign';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
@@ -234,7 +235,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('F', 4 | 8 | 16); // Print, NoZoom, NoRotate
       break;
     case 'stamp':
-      set('Name', a.name ?? (a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp'));
+      set('Name', a.kind ? SIGN_MARK_NAMES[a.kind] : (a.name ?? (a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp')));
       set('Rotate', a.rot ?? 0);
       if (a.appearance) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
@@ -257,6 +258,10 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const model: Record<string, unknown> = { ...rest, rect0: rect };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
+  if (a.type === 'stamp' && a.kind) {
+    // The /Name names the mark in other viewers; keep it so the round trip keeps it too.
+    model.name ??= SIGN_MARK_NAMES[a.kind];
+  }
   if (a.type === 'text') {
     // Kept only while it still shows the box (otherwise it is just dead weight).
     if (keepsAppearance(a)) model.appearance = 'pdf';
@@ -532,7 +537,8 @@ function fromStandard(dict: PDFDict, env: ParseEnv): Annotation | null {
       // Drawn in user space like page content: upright in the unrotated page (rot 0).
       const name = (dict.lookup(PDFName.of('Name')) as PDFName | undefined)?.decodeText();
       const label = b.subject || (name && /^[A-Za-z][A-Za-z0-9 ]*$/.test(name) ? name : '') || 'Stamp';
-      return { ...b, type: 'stamp', rect, rot: 0, label, name };
+      const kind = name === 'Checkmark' ? 'check' : name === 'Cross' ? 'cross' : undefined;
+      return { ...b, type: 'stamp', rect, rot: 0, label, name, ...(kind ? { kind } : {}) };
     }
     default:
       return null;
