@@ -61,6 +61,23 @@ describe('saving files pdf-lib would refuse', () => {
     expect((await PDFDocument.load(out)).getPage(0).getRotation().angle).toBe(90);
   });
 
+  it('adds Document Properties the XMP does not have yet, so PDF/A files stay consistent', async () => {
+    const { PDFName } = await import('@cantoo/pdf-lib');
+    const { saveDoc } = await import('../src/lib/pdfSave');
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    const xmp = '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/" pdfaid:part="2" pdfaid:conformance="B"/></rdf:RDF></x:xmpmeta>';
+    doc.catalog.set(PDFName.of('Metadata'), doc.context.register(doc.context.stream(xmp, { Type: 'Metadata', Subtype: 'XML' })));
+    doc.setTitle('Plan & <Budget>');
+    doc.setAuthor('Jo');
+    doc.setCreator('Writer');
+    const text = await streamText(await saveDoc(doc));
+    expect(text).toContain('<dc:title><rdf:Alt><rdf:li xml:lang="x-default">Plan &amp; &lt;Budget&gt;</rdf:li></rdf:Alt></dc:title>');
+    expect(text).toContain('<dc:creator><rdf:Seq><rdf:li>Jo</rdf:li></rdf:Seq></dc:creator>');
+    expect(text).toContain('<xmp:CreatorTool>Writer</xmp:CreatorTool>');
+    expect(text).toContain('pdfaid:part="2"');
+  });
+
   it('fills forms whose widgets have a broken appearance (/AP << /N 0 0 R >>)', async () => {
     const { PDFName, PDFRef } = await import('@cantoo/pdf-lib');
     const doc = await PDFDocument.create();

@@ -383,6 +383,8 @@ export interface AppearanceOptions {
   author?: string;
   /** A flattened copy has no editable comments left, so it gets no status annotations either. */
   flatten?: boolean;
+  /** false: no private model (/AwesomePDF…) is written, as after Sanitize removed hidden data. */
+  privateData?: boolean;
 }
 
 /** Another program's drawing (a one-page PDF, base64), embedded once per document. */

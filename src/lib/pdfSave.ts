@@ -294,9 +294,31 @@ export function syncXmp(doc: PDFDocument): void {
   simple('xmp:MetadataDate', date);
   simple('pdf:Producer', get('Producer'));
   simple('pdf:Keywords', get('Keywords'));
+  simple('xmp:CreatorTool', get('Creator'));
   list('dc:title', get('Title'));
   list('dc:creator', get('Author'));
   list('dc:description', get('Subject'));
+  // Properties the XMP does not have yet: added in a description of their own, so the
+  // two stay equivalent (PDF/A requires it).
+  const has = (name: string) => new RegExp(`<${name}[\\s>/]|\\s${name}\\s*=`).test(xml);
+  const add: string[] = [];
+  const addSimple = (name: string, value: string | undefined) => {
+    if (value && !has(name)) add.push(`<${name}>${xmlEscape(value)}</${name}>`);
+  };
+  const addList = (name: string, kind: 'Alt' | 'Seq', value: string | undefined) => {
+    if (value && !has(name)) add.push(`<${name}><rdf:${kind}><rdf:li${kind === 'Alt' ? ' xml:lang="x-default"' : ''}>${xmlEscape(value)}</rdf:li></rdf:${kind}></${name}>`);
+  };
+  addList('dc:title', 'Alt', get('Title'));
+  addList('dc:creator', 'Seq', get('Author'));
+  addList('dc:description', 'Alt', get('Subject'));
+  addSimple('pdf:Keywords', get('Keywords'));
+  addSimple('pdf:Producer', get('Producer'));
+  addSimple('xmp:CreatorTool', get('Creator'));
+  addSimple('xmp:ModifyDate', date);
+  if (add.length && /<\/rdf:RDF>/.test(xml)) {
+    const desc = `<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:pdf="http://ns.adobe.com/pdf/1.3/">${add.join('')}</rdf:Description>`;
+    xml = xml.replace(/<\/rdf:RDF>/, `${desc}</rdf:RDF>`);
+  }
   if (xml === before) return;
   const out = doc.context.stream(new TextEncoder().encode(xml), { Type: 'Metadata', Subtype: 'XML' });
   doc.context.assign(ref, out);

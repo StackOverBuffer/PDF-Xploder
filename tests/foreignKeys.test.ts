@@ -82,3 +82,25 @@ describe("other programs' annotations", () => {
     expect(Buffer.from(decodePDFRawStream(n).decode()).toString('latin1')).toMatch(/\/Ap\d+ Do/);
   });
 });
+
+describe('after Sanitize', () => {
+  it('saves comments with standard keys only, and Sanitize strips ours from the file', async () => {
+    const { sanitizeDocument } = await import('../src/lib/sanitize');
+    const doc = await PDFDocument.create();
+    doc.addPage([300, 300]);
+    const rect = { id: 'r1', type: 'rect', rect: { x: 10, y: 10, w: 50, h: 50 }, width: 2, color: '#ff0000', opacity: 1, author: 'Jo', createdAt: 0 } as never;
+    const hasPrivate = async (b: Uint8Array) => {
+      const d = await PDFDocument.load(b);
+      return (d.getPage(0).node.Annots()?.asArray() ?? []).some((r) => (d.context.lookup(r) as PDFDict).has(N('AwesomePDF')));
+    };
+    const withPrivate = await ops.exportWithAnnotations(await doc.save(), [[rect]]);
+    expect(await hasPrivate(withPrivate)).toBe(true);
+    const loaded = await PDFDocument.load(withPrivate);
+    const report = sanitizeDocument(loaded, { hiddenData: true });
+    expect(report.hiddenData).toBe(1);
+    expect(await hasPrivate(await loaded.save())).toBe(false);
+    const plain = await ops.exportWithAnnotations(await doc.save(), [[rect]], { privateData: false });
+    expect(await hasPrivate(plain)).toBe(false);
+    expect((await ops.importForEditing(plain)).annotations[0][0]).toMatchObject({ type: 'rect', author: 'Jo' });
+  });
+});

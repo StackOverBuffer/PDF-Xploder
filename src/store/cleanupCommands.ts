@@ -61,6 +61,15 @@ export async function sanitizeDocument(o: SanitizeOptions) {
   if (!requirePermission('modify') || !(await okToRewrite())) return;
   await S().run('Sanitizing…', async () => {
     const { bytes, report } = await sanitize(await load(S().bytes!), o);
+    // The comments being edited carry our private model (authors, marked text, original
+    // images) into the file on save: from now on they are saved with standard keys only.
+    if (o.hiddenData && S().privateData) {
+      const n = Object.values(S().annotations).reduce((k, l) => k + (l?.length ?? 0), 0);
+      if (n) {
+        report.hiddenData += n;
+        useStore.setState({ privateData: false, dirty: true });
+      }
+    }
     const removed = describeSanitize(report);
     const pdfA = report.keptForPdfA ? ` ${tr('The metadata was kept, because the file is PDF/A, which requires it.')}` : '';
     if (!removed) return S().notify(`${tr('Nothing to remove: the document has none of the chosen items.')}${pdfA}`);

@@ -137,6 +137,8 @@ interface State {
   securityChanged: boolean;
   /** Re-encrypt like the opened file on save (see reencryptLike). */
   keepEncryption: { password: string } | null;
+  /** false after Sanitize removed hidden data: saving writes no private annotation model. */
+  privateData: boolean;
   /** What the document's security allows in this session. */
   permissions: Permissions;
   /** Whether security settings may be changed (owner password known, or nothing restricted). */
@@ -341,6 +343,7 @@ const initialDoc = {
   security: null,
   securityChanged: false,
   keepEncryption: null,
+  privateData: true,
   permissions: ALL_PERMISSIONS,
   ownerAccess: true,
   lock: null,
@@ -595,6 +598,7 @@ export const useStore = create<Store>()((set, get) => {
       security,
       securityChanged: false,
       keepEncryption,
+      privateData: true,
       permissions,
       ownerAccess,
       lock,

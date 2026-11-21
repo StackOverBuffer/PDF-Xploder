@@ -37,7 +37,7 @@ async function withPageRendered<T>(page: number, scale: number, fn: (canvas: HTM
   let doc: PDFDocumentProxy = s.pdf!;
   let own = false;
   if (hasComments) {
-    doc = (await openPdf(await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author }), () => null)).pdf;
+    doc = (await openPdf(await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author, privateData: s.privateData }), () => null)).pdf;
     own = true;
   }
   try {

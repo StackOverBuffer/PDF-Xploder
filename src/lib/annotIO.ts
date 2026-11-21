@@ -173,6 +173,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const pdf = doc.context;
   const { ref, rect } = await buildAppearance(ctx, a, g, opts);
   const color = hexToRgbTuple(a.color);
+  const priv = opts.privateData !== false;
   const dict = pdf.obj({
     Type: 'Annot',
     Subtype: SUBTYPE[a.type],
@@ -231,7 +232,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('DA', PDFString.of(`/Helv ${a.fontSize} Tf ${color.map((v) => v.toFixed(3)).join(' ')} rg`));
       set('BS', { W: a.border ? 1 : 0 });
       set('Rotate', a.rot ?? 0);
-      if (keepsAppearance(a)) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
+      if (keepsAppearance(a) && priv) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'note':
       set('Name', 'Comment');
@@ -240,13 +241,13 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     case 'stamp':
       set('Name', a.kind ? SIGN_MARK_NAMES[a.kind] : (a.name ?? (a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp')));
       set('Rotate', a.rot ?? 0);
-      if (a.appearance) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
+      if (a.appearance && priv) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'image': {
       set('Name', a.signature ? 'Signature' : 'Image');
       set('Rotate', a.rot ?? 0);
       const { bytes } = dataUrlToBytes(a.src);
-      dict.set(PRIVATE_SRC, pdf.register(pdf.stream(bytes)));
+      if (priv) dict.set(PRIVATE_SRC, pdf.register(pdf.stream(bytes)));
       break;
     }
     case 'redact':
@@ -273,7 +274,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     if (keepsAppearance(a)) model.appearance = 'pdf';
     else delete model.appearance, delete model.appearanceOf;
   }
-  dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
+  if (priv) dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
   // A popup for the text (where it was placed here, open or closed as it is now): some

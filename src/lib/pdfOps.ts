@@ -391,6 +391,8 @@ export interface ExportOptions {
   burnRedactions?: boolean;
   /** The acting user, written as the /T of the review status annotations (see annotIO). */
   author?: string;
+  /** false: annotations get only standard keys, no private model (after Sanitize). */
+  privateData?: boolean;
 }
 
 /** Text drawn by an annotation, used to decide which fonts to embed. */
@@ -429,7 +431,7 @@ export async function exportWithAnnotations(
     for (const a of annotationsByPage[i] ?? []) {
       const flatten = opts.flatten || (opts.burnRedactions && a.type === 'redact');
       if (!flatten) {
-        await writeNativeAnnotation(ctx, page, g, a, { author: opts.author });
+        await writeNativeAnnotation(ctx, page, g, a, { author: opts.author, privateData: opts.privateData });
         continue;
       }
       if (a.type === 'redact' && !opts.burnRedactions) continue;
