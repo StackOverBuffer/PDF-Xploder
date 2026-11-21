@@ -101,6 +101,8 @@ const DE: Record<string, string> = {
   'Keep as initials': 'Als Paraphe behalten',
   'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichne oder tippe deine Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).',
   'The browser could not store the initials (storage full or disabled).': 'Der Browser konnte die Paraphe nicht speichern (Speicher voll oder deaktiviert).',
+  // dynamic stamps
+  'Approved (dynamic)': 'Genehmigt (dynamisch)', 'Reviewed (dynamic)': 'Geprüft (dynamisch)', 'Received (dynamic)': 'Eingegangen (dynamisch)',
   'Redaction marks are only previews. Use': 'Schwärzungsmarkierungen sind nur eine Vorschau. Mit', 'Protect → Apply redactions': 'Schützen → Schwärzung anwenden',
   'to permanently remove the content underneath.': 'wird der Inhalt darunter dauerhaft entfernt.',
   'Select an annotation to edit it, or pick a tool from the Comment tab.': 'Wählen Sie einen Kommentar zum Bearbeiten aus oder ein Werkzeug auf der Registerkarte „Anmerkungen“.',
