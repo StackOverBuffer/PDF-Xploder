@@ -131,6 +131,10 @@ function fieldsFor(type: string): Fields {
       return { color: true };
     case 'stamp':
       return { color: true, opacity: true, stamp: true };
+    case 'signCheck':
+    case 'signCross':
+      // The mark's own colour (its stroke width follows the rect size).
+      return { color: true, opacity: true };
     case 'image':
       return { opacity: true };
     default:
@@ -282,6 +286,7 @@ function Replies({ a, pageId }: { a: Annotation; pageId: string }) {
 const TOOL_NAMES: Record<string, string> = {
   highlight: 'Highlight', underline: 'Underline', strikeout: 'Strikeout', ink: 'Pencil', rect: 'Rectangle', ellipse: 'Ellipse',
   line: 'Line', arrow: 'Arrow', polygon: 'Polygon', polyline: 'Polyline', cloud: 'Cloud', text: 'Text box', note: 'Sticky note', stamp: 'Stamp', redact: 'Redact', sign: 'Signature', fieldText: 'Text field', fieldCheckbox: 'Check box', fieldDropdown: 'Dropdown', fieldList: 'List box', fieldRadio: 'Radio button',
+  signCheck: 'Check', signCross: 'Cross', signDate: 'Date', signInitials: 'Initials',
 };
 
 const TOOL_HINTS: Record<string, string> = {

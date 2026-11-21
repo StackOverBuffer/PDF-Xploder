@@ -96,6 +96,11 @@ const DE: Record<string, string> = {
   'Changes are made to the page itself (not as comments) and can be undone with Ctrl+Z.':
     'Die Änderungen erfolgen direkt im Seiteninhalt (nicht als Kommentare) und können mit Strg+Z rückgängig gemacht werden.',
   'Stamp text': 'Stempeltext', Border: 'Rahmen', Note: 'Notiz', 'Type your note…': 'Notiz eingeben…', 'Comment text': 'Kommentar', 'Add a comment…': 'Kommentar hinzufügen…',
+  // fill & sign (Comment tab)
+  'Fill & Sign': 'Ausfüllen & Signieren', Check: 'Häkchen', Cross: 'Kreuz', Date: 'Datum', Initials: 'Paraphe',
+  'Keep as initials': 'Als Paraphe behalten',
+  'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichne oder tippe deine Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).',
+  'The browser could not store the initials (storage full or disabled).': 'Der Browser konnte die Paraphe nicht speichern (Speicher voll oder deaktiviert).',
   'Redaction marks are only previews. Use': 'Schwärzungsmarkierungen sind nur eine Vorschau. Mit', 'Protect → Apply redactions': 'Schützen → Schwärzung anwenden',
   'to permanently remove the content underneath.': 'wird der Inhalt darunter dauerhaft entfernt.',
   'Select an annotation to edit it, or pick a tool from the Comment tab.': 'Wählen Sie einen Kommentar zum Bearbeiten aus oder ein Werkzeug auf der Registerkarte „Anmerkungen“.',
@@ -108,6 +113,7 @@ const DE: Record<string, string> = {
   'Rectangle tool': 'Werkzeug Rechteck', 'Ellipse tool': 'Werkzeug Ellipse', 'Line tool': 'Werkzeug Linie', 'Arrow tool': 'Werkzeug Pfeil',
   'Polygon tool': 'Werkzeug Vieleck', 'Polyline tool': 'Werkzeug Linienzug', 'Cloud tool': 'Werkzeug Wolke', 'Text box tool': 'Werkzeug Textfeld',
   'Sticky note tool': 'Werkzeug Notiz', 'Stamp tool': 'Werkzeug Stempel', 'Redact tool': 'Werkzeug Schwärzen', 'Signature tool': 'Werkzeug Unterschrift',
+  'Check tool': 'Werkzeug Häkchen', 'Cross tool': 'Werkzeug Kreuz', 'Date tool': 'Werkzeug Datum', 'Initials tool': 'Werkzeug Paraphe',
   'Text field tool': 'Werkzeug Textfeld (Formular)', 'Check box tool': 'Werkzeug Kontrollkästchen', 'Dropdown tool': 'Werkzeug Kombinationsfeld', 'List box tool': 'Werkzeug Listenfeld',
   'Radio button tool': 'Werkzeug Optionsfeld',
   'Select text on the page to highlight it.': 'Markieren Sie Text auf der Seite, um ihn hervorzuheben.',

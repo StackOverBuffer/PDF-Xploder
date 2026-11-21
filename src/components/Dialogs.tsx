@@ -6,7 +6,7 @@ import { uid, useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
-import { fixAccessibility, runAccessibilityCheck, summarizeComments } from '../store/extras';
+import { fixAccessibility, runAccessibilityCheck, saveInitials, summarizeComments } from '../store/extras';
 import type { CheckResult } from '../lib/accessibility';
 import { tf, tr, useLang, useT } from '../lib/i18n';
 import type { SignPlacement } from './SecurityDialogs';
@@ -263,6 +263,8 @@ function SignatureDialog({ close }: { close: () => void }) {
   const [font, setFont] = useState(SIG_FONTS[0]);
   const [color, setColor] = useState('#0d47a1');
   const [upload, setUpload] = useState<string | null>(null);
+  /** Keep the cropped image for the Initials tool. */
+  const [keepInitials, setKeepInitials] = useState(true);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   /** The box the strokes cover, kept while drawing (canvas pixels). */
@@ -335,6 +337,8 @@ function SignatureDialog({ close }: { close: () => void }) {
       }
       if (mode === 'upload' && upload) img = await cmd.normaliseImage(upload);
       if (!img) return useStore.getState().notify(t(mode === 'type' ? 'Type your name first.' : mode === 'draw' ? 'Draw your signature first.' : 'Choose an image first.'), 'error');
+      // The cropped image, as measured here, kept for the Initials tool.
+      if (keepInitials) saveInitials(img);
       close();
       // About 1/4 of the canvas pixels (a typed name is ~150 pt wide), at most 220 × 90 pt.
       const k = Math.min(1, 220 / (img.width / 4), 90 / (img.height / 4)) / 4;
@@ -380,6 +384,7 @@ function SignatureDialog({ close }: { close: () => void }) {
         </div>
       )}
       <p className="muted small">{t('This places an image of your signature. For a certificate-based digital signature use Protect → Sign.')}</p>
+      <label className="row"><input type="checkbox" checked={keepInitials} onChange={(e) => setKeepInitials(e.target.checked)} /> <span>{t('Keep as initials')}</span></label>
     </Modal>
   );
 }

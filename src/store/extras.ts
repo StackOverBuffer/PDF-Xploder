@@ -303,3 +303,33 @@ export async function fixAccessibility(fix: FixId): Promise<boolean> {
   await S().run('Updating document…', async () => S().commitBytes(await applyAccessibilityFix(S().bytes!, fix, value)));
   return true;
 }
+
+// ---------------------------------------------------------------- initials
+
+/** The initials image the Signature dialog keeps ("Keep as initials"): the cropped picture as it was made there. */
+export interface InitialsImage {
+  src: string;
+  width: number;
+  height: number;
+}
+
+const INITIALS_KEY = 'awesome-pdf.initials';
+
+/** The saved initials image, for the Initials tool to place, or null when there is none. */
+export function savedInitials(): InitialsImage | null {
+  try {
+    const img = JSON.parse(localStorage.getItem(INITIALS_KEY) || 'null') as InitialsImage | null;
+    return img && typeof img.src === 'string' && img.src ? img : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep the signature dialog's cropped image for reuse; it measures nothing itself. */
+export function saveInitials(img: InitialsImage) {
+  try {
+    localStorage.setItem(INITIALS_KEY, JSON.stringify(img));
+  } catch {
+    S().notify(tr('The browser could not store the initials (storage full or disabled).'), 'error');
+  }
+}
