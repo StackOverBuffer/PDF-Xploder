@@ -13,7 +13,7 @@ import { stampViewSize, usePendingStamp } from '../store/contentActions';
 import { viewSize } from '../lib/geometry';
 import type { NewFieldKind } from '../lib/forms';
 import { useLang, useT } from '../lib/i18n';
-import { formatSignedDate } from '../lib/fillSign';
+import { formatSignedDate, materializeStampLabel } from '../lib/fillSign';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 import { useAppearanceImage } from '../lib/appearanceImage';
 import { keepsAppearance } from '../lib/foreignAppearance';
@@ -308,7 +308,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
         store.addAnnotation(index, { ...base(tool), type: 'redact', rect });
         break;
       case 'stamp':
-        store.addAnnotation(index, { ...base(tool), type: 'stamp', rect, rot: geom.rotation, label: st.stampLabel || 'Approved' });
+        // A dynamic label fills in author and date at placement time (never in a selector:
+        // two stamps placed apart must show two different dates).
+        store.addAnnotation(index, { ...base(tool), type: 'stamp', rect, rot: geom.rotation, label: materializeStampLabel(st.stampLabel || 'Approved', useStore.getState().author, useLang.getState().lang) });
         break;
       case 'text': {
         const a: Annotation = { ...base(tool), type: 'text', rect, rot: geom.rotation, text: '', fontSize: st.fontSize, border: false };
@@ -558,7 +560,7 @@ function StampPreview({ at, scale: S, pending, geom }: { at: Pt; scale: number; 
   // Same drawing as a placed stamp (see AnnotShape), at the default size.
   const st = styleFor('stamp');
   const [w, h] = [160, 50];
-  const label = (st.stampLabel || 'Approved').toUpperCase();
+  const label = materializeStampLabel(st.stampLabel || 'Approved', useStore.getState().author, useLang.getState().lang).toUpperCase();
   let size = h * 0.55;
   const est = label.length * size * 0.68;
   if (est > w * 0.9) size *= (w * 0.9) / est;
