@@ -136,3 +136,38 @@ it('keeps a multi-line comment inside its list item, whatever it contains', () =
   expect(blocks).toEqual(['heading', 'heading', 'list', 'heading', 'list']);
   expect(md).toContain('https\\:');
 });
+
+it('keeps who set each review status and when, through a save by someone else', async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 200]);
+  const parent = doc.context.register(doc.context.obj({
+    Type: 'Annot', Subtype: 'Text', Rect: [10, 10, 30, 30], Contents: PDFHexString.fromText('the comment'),
+    NM: PDFHexString.fromText('c1'), T: PDFHexString.fromText('Bob'), F: 4, M: PDFString.fromDate(new Date(0)),
+  }));
+  const st = (state: string, who: string, at: number) => doc.context.register(doc.context.obj({
+    Type: 'Annot', Subtype: 'Text', IRT: parent, RT: 'R', State: state, StateModel: 'Review',
+    NM: PDFHexString.fromText(`s-${who}`), T: PDFHexString.fromText(who), F: 4, M: PDFString.fromDate(new Date(at)),
+  }));
+  // Listed newest first: the newest by date is the status, not the last listed.
+  page.node.set(PDFName.of('Annots'), doc.context.obj([parent, st('Completed', 'Dan', 2_000_000), st('Accepted', 'Alice', 1_000_000)]));
+  const res = await importAnnotations(doc, [g], () => 'x');
+  const a = res.annotations[0][0];
+  expect(a.status).toBe('Completed');
+  expect(a.statusLog?.map((e) => [e.state, e.author, e.at])).toEqual([['Accepted', 'Alice', 1_000_000], ['Completed', 'Dan', 2_000_000]]);
+
+  // Carol saves without touching the status: both changes are written as they were.
+  const out = await PDFDocument.create();
+  out.addPage([300, 200]);
+  await writeNativeAnnotation(await drawContext(out), out.getPages()[0], g, a, { author: 'Carol' });
+  const back = (await importAnnotations(await PDFDocument.load(await out.save()), [g], () => 'y')).annotations[0][0];
+  expect(back.statusLog?.map((e) => [e.state, e.author, e.at])).toEqual([['Accepted', 'Alice', 1_000_000], ['Completed', 'Dan', 2_000_000]]);
+  expect(back.status).toBe('Completed');
+});
+
+it('adds a status set in this session as a new change by the current author', async () => {
+  const { setStatus } = await import('../src/lib/reviewStatus');
+  const a = note({ status: 'Accepted', statusLog: [{ id: 's1', state: 'Accepted', author: 'Alice', at: 1000 }] });
+  const next = { ...a, ...setStatus(a, 'Rejected', 'Carol', 5000) };
+  expect(next.statusLog).toEqual([{ id: 's1', state: 'Accepted', author: 'Alice', at: 1000 }, { id: 'state-n1-1', state: 'Rejected', author: 'Carol', at: 5000 }]);
+  expect(setStatus(a, 'Accepted', 'Carol').statusLog).toBe(a.statusLog);
+});

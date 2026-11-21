@@ -26,7 +26,8 @@ import { SIGN_MARK_NAMES } from './fillSign';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
-import type { Annotation, PageGeom, Pt, Rect, Reply, ReviewStatus } from './types';
+import type { Annotation, PageGeom, Pt, Rect, Reply, StatusEntry } from './types';
+import { statusHistory } from './reviewStatus';
 import { textString } from './pdfStrings';
 
 const PRIVATE = PDFName.of('AwesomePDF');
@@ -255,7 +256,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
 
   // Replies are separate annotations (below), read back from there; the status becomes
   // a standard review state annotation, so it is kept out of the private model too.
-  const { replies, status, ...rest } = a;
+  const { replies, status, statusLog, ...rest } = a;
   const model: Record<string, unknown> = { ...rest, rect0: rect };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
@@ -293,10 +294,14 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   }
   // The review status, as Acrobat stores it: a /State reply annotation under StateModel
   // 'Review', so other editors keep it too. Read back from there on import.
-  if (status && !opts.flatten) {
-    const at = noteCorner(g, rect);
-    const icon = await buildAppearance(ctx, { id: `state-${a.id}`, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: opts.author ?? a.author, createdAt: Date.now() }, g, opts);
-    page.node.addAnnot(pdf.register(stateDict(pdf, a, annotRef, icon, opts)));
+  // Each change keeps who made it and when; only a change made in this session gets
+  // the current author and time.
+  if (!opts.flatten) {
+    for (const e of statusHistory({ id: a.id, status, statusLog }, opts.author ?? a.author, Date.now())) {
+      const at = noteCorner(g, rect);
+      const icon = await buildAppearance(ctx, { id: e.id, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: e.author, createdAt: e.at }, g, opts);
+      page.node.addAnnot(pdf.register(stateDict(pdf, e, annotRef, icon)));
+    }
   }
 }
 
@@ -333,7 +338,7 @@ function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, icon: 
  * The review status as other editors write it: a reply that carries /State and
  * /StateModel 'Review' instead of text. It says nothing by itself, so it has no Contents.
  */
-function stateDict(pdf: PDFDocument['context'], a: Annotation, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }, opts: AppearanceOptions): PDFDict {
+function stateDict(pdf: PDFDocument['context'], e: StatusEntry, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }): PDFDict {
   const { rect } = icon;
   return pdf.obj({
     Type: 'Annot',
@@ -342,11 +347,12 @@ function stateDict(pdf: PDFDocument['context'], a: Annotation, parent: PDFRef, i
     AP: { N: icon.ref },
     IRT: parent,
     RT: 'R',
-    State: a.status,
+    State: e.state,
     StateModel: 'Review',
-    NM: PDFHexString.fromText(`state-${a.id}`),
-    T: PDFHexString.fromText(opts.author ?? a.author),
-    M: PDFString.fromDate(new Date()),
+    NM: PDFHexString.fromText(e.id),
+    T: PDFHexString.fromText(e.author),
+    CreationDate: PDFString.fromDate(new Date(e.at)),
+    M: PDFString.fromDate(new Date(e.at)),
     Name: 'Comment',
     F: 4 | 8 | 16, // Print, NoZoom, NoRotate
     C: [1, 0.93, 0.35],
@@ -430,6 +436,7 @@ function fromPrivate(dict: PDFDict): Annotation | null {
   const subject = text(dict.lookup(PDFName.of('Subj')));
   if (subject) a.subject = subject;
   delete a.replies;
+  delete a.statusLog;
   return a;
 }
 
@@ -649,9 +656,10 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
       const state = nameOrText(dict.lookup(PDFName.of('State')));
       const model = nameOrText(dict.lookup(PDFName.of('StateModel')));
       if (state && model === 'Review') {
-        if (root) {
-          if (state === 'None') delete root.status;
-          else if (REVIEW_STATES.includes(state)) root.status = state as ReviewStatus;
+        if (root && (state === 'None' || REVIEW_STATES.includes(state))) {
+          const b = base(dict, env);
+          const at = parsePdfDate(text(dict.lookup(PDFName.of('M'))) ?? text(dict.lookup(PDFName.of('CreationDate')))) ?? b.createdAt;
+          (root.statusLog ??= []).push({ id: b.id, state: state as StatusEntry['state'], author: b.author, at });
         }
         // An orphaned state says nothing: it is consumed either way.
         remove.add(entry as PDFRef);
@@ -670,7 +678,16 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
       const popup = dict.get(PDFName.of('Popup'));
       if (popup instanceof PDFRef) remove.add(popup);
     }
-    for (const a of out) a.replies?.sort((x, y) => x.createdAt - y.createdAt);
+    for (const a of out) {
+      a.replies?.sort((x, y) => x.createdAt - y.createdAt);
+      // The newest change is the current status (a stable sort keeps file order on ties).
+      if (a.statusLog) {
+        a.statusLog.sort((x, y) => x.at - y.at);
+        const last = a.statusLog[a.statusLog.length - 1].state;
+        if (last === 'None') delete a.status;
+        else a.status = last;
+      }
+    }
     if (!remove.size) continue;
     const kept = annots.asArray().filter((e) => !remove.has(e as PDFRef));
     if (kept.length) page.node.set(PDFName.of('Annots'), doc.context.obj(kept));

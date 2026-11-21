@@ -8,6 +8,7 @@ import { tf, useT } from '../lib/i18n';
 import { hasPopup } from '../lib/popups';
 import { setPopupOpen } from '../store/popups';
 import type { ReviewStatus } from '../lib/types';
+import { setStatus } from '../lib/reviewStatus';
 
 const STATUSES: ReviewStatus[] = ['Accepted', 'Rejected', 'Cancelled', 'Completed', 'Reopened'];
 
@@ -86,7 +87,10 @@ export function CommentsPanel() {
                         value={a.status ?? ''}
                         title={t('Review status')}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => useStore.getState().updateAnnotation(pid, a.id, { status: (e.target.value || undefined) as ReviewStatus | undefined })}
+                        onChange={(e) => {
+                          const st = useStore.getState();
+                          st.updateAnnotation(pid, a.id, setStatus(a, (e.target.value || undefined) as ReviewStatus | undefined, st.author));
+                        }}
                       >
                         <option value="">{t('Not reviewed')}</option>
                         {STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
