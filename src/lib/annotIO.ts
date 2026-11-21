@@ -27,6 +27,7 @@ import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
 import type { Annotation, PageGeom, Pt, Rect, Reply, ReviewStatus } from './types';
+import { textString } from './pdfStrings';
 
 const PRIVATE = PDFName.of('AwesomePDF');
 const PRIVATE_SRC = PDFName.of('AwesomePDFSrc');
@@ -136,11 +137,11 @@ const SUBTYPE: Record<Annotation['type'], string> = {
 function writeMeasure(dict: PDFDict, m: Measure, pdf: PDFDocument['context']) {
   const it = m.kind === 'distance' ? 'LineDimension' : m.kind === 'perimeter' ? 'PolyLineDimension' : 'PolygonDimension';
   dict.set(PDFName.of('IT'), PDFName.of(it));
-  const fmt = (unit: string, c: number) => pdf.obj({ Type: 'NumberFormat', U: PDFString.of(unit), C: c, D: 100, F: 'D' });
+  const fmt = (unit: string, c: number) => pdf.obj({ Type: 'NumberFormat', U: textString(unit), C: c, D: 100, F: 'D' });
   const measure = pdf.obj({
     Type: 'Measure',
     Subtype: 'RL',
-    R: PDFString.of(m.scale.label),
+    R: textString(m.scale.label),
     X: [fmt(m.scale.unit, m.scale.perPoint)],
     D: [fmt(m.scale.unit, 1)],
     A: [fmt(`${m.scale.unit}²`, 1)],

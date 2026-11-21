@@ -3,12 +3,13 @@
  * the bundled Noto fonts (any script), Courier for code, clickable links,
  * bookmarks for the headings and links to them (#anchor) that work.
  */
-import { PDFArray, PDFDocument, PDFName, PDFNull, PDFNumber, PDFString, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDocument, PDFName, PDFNull, PDFNumber, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
 import { createTextEngine } from './fonts';
 import type { TextEngine } from './appearance';
 import { inlineText, parseMarkdown, slug, type Align, type Block, type Inline } from './markdown';
 import { setOutline, type OutlineNode } from './outline';
 import { saveDoc } from './pdfSave';
+import { asciiString } from './pdfStrings';
 
 export interface TextPdfOptions {
   /** Page size in points (default A4 portrait). */
@@ -646,7 +647,7 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
       if (!a) continue;
       target = { Dest: [wr.pages[a.page].ref, PDFName.of('XYZ'), PDFNull, PDFNumber.of(a.y), PDFNull] };
     } else if (/^(https?|mailto|ftp|tel):/i.test(l.href)) {
-      target = { A: { Type: 'Action', S: 'URI', URI: PDFString.of(l.href) } };
+      target = { A: { Type: 'Action', S: 'URI', URI: asciiString(l.href) } };
     } else continue; // Relative links have nothing to point to in a PDF.
     const page = wr.pages[l.page];
     const ref = doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], F: 4, ...target }));

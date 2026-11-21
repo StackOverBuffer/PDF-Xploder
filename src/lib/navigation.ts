@@ -1,8 +1,9 @@
 /** Bookmarks (document outline) and link annotations. */
-import { PDFArray, PDFDict, PDFName, PDFNull, PDFNumber, PDFRef, PDFString } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFName, PDFNull, PDFNumber, PDFRef } from '@cantoo/pdf-lib';
 import { load } from './pdfOps';
 import type { Rect } from './types';
 import { saveDoc } from './pdfSave';
+import { asciiString, textString } from './pdfStrings';
 
 export type LinkTarget = { page: number; y?: number } | { url: string };
 
@@ -27,7 +28,7 @@ export async function addBookmark(bytes: Uint8Array, title: string, page: number
     outlinesRef = ctx.register(root);
     doc.catalog.set(PDFName.of('Outlines'), outlinesRef);
   }
-  const item = ctx.obj({ Title: PDFString.of(title), Parent: outlinesRef, Dest: destination(doc, page, y) });
+  const item = ctx.obj({ Title: textString(title), Parent: outlinesRef, Dest: destination(doc, page, y) });
   const itemRef = ctx.register(item);
   const lastRef = root.get(PDFName.of('Last'));
   const last = root.lookup(PDFName.of('Last'));
@@ -58,7 +59,7 @@ export async function addLink(bytes: Uint8Array, page: number, rect: Rect, targe
     F: 4,
     P: p.ref,
   });
-  if ('url' in target) annot.set(PDFName.of('A'), ctx.obj({ S: 'URI', URI: PDFString.of(target.url) }));
+  if ('url' in target) annot.set(PDFName.of('A'), ctx.obj({ S: 'URI', URI: asciiString(target.url) }));
   else annot.set(PDFName.of('Dest'), destination(doc, target.page, target.y));
   const ref = ctx.register(annot);
   const annots = p.node.lookup(PDFName.of('Annots'));
