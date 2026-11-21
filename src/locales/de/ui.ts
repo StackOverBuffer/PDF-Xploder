@@ -28,6 +28,10 @@ const DE: Record<string, string> = {
   'Burn all annotations into the page content': 'Alle Kommentare fest in den Seiteninhalt einbetten', 'Flatten all': 'Alle reduzieren',
   'No comments yet. Use the Comment tab to highlight, draw, or add notes.':
     'Noch keine Kommentare. Verwenden Sie die Registerkarte „Anmerkungen“, um Text hervorzuheben, zu zeichnen oder Notizen hinzuzufügen.',
+  // review status of a comment (comments pane, summary)
+  Accepted: 'Angenommen', Rejected: 'Abgelehnt', Cancelled: 'Zurückgezogen', Completed: 'Erledigt', Reopened: 'Wieder geöffnet',
+  'Not reviewed': 'Nicht geprüft', 'Review status': 'Prüfstatus', All: 'Alle',
+  'Show only comments with this review status': 'Nur Kommentare mit diesem Prüfstatus anzeigen',
   'Find text…': 'Text suchen…', 'Match case': 'Groß/Klein beachten', 'Highlight all matches': 'Alle Treffer hervorheben', 'Searching…': 'Suche läuft…',
   '{n} match(es)': '{n} Treffer', '{i} of {n}': '{i} von {n}', 'Highlighted {n} match(es).': '{n} Treffer hervorgehoben.',
   'Drag a box on the page for a visible signature': 'Ziehen Sie auf der Seite einen Rahmen für eine sichtbare Signatur auf', 'Sign…': 'Signieren…',

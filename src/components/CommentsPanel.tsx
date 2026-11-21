@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import { ANNOT_LABELS, annotSummary } from '../lib/annotGeom';
@@ -6,6 +7,9 @@ import { flattenAnnotations } from '../store/commands';
 import { tf, useT } from '../lib/i18n';
 import { hasPopup } from '../lib/popups';
 import { setPopupOpen } from '../store/popups';
+import type { ReviewStatus } from '../lib/types';
+
+const STATUSES: ReviewStatus[] = ['Accepted', 'Rejected', 'Cancelled', 'Completed', 'Reopened'];
 
 export function CommentsPanel() {
   const t = useT();
@@ -16,17 +20,30 @@ export function CommentsPanel() {
   const editable = useCan('annotate');
   const canFlatten = useCan('modify');
   const total = pageIds.reduce((n, id) => n + (annotations[id]?.length ?? 0), 0);
+  // '' = every comment, 'none' = the ones without a review status.
+  const [filter, setFilter] = useState<'' | ReviewStatus | 'none'>('');
+  const matches = (a: { status?: ReviewStatus }) => filter === '' || (filter === 'none' ? !a.status : a.status === filter);
 
   return (
     <div className="panel">
       <div className="panel-title">
         {t('Comments')} <span className="muted">({total})</span>
+        <select
+          className="status-filter"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as '' | ReviewStatus | 'none')}
+          title={t('Show only comments with this review status')}
+        >
+          <option value="">{t('All')}</option>
+          <option value="none">{t('Not reviewed')}</option>
+          {STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+        </select>
         <button className="small-btn" disabled={!canFlatten || !total} onClick={flattenAnnotations} title={t('Burn all annotations into the page content')}>{t('Flatten all')}</button>
       </div>
       {total === 0 && <p className="muted pad">{t('No comments yet. Use the Comment tab to highlight, draw, or add notes.')}</p>}
       <div className="comment-list">
         {pageIds.map((pid, i) => {
-          const list = annotations[pid] ?? [];
+          const list = (annotations[pid] ?? []).filter(matches);
           if (!list.length) return null;
           return (
             <div key={pid}>
@@ -62,6 +79,18 @@ export function CommentsPanel() {
                         </div>
                       ))}
                     </div>
+                    {editable && (
+                      <select
+                        className="small-btn status-select"
+                        value={a.status ?? ''}
+                        title={t('Review status')}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => useStore.getState().updateAnnotation(pid, a.id, { status: (e.target.value || undefined) as ReviewStatus | undefined })}
+                      >
+                        <option value="">{t('Not reviewed')}</option>
+                        {STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
+                      </select>
+                    )}
                     {editable && (
                       <button className="icon-btn" title={t('Delete')} onClick={(e) => { e.stopPropagation(); useStore.getState().deleteAnnotation(pid, a.id); }}>
                         <Trash2 size={14} />
