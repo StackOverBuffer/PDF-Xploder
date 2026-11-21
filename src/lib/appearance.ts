@@ -378,6 +378,10 @@ function viewLine(c: Canvas, frame: PageGeom, a: Pt, b: Pt, color: string, width
 export interface AppearanceOptions {
   /** Draw redaction marks as solid black (when applying them) instead of as a preview outline. */
   burnRedactions?: boolean;
+  /** The acting user, written as the /T of the review status annotation (see annotIO). */
+  author?: string;
+  /** A flattened copy has no editable comments left, so it gets no status annotations either. */
+  flatten?: boolean;
 }
 
 /** Another program's drawing (a one-page PDF, base64), embedded once per document. */
