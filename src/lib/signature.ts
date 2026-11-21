@@ -278,11 +278,11 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
   acroDict.set(PDFName.of('SigFlags'), PDFNumber.of(3));
 
   const update = await doc.saveIncremental(snapshot, { useObjectStreams: false });
-  const sep = bytes[bytes.length - 1] === 0x0a ? new Uint8Array(0) : new Uint8Array([0x0a]);
-  const out = new Uint8Array(bytes.length + sep.length + update.length);
+  // The update starts with its own line break, and its offsets count from the end of
+  // `bytes`: nothing may go in between (an extra newline put every xref entry 1 byte off).
+  const out = new Uint8Array(bytes.length + update.length);
   out.set(bytes, 0);
-  out.set(sep, bytes.length);
-  out.set(update, bytes.length + sep.length);
+  out.set(update, bytes.length);
 
   // Locate the placeholders in the update and fill in the byte range.
   const tailStart = bytes.length;
