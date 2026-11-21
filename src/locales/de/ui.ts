@@ -164,6 +164,7 @@ const DE: Record<string, string> = {
   'the document’s security settings do not allow filling in forms': 'die Sicherheitseinstellungen des Dokuments erlauben kein Ausfüllen von Formularen',
   '{name}: cannot be filled in because {reasons}.': '{name}: kann nicht ausgefüllt werden, da {reasons}.',
   'Open this link in a new tab?': 'Diesen Link in einem neuen Tab öffnen?',
+  'This file claims PDF/A-1, which does not allow transparency: its highlights and see-through comments make it fail PDF/A-1 validation.': 'Diese Datei gibt an, PDF/A-1 zu sein, das keine Transparenz erlaubt: Ihre Hervorhebungen und durchscheinenden Kommentare lassen die PDF/A-1-Prüfung scheitern.',
   'This link is not opened: only web, e-mail and phone addresses are.': 'Dieser Link wird nicht geöffnet: Nur Web-, E-Mail- und Telefonadressen werden geöffnet.', 'Go to destination': 'Zum Ziel springen',
   locked: 'gesperrt', 'read-only': 'schreibgeschützt', required: 'erforderlich', 'Double-click to edit': 'Zum Bearbeiten doppelklicken',
 

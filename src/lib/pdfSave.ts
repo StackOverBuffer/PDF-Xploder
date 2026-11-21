@@ -6,6 +6,11 @@
  */
 import { decodePDFRawStream, PDFArray, PDFDict, PDFHexString, PDFName, PDFNull, PDFRawStream, PDFRef, PDFStream, PDFString, type PDFDocument, type PDFObject } from '@cantoo/pdf-lib';
 
+/** The object if it has the expected type: broken files never make these lookups throw. */
+const dictOf = (o: unknown) => (o instanceof PDFDict ? o : undefined);
+const arrayOf = (o: unknown) => (o instanceof PDFArray ? o : undefined);
+
+
 /** Delete indirect objects that cannot be reached from the trailer. Returns how many were removed. */
 export function pruneUnreachable(doc: PDFDocument): number {
   const ctx = doc.context;
@@ -117,7 +122,7 @@ export function cutLostPageRefs(doc: PDFDocument): number {
       dict.delete(PDFName.of('Dest'));
       cleared = true;
     }
-    const action = dict.lookupMaybe(PDFName.of('A'), PDFDict);
+    const action = dictOf(dict.lookup(PDFName.of('A')));
     if (action && deadDest(action.get(PDFName.of('D')))) {
       dict.delete(PDFName.of('A'));
       cleared = true;
@@ -138,7 +143,7 @@ export function cutLostPageRefs(doc: PDFDocument): number {
   // Form fields whose widgets were on those pages: the widgets go, and a field left
   // without any goes too, so its value does not stay in the form data of the file.
   const onPages = new Set<PDFObject>();
-  for (const leaf of leaves) for (const a of leaf.lookupMaybe(PDFName.of('Annots'), PDFArray)?.asArray() ?? []) onPages.add(ctx.lookup(a) ?? a);
+  for (const leaf of leaves) for (const a of arrayOf(leaf.lookup(PDFName.of('Annots')))?.asArray() ?? []) onPages.add(ctx.lookup(a) ?? a);
   const gone = (w: PDFDict) => {
     if (onPages.has(w)) return false;
     if (orphaned.has(w)) return true;
@@ -158,7 +163,7 @@ export function cutLostPageRefs(doc: PDFDocument): number {
     field.set(PDFName.of('Kids'), ctx.obj(kept));
     return kept.length === 0;
   };
-  const form = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  const form = dictOf(doc.catalog.lookup(PDFName.of('AcroForm')));
   const fields = form?.lookup(PDFName.of('Fields'));
   if (fields instanceof PDFArray) {
     const kept = fields.asArray().filter((f) => {
@@ -167,19 +172,24 @@ export function cutLostPageRefs(doc: PDFDocument): number {
     });
     if (kept.length !== fields.size()) form!.set(PDFName.of('Fields'), ctx.obj(kept));
   }
-  const outlines = doc.catalog.lookupMaybe(PDFName.of('Outlines'), PDFDict);
+  // Wrong types (fuzzed or broken files) are skipped, never thrown on.
+  const dictAt = (d: PDFDict | undefined, key: string) => {
+    const v = d?.lookup(PDFName.of(key));
+    return v instanceof PDFDict ? v : undefined;
+  };
   const walk = (item: PDFDict | undefined, depth: number) => {
     const visited = new Set<PDFDict>();
     while (item && !visited.has(item) && depth < 64) {
       visited.add(item);
       clearDest(item);
-      walk(item.lookupMaybe(PDFName.of('First'), PDFDict), depth + 1);
-      item = item.lookupMaybe(PDFName.of('Next'), PDFDict);
+      walk(dictAt(item, 'First'), depth + 1);
+      item = dictAt(item, 'Next');
     }
   };
-  walk(outlines?.lookupMaybe(PDFName.of('First'), PDFDict), 0);
+  walk(dictAt(dictAt(doc.catalog, 'Outlines'), 'First'), 0);
   const open = doc.catalog.get(PDFName.of('OpenAction'));
-  if (deadDest(open) || (open !== undefined && deadDest(ctx.lookupMaybe(open, PDFDict)?.get(PDFName.of('D'))))) doc.catalog.delete(PDFName.of('OpenAction'));
+  const action = dictAt(doc.catalog, 'OpenAction');
+  if (deadDest(open) || (action && deadDest(action.get(PDFName.of('D'))))) doc.catalog.delete(PDFName.of('OpenAction'));
   return cut;
 }
 
@@ -193,11 +203,11 @@ export function cutLostPageRefs(doc: PDFDocument): number {
  */
 export function fillFormResources(doc: PDFDocument) {
   const ctx = doc.context;
-  const form = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  const form = dictOf(doc.catalog.lookup(PDFName.of('AcroForm')));
   const fields = form?.lookup(PDFName.of('Fields'));
   if (!form || !(fields instanceof PDFArray) || !fields.size()) return;
-  let dr = form.lookupMaybe(PDFName.of('DR'), PDFDict);
-  let fonts = dr?.lookupMaybe(PDFName.of('Font'), PDFDict);
+  let dr = dictOf(form.lookup(PDFName.of('DR')));
+  let fonts = dictOf(dr?.lookup(PDFName.of('Font')));
   const ensureFonts = () => {
     if (!dr) {
       dr = ctx.obj({}) as PDFDict;
@@ -211,10 +221,10 @@ export function fillFormResources(doc: PDFDocument) {
   };
   const helvetica = () => ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica', Encoding: 'WinAnsiEncoding' }));
   const fontOfAppearance = (widget: PDFDict, name: PDFName): PDFObject | undefined => {
-    const n = widget.lookupMaybe(PDFName.of('AP'), PDFDict)?.lookup(PDFName.of('N'));
+    const n = dictOf(widget.lookup(PDFName.of('AP')))?.lookup(PDFName.of('N'));
     const streams = n instanceof PDFStream ? [n] : n instanceof PDFDict ? n.values().map((v) => ctx.lookup(v)).filter((v): v is PDFStream => v instanceof PDFStream) : [];
     for (const st of streams) {
-      const f = st.dict.lookupMaybe(PDFName.of('Resources'), PDFDict)?.lookupMaybe(PDFName.of('Font'), PDFDict)?.get(name);
+      const f = dictOf(dictOf(st.dict.lookup(PDFName.of('Resources')))?.lookup(PDFName.of('Font')))?.get(name);
       if (f) return f;
     }
     return undefined;

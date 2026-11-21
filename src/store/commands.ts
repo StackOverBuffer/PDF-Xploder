@@ -130,10 +130,23 @@ function unchangedSinceOpen(): boolean {
   return !s.dirty && !s.savedOnce && !!s.originalBytes;
 }
 
+/**
+ * PDF/A-1 forbids transparency, which highlights and see-through comments need. The file
+ * still claims PDF/A-1, so validators reject it: say so instead of failing silently.
+ */
+function warnPdfA1Transparency() {
+  const s = S();
+  if (s.pdfA !== '1') return;
+  const all = Object.values(s.annotations).flat();
+  if (!all.some((a) => a.type === 'highlight' || a.opacity < 1)) return;
+  s.notify(tr('This file claims PDF/A-1, which does not allow transparency: its highlights and see-through comments make it fail PDF/A-1 validation.'), 'error');
+}
+
 /** Build the file and write it to `handle`, or download it as `name` when there is none or writing fails. */
 async function writeOut(handle: FileSystemFileHandle | null, name: string) {
   await S().run('Saving…', async () => {
     const out = await buildFileForSave();
+    warnPdfA1Transparency();
     if (handle) {
       try {
         await writeToHandle(handle, out);

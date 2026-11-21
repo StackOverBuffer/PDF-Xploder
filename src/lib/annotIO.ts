@@ -28,6 +28,7 @@ import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
 import type { Annotation, PageGeom, Pt, Rect, Reply, StatusEntry } from './types';
 import { statusHistory } from './reviewStatus';
+import { tagAnnotation, untagAnnotations } from './tagAnnots';
 import { drawsDifferently, foreignKey, readKeys, restoreKeys } from './foreignKeys';
 import { textString } from './pdfStrings';
 
@@ -277,6 +278,8 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   if (priv) dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
+  // Tagged documents: the annotation gets its structure element (described by its text).
+  tagAnnotation(doc, page.ref, annotRef, contents || a.subject || SUBTYPE[a.type]);
   // A popup for the text (where it was placed here, open or closed as it is now): some
   // viewers (Preview, mobile apps) show comments only through it.
   if ((contents || a.popup) && a.type !== 'redact') {
@@ -295,7 +298,9 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     // The reply's icon: a note at the comment's top-left corner (in the page's view), as PDF-XChange draws it.
     const at = noteCorner(g, rect);
     const icon = await buildAppearance(ctx, { id: r.id, type: 'note', at, text: r.text, color: '#ffee58', opacity: 1, author: r.author, createdAt: r.createdAt }, g, opts);
-    page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, icon)));
+    const replyRef = pdf.register(replyDict(pdf, r, annotRef, icon));
+    page.node.addAnnot(replyRef);
+    tagAnnotation(doc, page.ref, replyRef, r.text);
   }
   // The review status, as Acrobat stores it: a /State reply annotation under StateModel
   // 'Review', so other editors keep it too. Read back from there on import.
@@ -305,7 +310,9 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     for (const e of statusHistory({ id: a.id, status, statusLog }, opts.author ?? a.author, Date.now())) {
       const at = noteCorner(g, rect);
       const icon = await buildAppearance(ctx, { id: e.id, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: e.author, createdAt: e.at }, g, opts);
-      page.node.addAnnot(pdf.register(stateDict(pdf, e, annotRef, icon)));
+      const stateRef = pdf.register(stateDict(pdf, e, annotRef, icon));
+      page.node.addAnnot(stateRef);
+      tagAnnotation(doc, page.ref, stateRef, `${e.state} (${e.author})`);
     }
   }
 }
@@ -727,6 +734,7 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
       }
     }
     if (!remove.size) continue;
+    untagAnnotations(doc, [...remove].filter((r): r is PDFRef => r instanceof PDFRef));
     const kept = annots.asArray().filter((e) => !remove.has(e as PDFRef));
     if (kept.length) page.node.set(PDFName.of('Annots'), doc.context.obj(kept));
     else page.node.delete(PDFName.of('Annots'));

@@ -27,6 +27,10 @@ import {
   type PDFPageLeaf,
 } from '@cantoo/pdf-lib';
 
+/** The object if it has the expected type: broken files never make these lookups throw. */
+const dictOf = (o: unknown) => (o instanceof PDFDict ? o : undefined);
+
+
 const N = (s: string) => PDFName.of(s);
 
 function text(o: unknown): string | undefined {
@@ -42,7 +46,7 @@ function nameTreeLookup(node: PDFDict | undefined, key: string, depth = 0): PDFO
   const kids = node.lookup(N('Kids'));
   if (kids instanceof PDFArray) {
     for (let k = 0; k < kids.size(); k++) {
-      const hit = nameTreeLookup(kids.lookupMaybe(k, PDFDict), key, depth + 1);
+      const hit = nameTreeLookup(dictOf(kids.lookup(k)), key, depth + 1);
       if (hit) return hit;
     }
   }
@@ -52,9 +56,9 @@ function nameTreeLookup(node: PDFDict | undefined, key: string, depth = 0): PDFO
 /** A named destination of `doc` as its explicit array (or undefined). */
 export function resolveNamedDest(doc: PDFDocument, name: PDFObject): PDFArray | undefined {
   let d: PDFObject | undefined;
-  if (name instanceof PDFName) d = doc.catalog.lookupMaybe(N('Dests'), PDFDict)?.lookup(name);
+  if (name instanceof PDFName) d = dictOf(doc.catalog.lookup(N('Dests')))?.lookup(name);
   else if (name instanceof PDFString || name instanceof PDFHexString) {
-    d = nameTreeLookup(doc.catalog.lookupMaybe(N('Names'), PDFDict)?.lookupMaybe(N('Dests'), PDFDict), name.decodeText());
+    d = nameTreeLookup(dictOf(dictOf(doc.catalog.lookup(N('Names')))?.lookup(N('Dests'))), name.decodeText());
   }
   if (d instanceof PDFRef) d = doc.context.lookup(d);
   if (d instanceof PDFDict) d = d.lookup(N('D'));
@@ -104,7 +108,7 @@ function fixActions(annot: PDFDict, env: Env): boolean {
       ok = false;
     }
   }
-  const action = annot.lookupMaybe(N('A'), PDFDict);
+  const action = dictOf(annot.lookup(N('A')));
   if (action && action.lookup(N('S'))?.toString() === '/GoTo') {
     const d = fixDest(action.get(N('D')), env);
     if (d) action.set(N('D'), d);
@@ -150,7 +154,7 @@ function sweepDead(root: PDFObject, env: Env) {
 
 /** The form dictionary of `doc`, created when it has none. */
 function acroForm(doc: PDFDocument): PDFDict {
-  const existing = doc.catalog.lookupMaybe(N('AcroForm'), PDFDict);
+  const existing = dictOf(doc.catalog.lookup(N('AcroForm')));
   if (existing) return existing;
   const form = doc.context.obj({ Fields: [] }) as PDFDict;
   doc.catalog.set(N('AcroForm'), doc.context.register(form));
@@ -215,7 +219,7 @@ function registerFields(pages: PDFPage[], env: Env) {
   const form = acroForm(env.dest);
   const fields = fieldsArray(form, env.dest);
   const present = new Set(fields.asArray().map((r) => r.toString()));
-  const names = new Set(fields.asArray().map((r) => text(ctx.lookupMaybe(r, PDFDict)?.lookup(N('T')))).filter((t): t is string => !!t));
+  const names = new Set(fields.asArray().map((r) => text(dictOf(ctx.lookup(r))?.lookup(N('T')))).filter((t): t is string => !!t));
   const roots = new Map<string, { dict: PDFDict; ref: PDFRef }>();
   for (const w of widgets) {
     const root = fieldRoot(w, ctx);
@@ -239,15 +243,15 @@ function registerFields(pages: PDFPage[], env: Env) {
   }
   // The appearance defaults the copied fields rely on.
   if (!env.same) {
-    const srcForm = env.src.catalog.lookupMaybe(N('AcroForm'), PDFDict);
+    const srcForm = dictOf(env.src.catalog.lookup(N('AcroForm')));
     if (srcForm) {
       for (const key of ['DA', 'Q', 'NeedAppearances']) {
         const v = srcForm.get(N(key));
         if (v && !form.has(N(key))) form.set(N(key), env.copier.copy(v));
       }
-      const srcDr = srcForm.lookupMaybe(N('DR'), PDFDict);
+      const srcDr = dictOf(srcForm.lookup(N('DR')));
       if (srcDr) {
-        const dr = form.lookupMaybe(N('DR'), PDFDict);
+        const dr = dictOf(form.lookup(N('DR')));
         if (!dr) form.set(N('DR'), env.copier.copy(srcDr));
         else {
           for (const [k, v] of srcDr.entries()) {
@@ -270,7 +274,7 @@ function usedNames(doc: PDFDocument, skip: Set<PDFPageLeaf>): Set<string> {
   for (const p of doc.getPages()) {
     if (skip.has(p.node)) continue;
     for (const ref of p.node.Annots()?.asArray() ?? []) {
-      const nm = text(doc.context.lookupMaybe(ref, PDFDict)?.lookup(N('NM')));
+      const nm = text(dictOf(doc.context.lookup(ref))?.lookup(N('NM')));
       if (nm) used.add(nm);
     }
   }
