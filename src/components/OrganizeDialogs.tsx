@@ -267,6 +267,24 @@ function InsertFileDialog({ close, merge }: Close & { merge?: boolean }) {
   );
 }
 
+/** Combine the pages of this document and a picked file alternately (front and back sides of a scan). */
+function InterleaveDialog({ close }: Close) {
+  const t = useT();
+  const [file, choose] = usePdfFile();
+  const [first, setFirst] = useState<'current' | 'file'>('current');
+  const [reverseOther, setReverseOther] = useState(false);
+  return (
+    <Modal title={t('Interleave with File…')} onClose={close} footer={<Foot close={close} label="Interleave" disabled={!file} ok={() => oc.interleaveWithFile(file!.bytes, { first, reverseOther })} />}>
+      <FileRow accept={OPEN_ACCEPT} file={file} onChange={choose} />
+      <Row label="First page from">
+        <Choice value={first} onChange={setFirst} options={[['current', 'This document (front sides)'], ['file', 'The chosen file']]} />
+      </Row>
+      <Check checked={reverseOther} onChange={setReverseOther} label="The file's pages are in reverse order (typical when the stack was re-fed for the back sides)" />
+      <Hint>The pages of both documents are combined alternately. Leftover pages of the longer document are appended at the end.</Hint>
+    </Modal>
+  );
+}
+
 function ImagePagesDialog({ close }: Close) {
   const t = useT();
   const [files, setFiles] = useState<File[]>([]);
@@ -695,6 +713,7 @@ function PageLabelsDialog({ close }: Close) {
 export const ORGANIZE_DIALOGS = {
   orgInsertBlank: InsertBlankDialog,
   orgInsertFile: InsertFileDialog,
+  orgInterleave: InterleaveDialog,
   orgMerge: (p: Close) => <InsertFileDialog {...p} merge />,
   orgImagePages: ImagePagesDialog,
   orgDelete: DeleteDialog,

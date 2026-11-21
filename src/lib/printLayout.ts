@@ -4,6 +4,7 @@
  * PDF with one page per printed sheet, handed to the browser's print dialog.
  */
 import { PDFDocument, PDFRef, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath } from '@cantoo/pdf-lib';
+import { baseName } from './download';
 import { load } from './pdfOps';
 import { uprightMatrix } from './organize';
 import { inv, mul, type M } from './content/matrix';
@@ -20,6 +21,8 @@ export const PAPERS = {
 
 export type Paper = 'document' | keyof typeof PAPERS;
 export type PerSheet = 1 | 2 | 4 | 6 | 9 | 16;
+
+export type Imposition = 'none' | 'booklet' | 'poster';
 
 export interface PrintOptions {
   /** 0-based page indices in document order, before subset and reverse. */
@@ -38,6 +41,11 @@ export interface PrintOptions {
   borders: boolean;
   /** Sheet margin in millimetres. */
   margin: number;
+  imposition: Imposition;
+  /** Poster: sheets across; the rows follow from the scaled page height. */
+  posterColumns: number;
+  /** Poster: how much neighbouring tiles overlap, in millimetres. */
+  posterOverlap: number;
 }
 
 export const DEFAULT_PRINT: Omit<PrintOptions, 'pages'> = {
@@ -52,6 +60,9 @@ export const DEFAULT_PRINT: Omit<PrintOptions, 'pages'> = {
   order: 'horizontal',
   borders: false,
   margin: 0,
+  imposition: 'none',
+  posterColumns: 2,
+  posterOverlap: 0,
 };
 
 const MM = 72 / 25.4;
@@ -95,28 +106,40 @@ function grid(n: PerSheet, landscape: boolean): [number, number] {
 const orient = (w: number, h: number, landscape: boolean): [number, number] => (landscape === w > h ? [w, h] : [h, w]);
 
 /**
- * Lay out the printed pages on sheets. `sizes[i]` is page i as displayed
- * (width × height in points, rotation applied).
+ * Saddle-stitch booklet order as positions into the page list, `-1` for a blank half:
+ * the first sheet holds [last, first] on the front and [second, second-last] on the back,
+ * and so on inward, so two-sided printing folds the stack into a booklet. Blanks pad the
+ * count up to a multiple of 4.
  */
-export function planSheets(o: PrintOptions, sizes: { width: number; height: number }[]): Sheet[] {
-  const pages = printedPages(o).filter((i) => sizes[i]);
-  if (!pages.length) return [];
+export function bookletSequence(count: number): number[] {
+  const m = Math.ceil(count / 4) * 4;
+  const out: number[] = [];
+  for (let k = 0; k < m / 4; k++) out.push(m - 2 * k - 1, 2 * k, 2 * k + 1, m - 2 * k - 2);
+  return out.map((p) => (p < count ? p : -1));
+}
+
+/** Lay the pages of `list` out on sheets, n per sheet (`-1` leaves its cell empty, e.g. a booklet blank). */
+function gridSheets(o: PrintOptions, list: number[], sizes: { width: number; height: number }[]): Sheet[] {
+  const sized = (i: number) => i >= 0 && !!sizes[i];
+  if (!list.some(sized)) return [];
   const n = o.perSheet;
   const margin = Math.max(0, o.margin) * MM;
   const sheets: Sheet[] = [];
-  for (let k = 0; k < pages.length; k += n) {
-    const group = pages.slice(k, k + n);
-    const first = sizes[group[0]];
-    const firstLandscape = first.width > first.height;
+  for (let k = 0; k < list.length; k += n) {
+    const group = list.slice(k, k + n);
+    // The first page with a size decides the sheet's orientation (blanks and dropped pages do not).
+    const ref = sizes[group.find(sized) ?? list.find(sized)!];
+    const firstLandscape = ref.width > ref.height;
     // Auto: one page follows the page; 2 and 6 per sheet turn the sheet the other way so the pages stay large.
     const landscape = o.orientation === 'auto' ? (n === 2 || n === 6 ? !firstLandscape : firstLandscape) : o.orientation === 'landscape';
-    const base: readonly [number, number] = o.paper === 'document' ? [first.width, first.height] : PAPERS[o.paper];
+    const base: readonly [number, number] = o.paper === 'document' ? [ref.width, ref.height] : PAPERS[o.paper];
     const [width, height] = orient(base[0], base[1], landscape);
     const [cols, rows] = grid(n, width > height);
     const gap = n > 1 ? GUTTER : 0;
     const cw = (width - 2 * margin - gap * (cols - 1)) / cols;
     const ch = (height - 2 * margin - gap * (rows - 1)) / rows;
-    const items = group.map((page, j): Placement => {
+    const items = group.map((page, j): Placement | null => {
+      if (!sized(page)) return null;
       const col = o.order === 'horizontal' ? j % cols : Math.floor(j / rows);
       const row = o.order === 'horizontal' ? Math.floor(j / cols) : j % rows;
       const cell = { x: margin + col * (cw + gap), y: height - margin - (row + 1) * ch - row * gap, w: cw, h: ch };
@@ -126,8 +149,62 @@ export function planSheets(o: PrintOptions, sizes: { width: number; height: numb
       const w = s.width * scale;
       const h = s.height * scale;
       return { page, scale, w, h, cell, x: cell.x + (cell.w - w) / 2, y: cell.y + (cell.h - h) / 2 };
-    });
+    }).filter((p): p is Placement => !!p);
     sheets.push({ width, height, items, borders: o.borders && n > 1 });
+  }
+  return sheets;
+}
+
+/**
+ * Lay the printed pages out on sheets: plain N-up grids, or booklet/poster imposition.
+ * `sizes[i]` is page i as displayed (width × height in points, rotation applied).
+ */
+export function planSheets(o: PrintOptions, sizes: { width: number; height: number }[]): Sheet[] {
+  if (o.imposition === 'booklet') {
+    // The booklet order replaces subset and reverse; it is always two pages per sheet, side by side.
+    const forced = { ...o, perSheet: 2 as PerSheet, order: 'horizontal' as const, subset: 'all' as const, reverse: false };
+    return gridSheets(forced, bookletSequence(o.pages.length).map((p) => (p < 0 ? -1 : o.pages[p])), sizes);
+  }
+  if (o.imposition === 'poster') return posterSheets(o, sizes);
+  return gridSheets(o, printedPages(o).filter((i) => sizes[i]), sizes);
+}
+
+/**
+ * Poster imposition: every page is enlarged to cover `posterColumns` sheets across, with as many
+ * rows as the scaled height needs, so nothing is cropped and no gap appears. Neighbouring tiles
+ * overlap by the chosen amount so they can be glued; `buildPrintPdf` clips each drawing to its
+ * tile's cell.
+ */
+function posterSheets(o: PrintOptions, sizes: { width: number; height: number }[]): Sheet[] {
+  const pages = printedPages(o).filter((i) => sizes[i]);
+  if (!pages.length) return [];
+  const margin = Math.max(0, o.margin) * MM;
+  const overlap = Math.max(0, o.posterOverlap) * MM;
+  // Poster sheets stand portrait unless landscape is picked (auto follows the paper, not the page).
+  const base: readonly [number, number] = o.paper === 'document' ? [sizes[pages[0]].width, sizes[pages[0]].height] : PAPERS[o.paper];
+  const [width, height] = o.orientation === 'landscape' ? [Math.max(base[0], base[1]), Math.min(base[0], base[1])] : [Math.min(base[0], base[1]), Math.max(base[0], base[1])];
+  const tileW = width - 2 * margin;
+  const tileH = height - 2 * margin;
+  const advanceX = tileW - overlap;
+  const advanceY = tileH - overlap;
+  if (tileW <= 0 || tileH <= 0 || advanceX <= 0 || advanceY <= 0) return [];
+  const columns = Math.max(1, Math.round(o.posterColumns));
+  const sheets: Sheet[] = [];
+  for (const page of pages) {
+    const s = sizes[page];
+    const scale = (columns * tileW - (columns - 1) * overlap) / s.width;
+    const scaledH = s.height * scale;
+    const rows = scaledH <= tileH ? 1 : Math.ceil((scaledH - tileH) / advanceY) + 1;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        sheets.push({
+          width,
+          height,
+          borders: false,
+          items: [{ page, scale, w: tileW, h: tileH, x: margin - col * advanceX, y: margin + tileH - scaledH + row * advanceY, cell: { x: margin, y: margin, w: tileW, h: tileH } }],
+        });
+      }
+    }
   }
   return sheets;
 }
@@ -135,7 +212,13 @@ export function planSheets(o: PrintOptions, sizes: { width: number; height: numb
 /** Whether printing the prepared document as is gives the same result (no re-layout needed). */
 export function isPlain(o: PrintOptions, count: number): boolean {
   const all = o.pages.length === count && o.pages.every((p, i) => p === i);
-  return all && o.subset === 'all' && !o.reverse && o.paper === 'document' && o.perSheet === 1 && o.orientation === 'auto' && o.margin === 0 && (o.scaling === 'fit' || o.scaling === 'shrink' || o.scaling === 'actual' || o.customScale === 100);
+  return all && o.imposition === 'none' && o.subset === 'all' && !o.reverse && o.paper === 'document' && o.perSheet === 1 && o.orientation === 'auto' && o.margin === 0 && (o.scaling === 'fit' || o.scaling === 'shrink' || o.scaling === 'actual' || o.customScale === 100);
+}
+
+/** Name for saving the printed layout: the document's name plus what was imposed on it. */
+export function printFileName(o: Pick<PrintOptions, 'imposition' | 'perSheet'>, fileName: string): string {
+  const suffix = o.imposition === 'booklet' ? ' (booklet)' : o.imposition === 'poster' ? ' (poster)' : o.perSheet > 1 ? ` (${o.perSheet}-up)` : '';
+  return `${baseName(fileName)}${suffix}.pdf`;
 }
 
 /** Build the sheets as a PDF from the prepared document (comments and form fields already in the page content). */

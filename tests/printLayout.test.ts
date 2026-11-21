@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDict, PDFDocument, PDFName, degrees } from '@cantoo/pdf-lib';
-import { DEFAULT_PRINT, PAPERS, buildPrintPdf, isPlain, planSheets, printedPages, type PrintOptions } from '../src/lib/printLayout';
+import { DEFAULT_PRINT, PAPERS, bookletSequence, buildPrintPdf, isPlain, planSheets, printFileName, printedPages, type PrintOptions } from '../src/lib/printLayout';
 
 const A4 = { width: 595.28, height: 841.89 };
 const LAND = { width: 841.89, height: 595.28 };
@@ -52,6 +52,54 @@ describe('print layout', () => {
     expect(one('shrink')).toBe(1);
     expect(one('actual')).toBe(1);
     expect(one('custom', 50)).toBe(0.5);
+  });
+
+  it('orders booklet sheets for saddle-stitch folding, padding with blanks', () => {
+    expect(bookletSequence(8)).toEqual([7, 0, 1, 6, 5, 2, 3, 4]);
+    expect(bookletSequence(6)).toEqual([-1, 0, 1, -1, 5, 2, 3, 4]);
+    expect(bookletSequence(1)).toEqual([-1, 0, -1, -1]);
+  });
+
+  it('lays a booklet out two pages per sheet with blanks skipped', () => {
+    const sheets = planSheets(opts({ imposition: 'booklet', paper: 'A4' }), [A4, A4, A4, A4, A4]);
+    expect(sheets).toHaveLength(4); // ceil(5/4) half-sheets … 8 positions → 4 sheets
+    expect(sheets[0].items).toHaveLength(1); // left half blank, right half page 0
+    expect(sheets[0].items[0]).toMatchObject({ page: 0 });
+    expect(sheets[0].items[0].x).toBeGreaterThan(sheets[0].width / 2);
+  });
+
+  it('tiles a page over poster sheets without gaps or crops', () => {
+    const sheets = planSheets(opts({ imposition: 'poster', paper: 'A4', posterColumns: 2, posterOverlap: 0 }), [A4]);
+    // scale 2: two columns cover 1190.56 pt; height 1683.78 → 2 rows → 4 sheets
+    expect(sheets).toHaveLength(4);
+    const [a, b, c] = sheets.map((s) => s.items[0]);
+    expect(a).toMatchObject({ page: 0, scale: 2, x: 0 });
+    expect(b).toMatchObject({ x: -a.cell.w });
+    // Sheet 1 shows the top-left of the page: its top edge sits at the top of the tile,
+    // later rows move the page down so each shows the next band (no gaps, nothing cropped).
+    expect(a.y).toBeCloseTo(-A4.height);
+    expect(b.y).toBeCloseTo(-A4.height);
+    expect(c.y).toBe(0);
+    expect(sheets.every((s) => !s.borders)).toBe(true);
+  });
+
+  it('keeps the whole page on poster tiles when the sheet has a margin', () => {
+    const sheets = planSheets(opts({ imposition: 'poster', paper: 'A4', posterColumns: 2, posterOverlap: 0, margin: 10 }), [A4]);
+    const first = sheets[0].items[0];
+    // The page's left and top edges sit at the tile's left and top edges, not inside the margin.
+    expect(first.x).toBeCloseTo(first.cell.x);
+    expect(first.y + A4.height * first.scale).toBeCloseTo(first.cell.y + first.cell.h);
+    // The last tile reaches the page's right edge and shows its bottom edge (nothing cropped).
+    const last = sheets[sheets.length - 1].items[0];
+    expect(last.x + A4.width * last.scale).toBeCloseTo(last.cell.x + last.cell.w);
+    expect(last.y).toBeGreaterThanOrEqual(last.cell.y - 1e-6);
+  });
+
+  it('names saved print files after the layout', () => {
+    expect(printFileName({ imposition: 'booklet', perSheet: 1 }, 'Report.pdf')).toBe('Report (booklet).pdf');
+    expect(printFileName({ imposition: 'poster', perSheet: 1 }, 'Report')).toBe('Report (poster).pdf');
+    expect(printFileName({ imposition: 'none', perSheet: 2 }, 'Report.pdf')).toBe('Report (2-up).pdf');
+    expect(printFileName({ imposition: 'none', perSheet: 1 }, 'Report.pdf')).toBe('Report.pdf');
   });
 
   it('builds one PDF page per sheet, with rotated pages upright', async () => {

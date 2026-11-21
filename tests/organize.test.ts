@@ -53,6 +53,29 @@ describe('page lists and layouts', () => {
     expect(org.reverseLayout(5, [1, 2, 3])).toEqual([0, 3, 2, 1, 4]);
     expect(org.reverseLayout(3, [])).toEqual([2, 1, 0]);
   });
+
+  it('interleaves two documents alternately', () => {
+    expect(org.interleaveLayout(2, 2, { first: 'current', reverseOther: false }))
+      .toEqual([0, { file: 0, page: 0 }, 1, { file: 0, page: 1 }]);
+    expect(org.interleaveLayout(2, 2, { first: 'file', reverseOther: false }))
+      .toEqual([{ file: 0, page: 0 }, 0, { file: 0, page: 1 }, 1]);
+  });
+
+  it('interleaves a reversed second file (re-fed scan stack)', () => {
+    expect(org.interleaveLayout(3, 2, { first: 'current', reverseOther: true }))
+      .toEqual([0, { file: 0, page: 1 }, 1, { file: 0, page: 0 }, 2]);
+  });
+
+  it('appends the leftover pages of the longer document', () => {
+    expect(org.interleaveLayout(1, 3, { first: 'current', reverseOther: false }))
+      .toEqual([0, { file: 0, page: 0 }, { file: 0, page: 1 }, { file: 0, page: 2 }]);
+    expect(org.interleaveLayout(3, 1, { first: 'file', reverseOther: false }))
+      .toEqual([{ file: 0, page: 0 }, 0, 1, 2]);
+  });
+
+  it('refuses an empty file', () => {
+    expect(() => org.interleaveLayout(1, 0, { first: 'current', reverseOther: false })).toThrow();
+  });
 });
 
 describe('assembling pages', () => {
