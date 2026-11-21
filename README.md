@@ -160,7 +160,7 @@ PDF-XChange Editor, and what comes next is in [ROADMAP.md](ROADMAP.md).
 - Pencil (freehand), rectangle, ellipse, line, arrow (Shift to constrain)
 - Polygon, polyline and cloud (click the vertices, double-click to finish); clouds have scallops all along their edges, like revision clouds
 - Text box (typewriter) with inline editing, sticky notes
-- Stamps (Approved, Draft, Confidential, … or custom text); stamps made in other programs (e.g. PDF-XChange custom stamps) keep their own drawing and can be moved, resized and commented
+- Stamps (Approved, Draft, Confidential, … or custom text); stamps made in other programs (e.g. PDF-XChange custom stamps) keep their own drawing and can be moved, resized and commented. The Fill & Sign tools place a check, a cross, today's date or your saved initials with one click, for paper-style forms without form fields; dynamic stamps (Approved, Reviewed, Received) fill in author and date when they are placed
 - Pictures and signatures hang on the pointer like stamps and are placed with a click; they keep their proportions when resized (Shift: freely). Typed signatures in four bundled handwriting fonts
 - Select, move, resize, restyle (colour, fill, thickness, opacity, font size), delete
 - Selecting overlapping comments: the smaller one under the pointer comes first; click again on the same spot for the next one underneath (Alt+click: directly), right-click → Select lists everything there, Tab / Shift+Tab steps through the page's comments; thin lines and outlines are picked within a few pixels
