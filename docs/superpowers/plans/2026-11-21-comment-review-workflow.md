@@ -262,10 +262,10 @@ git commit -m "Comments CSV export"
 
 ### Task 5: Roadmap and README
 
-- [ ] **Step 1: ROADMAP.md** — Next up item 5 becomes 🟡 with "(review status, comment summary and CSV export done; FDF/XFDF still open)". Rows: "Comment Review Status" → ✅ ("set in the comments panel, stored as standard review state annotations"); "Summarize Comments (with font customization)" → ✅ ("as a generated PDF document; font size and replies optional — see markdownToPdf options"); leave the FDF/XFDF row ⬜.
-- [ ] **Step 2: README.md** — extend the comments section with one or two sentences (status, summary, CSV).
-- [ ] **Step 3: Commit** `git commit -m "Roadmap and README: comment review workflow"` (add the two files).
+- [x] **Step 1: ROADMAP.md** — Next up item 5 becomes 🟡 with "(review status, comment summary and CSV export done; FDF/XFDF still open)". Rows: "Comment Review Status" → ✅ ("set in the comments panel, stored as standard review state annotations"); "Summarize Comments (with font customization)" → ✅ ("as a generated PDF document; font size and replies optional — see markdownToPdf options"); leave the FDF/XFDF row ⬜.
+- [x] **Step 2: README.md** — extend the comments section with one or two sentences (status, summary, CSV).
+- [x] **Step 3: Commit** `git commit -m "Roadmap and README: comment review workflow"` (add the two files).
 
 ### Task 6: Final verification
 
-- [ ] `npm run typecheck`, `npm test`, `npm run build` — all green. Check off completed steps in this plan as you go and commit the check-offs.
+- [x] `npm run typecheck`, `npm test`, `npm run build` — all green. Check off completed steps in this plan as you go and commit the check-offs.
