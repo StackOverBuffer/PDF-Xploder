@@ -41,6 +41,7 @@ export function CommentsPanel() {
         <button className="small-btn" disabled={!canFlatten || !total} onClick={flattenAnnotations} title={t('Burn all annotations into the page content')}>{t('Flatten all')}</button>
       </div>
       {total === 0 && <p className="muted pad">{t('No comments yet. Use the Comment tab to highlight, draw, or add notes.')}</p>}
+      {total > 0 && filter !== '' && !pageIds.some((id) => (annotations[id] ?? []).some(matches)) && <p className="muted pad">{t('No comments with this review status.')}</p>}
       <div className="comment-list">
         {pageIds.map((pid, i) => {
           const list = (annotations[pid] ?? []).filter(matches);

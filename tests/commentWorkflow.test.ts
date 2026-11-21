@@ -112,3 +112,16 @@ it('quotes commas, quotes and line breaks in the comments CSV', () => {
   expect(commentsCsv([{ page: 1, type: 'Note', author: 'A', date: '2026-11-21', status: '', text: 'a, "b"\nc' }], 'en'))
     .toBe('page,type,author,date,status,text\r\n1,Note,A,2026-11-21,,"a, ""b""\nc"');
 });
+
+it('keeps formula-like cells in the comments CSV as plain text', () => {
+  const csv = commentsCsv([{ page: 1, type: 'Note', author: '@evil', date: '2026-11-21', status: '', text: '=HYPERLINK("http://x","y")' }], 'en');
+  expect(csv.split('\r\n')[1]).toBe(`1,Note,'@evil,2026-11-21,,"'=HYPERLINK(""http://x"",""y"")"`);
+  // Only the start of a cell counts: a minus inside the text stays as it is.
+  expect(commentsCsv([{ page: 1, type: 'Note', author: 'A', date: 'd', status: '', text: 'a-b' }], 'de').split('\r\n')[1]).toBe('1;Note;A;d;;a-b');
+});
+
+it('escapes markdown in author names and the document name of the summary', () => {
+  const md = commentSummaryMarkdown('*Plan*', [{ page: 1, list: [note({ author: '_Bo_' })] }], { includeReplies: true }, 'en');
+  expect(md).toContain('\\*Plan\\*');
+  expect(md).toContain('\\_Bo\\_');
+});
