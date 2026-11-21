@@ -8,7 +8,8 @@ import { annotationsByPage, useStore } from './store';
 import { requirePermission } from './permissions';
 import { tf, tr, useLang } from '../lib/i18n';
 import { ops, org } from '../lib/worker';
-import { commentSummaryMarkdown } from '../lib/commentSummary';
+import { commentsCsv, commentSummaryMarkdown, commentBody } from '../lib/commentSummary';
+import { ANNOT_LABELS } from '../lib/annotGeom';
 import { buildFileForSave, currentBytes, normaliseImage, placeContentImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
@@ -152,6 +153,23 @@ export async function summarizeComments(o: { includeReplies: boolean }) {
     const md = commentSummaryMarkdown(name, byPage, o, useLang.getState().lang);
     await s.openInNewTab(await org.markdownToPdf(md, { title: `${tr('Comments')} – ${name}` }), `${name}-comments.pdf`);
   });
+}
+
+/** The comments as a CSV file for spreadsheets (Review → Export comments CSV). */
+export function exportCommentsCsv() {
+  const s = S();
+  const rows = s.pageIds.flatMap((id, i) => (s.annotations[id] ?? []).map((a) => ({
+    page: i + 1,
+    type: ANNOT_LABELS[a.type],
+    author: a.author,
+    date: new Date(a.createdAt).toISOString(),
+    status: a.status ?? '',
+    text: commentBody(a),
+  })));
+  if (!rows.length) return s.notify('There are no comments to export.');
+  // A byte order mark, so spreadsheet programs read the umlauts correctly (like the measurements CSV).
+  const csv = '\ufeff' + commentsCsv(rows, useLang.getState().lang);
+  downloadBlob(new Blob([csv], { type: 'text/csv' }), `${baseName(s.fileName || 'document')}-comments.csv`, 'text/csv');
 }
 
 // ---------------------------------------------------------------- sharing

@@ -41,7 +41,7 @@ const WORDS: Record<'en' | 'de', { comments: string; page: string; states: Recor
 };
 
 /** The comment's own words: a note or text box's text, otherwise the comment on the annotation. */
-function bodyOf(a: Annotation): string {
+export function commentBody(a: Annotation): string {
   return a.type === 'note' || a.type === 'text' ? a.text : a.comment ?? '';
 }
 
@@ -55,7 +55,7 @@ export function commentSummaryMarkdown(docName: string, byPage: { page: number; 
     for (const a of list) {
       const status = a.status ? ` · ${w.states[a.status]}` : '';
       lines.push(`- **${w.types[a.type]}** · ${a.author} · ${date.format(a.createdAt)}${status}`);
-      const body = escapeMarkdownText(bodyOf(a));
+      const body = escapeMarkdownText(commentBody(a));
       if (body) lines.push(`  ${body}`);
       if (o.includeReplies) {
         for (const r of a.replies ?? []) {
@@ -65,4 +65,13 @@ export function commentSummaryMarkdown(docName: string, byPage: { page: number; 
     }
   }
   return lines.join('\n');
+}
+
+/** The comments as CSV for spreadsheets, RFC 4180: fields with separators, quotes or line breaks are quoted, quotes doubled, CRLF line endings. */
+export function commentsCsv(rows: { page: number; type: string; author: string; date: string; status: string; text: string }[], lang: 'en' | 'de'): string {
+  const sep = lang === 'de' ? ';' : ',';
+  const esc = (s: string) => (s.includes(sep) || /["\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const head = ['page', 'type', 'author', 'date', 'status', 'text'];
+  const lines = rows.map((r) => [String(r.page), r.type, r.author, r.date, r.status, r.text].map(esc).join(sep));
+  return [head.join(sep), ...lines].join('\r\n');
 }
