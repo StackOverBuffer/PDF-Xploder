@@ -104,6 +104,22 @@ describe('document operations', () => {
     const flat = await ops.setFormValues(filled, {}, { flatten: true });
     expect(await ops.getFormFields(flat)).toEqual([]);
   });
+
+  it('puts every font a field names in the form\'s default resources', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    doc.getForm().createTextField('name').addToPage(page, { x: 10, y: 200, width: 200, height: 20 });
+    const filled = await PDFDocument.load(await ops.setFormValues(await doc.save(), { name: 'Ada' }));
+    const acro = filled.catalog.lookup(PDFName.of('AcroForm'), PDFDict);
+    const fonts = acro.lookup(PDFName.of('DR'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+    const widget = filled.getForm().getTextField('name').acroField.getWidgets()[0];
+    const da = widget.getDefaultAppearance() ?? filled.getForm().getTextField('name').acroField.getDefaultAppearance() ?? '';
+    const name = da.match(/\/(\S+) [\d.]+ Tf/)![1];
+    expect(fonts.has(PDFName.of(name))).toBe(true);
+    // And a default appearance for the whole form, with its font in /DR too.
+    expect(acro.has(PDFName.of('DA'))).toBe(true);
+    expect(fonts.has(PDFName.of('Helv'))).toBe(true);
+  });
 });
 
 describe('export', () => {

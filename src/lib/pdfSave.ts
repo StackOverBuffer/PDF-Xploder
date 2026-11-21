@@ -183,6 +183,65 @@ export function cutLostPageRefs(doc: PDFDocument): number {
   return cut;
 }
 
+/**
+ * Every font a form field's /DA names, in the form's default resources (/DR), and a
+ * default /DA on the form. pdf-lib writes field /DAs such as "/Helvetica 10 Tf" with
+ * the font only in the widget's own appearance; Acrobat, print servers and form
+ * processors that regenerate an appearance resolve the name in /DR and fell back to
+ * another font. The font is taken from the widget's appearance, or for the standard
+ * Helvetica names created as a standard font.
+ */
+export function fillFormResources(doc: PDFDocument) {
+  const ctx = doc.context;
+  const form = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  const fields = form?.lookup(PDFName.of('Fields'));
+  if (!form || !(fields instanceof PDFArray) || !fields.size()) return;
+  let dr = form.lookupMaybe(PDFName.of('DR'), PDFDict);
+  let fonts = dr?.lookupMaybe(PDFName.of('Font'), PDFDict);
+  const ensureFonts = () => {
+    if (!dr) {
+      dr = ctx.obj({}) as PDFDict;
+      form.set(PDFName.of('DR'), dr);
+    }
+    if (!fonts) {
+      fonts = ctx.obj({}) as PDFDict;
+      dr.set(PDFName.of('Font'), fonts);
+    }
+    return fonts;
+  };
+  const helvetica = () => ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica', Encoding: 'WinAnsiEncoding' }));
+  const fontOfAppearance = (widget: PDFDict, name: PDFName): PDFObject | undefined => {
+    const n = widget.lookupMaybe(PDFName.of('AP'), PDFDict)?.lookup(PDFName.of('N'));
+    const streams = n instanceof PDFStream ? [n] : n instanceof PDFDict ? n.values().map((v) => ctx.lookup(v)).filter((v): v is PDFStream => v instanceof PDFStream) : [];
+    for (const st of streams) {
+      const f = st.dict.lookupMaybe(PDFName.of('Resources'), PDFDict)?.lookupMaybe(PDFName.of('Font'), PDFDict)?.get(name);
+      if (f) return f;
+    }
+    return undefined;
+  };
+  const visit = (o: PDFObject | undefined, inheritedDa: string | undefined, depth: number) => {
+    const dict = o instanceof PDFRef ? ctx.lookup(o) : o;
+    if (!(dict instanceof PDFDict) || depth > 32) return;
+    const own = dict.lookup(PDFName.of('DA'));
+    const da = own instanceof PDFString || own instanceof PDFHexString ? own.decodeText() : inheritedDa;
+    const m = da?.match(/\/([^\s/]+)\s+[\d.]+\s+Tf/);
+    if (m) {
+      const name = PDFName.of(m[1]);
+      if (!fonts?.has(name)) {
+        const font = fontOfAppearance(dict, name) ?? (/^(Helv|Helvetica)$/.test(m[1]) ? helvetica() : undefined);
+        if (font) ensureFonts().set(name, font);
+      }
+    }
+    const kids = dict.lookup(PDFName.of('Kids'));
+    if (kids instanceof PDFArray) for (const k of kids.asArray()) visit(k, da, depth + 1);
+  };
+  for (const f of fields.asArray()) visit(f, undefined, 0);
+  if (!form.has(PDFName.of('DA'))) {
+    if (!fonts?.has(PDFName.of('Helv'))) ensureFonts().set(PDFName.of('Helv'), helvetica());
+    form.set(PDFName.of('DA'), PDFString.of('/Helv 0 Tf 0 g'));
+  }
+}
+
 const xmlEscape = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** "D:20261021191500+02'00'" → "2026-10-21T19:15:00+02:00" (XMP dates). */
@@ -289,6 +348,7 @@ export async function saveDoc(doc: PDFDocument, opts: { useObjectStreams?: boole
   syncXmp(doc);
   dropBrokenAppearances(doc);
   cutLostPageRefs(doc);
+  fillFormResources(doc);
   pruneUnreachable(doc);
   return doc.save({ useObjectStreams: opts.useObjectStreams ?? !isPdfA1(doc) });
 }
