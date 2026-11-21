@@ -43,7 +43,7 @@
   - `export function formatSignedDate(lang: string | undefined, now?: Date): string` — de: `21.11.2026`, en: `Nov 21, 2026` (month abbreviations `Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec`, day not zero-padded in en).
   - `export function materializeStampLabel(template: string, author: string, lang: string | undefined, now?: Date): string` — a template starting with `dynamic:` becomes `` `${base} – ${author} – ${formatSignedDate(lang, now)}` `` (en dash U+2013); anything else passes through unchanged.
 
-- [ ] **Step 1: Write the failing tests** in `tests/fillSign.test.ts` (new file, `import { describe, expect, it } from 'vitest';`):
+- [x] **Step 1: Write the failing tests** in `tests/fillSign.test.ts` (new file, `import { describe, expect, it } from 'vitest';`):
 
 ```ts
 import { formatSignedDate, materializeStampLabel, SIGN_MARK_NAMES } from '../src/lib/fillSign';
@@ -67,13 +67,13 @@ it('names the marks as other editors expect', () => {
 });
 ```
 
-- [ ] **Step 2: Run `npm test -- tests/fillSign.test.ts` — expect FAIL** (module does not exist).
+- [x] **Step 2: Run `npm test -- tests/fillSign.test.ts` — expect FAIL** (module does not exist).
 
-- [ ] **Step 3: Implement the three exports** exactly as specified above (no `Intl`, no locale data files).
+- [x] **Step 3: Implement the three exports** exactly as specified above (no `Intl`, no locale data files).
 
-- [ ] **Step 4: Run `npm test -- tests/fillSign.test.ts` — expect PASS.**
+- [x] **Step 4: Run `npm test -- tests/fillSign.test.ts` — expect PASS.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/fillSign.ts tests/fillSign.test.ts
@@ -92,7 +92,7 @@ git commit -m "Fill & Sign helpers: mark names, date format and dynamic stamp la
 - Consumes: `SIGN_MARK_NAMES` (Task 1); `frameGeom`, `pdfRectToView`, `viewToPdf` (existing, appearance.ts); the existing stamp appearance case at `src/lib/appearance.ts:465`.
 - Produces: `StampAnnot.kind?: 'check' | 'cross'` (types.ts, field comment: "Fill & Sign mark drawn as a vector glyph instead of the boxed label"); the private `/AwesomePDF` dict carries `kind` automatically (the model is JSON-serialized — no annotIO change needed for our own files).
 
-- [ ] **Step 1: Write the failing round-trip test** in `tests/fillSign.test.ts` (pattern: build a document with pdf-lib, write the annotation, save, reload, import):
+- [x] **Step 1: Write the failing round-trip test** in `tests/fillSign.test.ts` (pattern: build a document with pdf-lib, write the annotation, save, reload, import):
 
 ```ts
 import { PDFDocument } from '@cantoo/pdf-lib';
@@ -128,19 +128,19 @@ it('maps another program\'s Checkmark stamp without an appearance to a check', a
 
 (Adjust imports/types to what the file already imports; `PDFName`/`PDFHexString` come from `@cantoo/pdf-lib` as in other tests.)
 
-- [ ] **Step 2: Run `npm test -- tests/fillSign.test.ts` — expect the new tests FAIL.**
+- [x] **Step 2: Run `npm test -- tests/fillSign.test.ts` — expect the new tests FAIL.**
 
-- [ ] **Step 3: Model**: add `kind?: 'check' | 'cross'` to `StampAnnot` in `src/lib/types.ts`.
+- [x] **Step 3: Model**: add `kind?: 'check' | 'cross'` to `StampAnnot` in `src/lib/types.ts`.
 
-- [ ] **Step 4: Appearance**: in `appearance.ts` case `'stamp'`, right after the `a.appearance` branch, add a `kind` branch: `const fg = frameGeom(g, a.rot); const v = pdfRectToView(fg, a.rect); const w = Math.max(1.5, Math.min(v.width, v.height) * 0.14);` then for `check` one polyline through the view points `(0.2w, 0.55h) (0.38w, 0.8h) (0.85w, 0.2h)` of the rect, for `cross` two polylines `(0.2w, 0.2h)–(0.8w, 0.8h)` and `(0.8w, 0.2h)–(0.2w, 0.8h)`, each drawn with `c.polyline(points.map(p => viewToPdf(fg, p)), { color: a.color, width: w, opacity: op })` — mirror how the note's bubble is drawn just below. If `c.polyline` supports a round cap option (check `src/lib/render/draw.ts`), set it; otherwise leave the defaults.
+- [x] **Step 4: Appearance**: in `appearance.ts` case `'stamp'`, right after the `a.appearance` branch, add a `kind` branch: `const fg = frameGeom(g, a.rot); const v = pdfRectToView(fg, a.rect); const w = Math.max(1.5, Math.min(v.width, v.height) * 0.14);` then for `check` one polyline through the view points `(0.2w, 0.55h) (0.38w, 0.8h) (0.85w, 0.2h)` of the rect, for `cross` two polylines `(0.2w, 0.2h)–(0.8w, 0.8h)` and `(0.8w, 0.2h)–(0.2w, 0.8h)`, each drawn with `c.polyline(points.map(p => viewToPdf(fg, p)), { color: a.color, width: w, opacity: op })` — mirror how the note's bubble is drawn just below. If `c.polyline` supports a round cap option (check `src/lib/render/draw.ts`), set it; otherwise leave the defaults.
 
-- [ ] **Step 5: Export**: in the `'stamp'` case of `writeNativeAnnotation` (annotIO.ts), when `a.kind` is set, set `/Name` to `SIGN_MARK_NAMES[a.kind]` (import from `./fillSign`); keep the existing name/label handling untouched otherwise.
+- [x] **Step 5: Export**: in the `'stamp'` case of `writeNativeAnnotation` (annotIO.ts), when `a.kind` is set, set `/Name` to `SIGN_MARK_NAMES[a.kind]` (import from `./fillSign`); keep the existing name/label handling untouched otherwise.
 
-- [ ] **Step 6: Import**: in the stamp branch of `fromStandard` (annotIO.ts), when the `/Name` text is `Checkmark` or `Cross`, include `kind: 'check' | 'cross'` in the returned stamp (label stays whatever that branch already derives).
+- [x] **Step 6: Import**: in the stamp branch of `fromStandard` (annotIO.ts), when the `/Name` text is `Checkmark` or `Cross`, include `kind: 'check' | 'cross'` in the returned stamp (label stays whatever that branch already derives).
 
-- [ ] **Step 7: Run `npm test -- tests/fillSign.test.ts` — expect PASS.**
+- [x] **Step 7: Run `npm test -- tests/fillSign.test.ts` — expect PASS.**
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/lib/types.ts src/lib/appearance.ts src/lib/annotIO.ts tests/fillSign.test.ts
@@ -163,17 +163,17 @@ git commit -m "Fill & Sign: check and cross marks as vector stamp kinds"
 - Consumes: `formatSignedDate`, `materializeStampLabel` (Task 1); `createNote` placement pattern (`AnnotationLayer.tsx:167`); `customStamps`/`saveStamps` localStorage pattern (`contentActions.ts:335`); `useDialog` (`Dialogs.tsx:40`).
 - Produces: `Tool` values `'signCheck' | 'signCross' | 'signDate' | 'signInitials'`; `savedInitials(): { src: string; width: number; height: number } | null` and `saveInitials(src: string): void` in `src/store/extras.ts` (localStorage key `awesome-pdf.initials`, JSON `{ src, width, height }`; `saveInitials` measures nothing — width/height come from the dialog's cropped image).
 
-- [ ] **Step 1: Model and styles.** Add the four `Tool` values to the union in `types.ts` (with short doc comments: check/cross = vector marks, date = text box with today's date, initials = saved initials image). Add four `DEFAULT_STYLES` entries in `store.ts` after `stamp`: `signCheck { color: '#2e7d32', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' }`, `signCross { color: '#e53935', … }`, `signDate { color: '#111111', …, fontSize: 12 }`, `signInitials { color: '#0d47a1', …, fontSize: 12 }` (copy the entry shape from `stamp`).
+- [x] **Step 1: Model and styles.** Add the four `Tool` values to the union in `types.ts` (with short doc comments: check/cross = vector marks, date = text box with today's date, initials = saved initials image). Add four `DEFAULT_STYLES` entries in `store.ts` after `stamp`: `signCheck { color: '#2e7d32', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' }`, `signCross { color: '#e53935', … }`, `signDate { color: '#111111', …, fontSize: 12 }`, `signInitials { color: '#0d47a1', …, fontSize: 12 }` (copy the entry shape from `stamp`).
 
-- [ ] **Step 2: Placement** in `AnnotationLayer.tsx`:
+- [x] **Step 2: Placement** in `AnnotationLayer.tsx`:
   - Add the four tools to `DRAW_TOOLS` (line ~38).
   - In the pointer-down handler next to the `tool === 'note'` case, add:
     - `signCheck` / `signCross`: create `{ ...base(tool), type: 'stamp', kind: tool === 'signCheck' ? 'check' : 'cross', rect: 18×18 pt centred on the click (viewToPdf of `p.x - 9`, `p.y - 9`), rot: geom.rotation, label: 'Check' | 'Cross' }`; then `setTool('select')` and `select(...)` like `createNote` does (no popup).
     - `signDate`: create `{ ...base('signDate'), type: 'text', rect: { x, y, w: 110, h: fontSize * 1.6 }, rot: geom.rotation, text: formatSignedDate(useLang.getState().lang), fontSize: styleFor('text').fontSize, border: false }`; select it, then `setPopupOpen(pageId, a.id, true, { focus: true })` like a text box deserves (mirror how new text boxes are handled two cases below).
     - `signInitials`: `const saved = savedInitials();` — if it returns an image, place `{ ...base('signInitials'), type: 'image', rect: fitted to height 24 pt at the click keeping the image's aspect ratio, rot: geom.rotation, src: saved.src, signature: true }` and select; otherwise `useStore.getState().notify('Draw or type your initials with the Signature tool first (Comment › Signature).')` and `setTool('select')`.
-- [ ] **Step 3: Signature dialog saves initials.** In `SignatureDialog` (`Dialogs.tsx:250`): add a checkbox `Check` labelled "Keep as initials" (default on) shown above the place button; where the dialog crops/places the signature image, when the box is ticked also call `saveInitials(src)` with the cropped data URL. Find the placement handler by searching the dialog body for where the image is handed over (it builds `{ src, width, height }` — reuse exactly that object for `saveInitials`).
+- [x] **Step 3: Signature dialog saves initials.** In `SignatureDialog` (`Dialogs.tsx:250`): add a checkbox `Check` labelled "Keep as initials" (default on) shown above the place button; where the dialog crops/places the signature image, when the box is ticked also call `saveInitials(src)` with the cropped data URL. Find the placement handler by searching the dialog body for where the image is handed over (it builds `{ src, width, height }` — reuse exactly that object for `saveInitials`).
 
-- [ ] **Step 4: Ribbon** — in the Comment tab after the Stamp group, add:
+- [x] **Step 4: Ribbon** — in the Comment tab after the Stamp group, add:
 
 ```tsx
 <Group label="Fill & Sign">
@@ -186,11 +186,11 @@ git commit -m "Fill & Sign: check and cross marks as vector stamp kinds"
 
 Add `Check, X, CalendarDays, PenLine` to the lucide-react import list (verify they are exported there; pick near-equivalents if a name clashes with an existing import).
 
-- [ ] **Step 5: German strings** in `src/locales/de/ui.ts`: `Check: 'Häkchen'`, `Cross: 'Kreuz'`, `Date: 'Datum'`, `Initials: 'Paraphe'`, `'Fill & Sign': 'Ausfüllen & Signieren'`, `'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichne oder tippe deine Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).'`, `'Keep as initials': 'Als Paraphe behalten'`.
+- [x] **Step 5: German strings** in `src/locales/de/ui.ts`: `Check: 'Häkchen'`, `Cross: 'Kreuz'`, `Date: 'Datum'`, `Initials: 'Paraphe'`, `'Fill & Sign': 'Ausfüllen & Signieren'`, `'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichne oder tippe deine Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).'`, `'Keep as initials': 'Als Paraphe behalten'`.
 
-- [ ] **Step 6: Run `npm test` — all green** (the locales test now covers the new keys; nothing else should have moved).
+- [x] **Step 6: Run `npm test` — all green** (the locales test now covers the new keys; nothing else should have moved).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/types.ts src/store/store.ts src/components/AnnotationLayer.tsx src/components/Ribbon.tsx src/components/Dialogs.tsx src/store/extras.ts src/locales/de/ui.ts
@@ -207,18 +207,18 @@ git commit -m "Fill & Sign tools: check, cross, date and initials on the page"
 **Interfaces:**
 - Consumes: `materializeStampLabel` (Task 1); the stamp placement at `AnnotationLayer.tsx:271-273`; the stamp menu at `Ribbon.tsx` (Group "Stamp", `STAMPS.map(...)`).
 
-- [ ] **Step 1: Menu** — in the stamp tool's `menu()` in Ribbon.tsx, after the `STAMPS.map(...)` spread, insert a dynamic section:
+- [x] **Step 1: Menu** — in the stamp tool's `menu()` in Ribbon.tsx, after the `STAMPS.map(...)` spread, insert a dynamic section:
 
 ```tsx
 ...['Approved', 'Reviewed', 'Received'].map((l): MenuItem => ({ label: `${l} (dynamic)`, checked: stampLabel === `dynamic:${l}`, onClick: () => { usePendingStamp.setState({ stamp: null }); S().setStyle('stamp', { stampLabel: `dynamic:${l}` }); S().setTool('stamp'); } })),
 null,
 ```
 
-- [ ] **Step 2: Placement** — in AnnotationLayer.tsx change the stamp creation label to `label: materializeStampLabel(st.stampLabel || 'Approved', useStore.getState().author, useLang.getState().lang)` (import `materializeStampLabel` from `../lib/fillSign` and `useLang` from `../lib/i18n` — check what the file already imports).
+- [x] **Step 2: Placement** — in AnnotationLayer.tsx change the stamp creation label to `label: materializeStampLabel(st.stampLabel || 'Approved', useStore.getState().author, useLang.getState().lang)` (import `materializeStampLabel` from `../lib/fillSign` and `useLang` from `../lib/i18n` — check what the file already imports).
 
-- [ ] **Step 3: German strings**: `'Approved (dynamic)': 'Genehmigt (dynamisch)'`, `'Reviewed (dynamic)': 'Geprüft (dynamisch)'`, `'Received (dynamic)': 'Eingegangen (dynamisch)'` in `de/ui.ts`.
+- [x] **Step 3: German strings**: `'Approved (dynamic)': 'Genehmigt (dynamisch)'`, `'Reviewed (dynamic)': 'Geprüft (dynamisch)'`, `'Received (dynamic)': 'Eingegangen (dynamisch)'` in `de/ui.ts`.
 
-- [ ] **Step 4: Run `npm run typecheck` and `npm test` — green. Commit:**
+- [x] **Step 4: Run `npm run typecheck` and `npm test` — green. Commit:**
 
 ```bash
 git add src/components/Ribbon.tsx src/components/AnnotationLayer.tsx src/locales/de/ui.ts
@@ -231,11 +231,11 @@ git commit -m "Dynamic stamps: author and date fill in when the stamp is placed"
 - Modify: `ROADMAP.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: ROADMAP.md** — Next up item 4 becomes ✅ with one sentence naming the four tools and the dynamic variants. Update the rows "Create Customized Dynamic Stamps (and via JavaScript console)" (section 3) and "Create Customized Dynamic Stamps" (section 16) to 🟡 with the note "(dynamic variants of standard stamps; no appearance editor)".
+- [x] **Step 1: ROADMAP.md** — Next up item 4 becomes ✅ with one sentence naming the four tools and the dynamic variants. Update the rows "Create Customized Dynamic Stamps (and via JavaScript console)" (section 3) and "Create Customized Dynamic Stamps" (section 16) to 🟡 with the note "(dynamic variants of standard stamps; no appearance editor)".
 
-- [ ] **Step 2: README.md** — find the paragraph describing stamps/comments in the feature list and add one or two sentences: check, cross, date and initials for forms without fields, and dynamic stamps that fill in name and date.
+- [x] **Step 2: README.md** — find the paragraph describing stamps/comments in the feature list and add one or two sentences: check, cross, date and initials for forms without fields, and dynamic stamps that fill in name and date.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add ROADMAP.md README.md
@@ -244,7 +244,7 @@ git commit -m "Roadmap and README: fill & sign tools and dynamic stamps"
 
 ### Task 6: Final verification
 
-- [ ] **Step 1:** `npm run typecheck` — no errors.
-- [ ] **Step 2:** `npm test` — the whole suite passes.
-- [ ] **Step 3:** `npm run build` — succeeds.
-- [ ] **Step 4:** Check off every box in this plan as it was completed (this file is committed, so just commit the checked version with `git commit -am "Plan: mark completed tasks"` — or fold the check-offs into each task's commit as you go, whichever happened).
+- [x] **Step 1:** `npm run typecheck` — no errors.
+- [x] **Step 2:** `npm test` — the whole suite passes.
+- [x] **Step 3:** `npm run build` — succeeds.
+- [x] **Step 4:** Check off every box in this plan as it was completed (this file is committed, so just commit the checked version with `git commit -am "Plan: mark completed tasks"` — or fold the check-offs into each task's commit as you go, whichever happened).
