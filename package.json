@@ -39,6 +39,7 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
+    "icons": "node scripts/icons/build-icons.mjs",
     "typecheck": "tsc -p .",
     "test": "vitest run",
     "corpus": "vite-node scripts/corpus/run.ts",
