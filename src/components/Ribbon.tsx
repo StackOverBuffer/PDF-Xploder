@@ -444,6 +444,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
             const custom = customStamps();
             return [
               ...STAMPS.map((l): MenuItem => ({ label: l, checked: stampLabel === l, onClick: () => { usePendingStamp.setState({ stamp: null }); S().setStyle('stamp', { stampLabel: l }); S().setTool('stamp'); } })),
+              ...['Approved', 'Reviewed', 'Received'].map((l): MenuItem => ({ label: `${l} (dynamic)`, checked: stampLabel === `dynamic:${l}`, onClick: () => { usePendingStamp.setState({ stamp: null }); S().setStyle('stamp', { stampLabel: `dynamic:${l}` }); S().setTool('stamp'); } })),
               null,
               ...(custom.length
                 ? custom.map((c): MenuItem => ({ label: c.name, icon: <img className="stamp-thumb" src={c.src} alt="" />, disabled: !canAnnotate, onClick: () => placeCustomStamp(c) }))
