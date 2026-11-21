@@ -83,7 +83,7 @@ export async function commitInserted(bytes: Uint8Array, at: number, count: numbe
 
 /** The document with comments and form values, for writing pages out to other files. */
 async function outputBytes(): Promise<Uint8Array> {
-  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()));
+  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { author: S().author });
 }
 
 function dataUrlImage(src: string): OrgT.PageImage {

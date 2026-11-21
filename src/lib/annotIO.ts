@@ -25,13 +25,15 @@ import { hexToRgbTuple } from './color';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
-import type { Annotation, PageGeom, Pt, Rect, Reply } from './types';
+import type { Annotation, PageGeom, Pt, Rect, Reply, ReviewStatus } from './types';
 
 const PRIVATE = PDFName.of('AwesomePDF');
 const PRIVATE_SRC = PDFName.of('AwesomePDFSrc');
 /** A stamp's own drawing (see StampAnnot.appearance), as a one-page PDF. */
 const PRIVATE_AP = PDFName.of('AwesomePDFAppearance');
 const IRT = PDFName.of('IRT');
+/** The review states of StateModel 'Review' that our model knows (types.ts). */
+const REVIEW_STATES: string[] = ['Accepted', 'Rejected', 'Cancelled', 'Completed', 'Reopened'];
 
 // ---------------------------------------------------------------- helpers
 
@@ -43,6 +45,11 @@ function numbers(o: unknown): number[] {
 
 function text(o: unknown): string | undefined {
   return o instanceof PDFString || o instanceof PDFHexString ? o.decodeText() : undefined;
+}
+
+/** States are names in Acrobat's files (/State /Accepted), but strings are allowed too. */
+function nameOrText(o: unknown): string | undefined {
+  return o instanceof PDFName ? o.decodeText() : text(o);
 }
 
 function toHex(c: number[]): string | undefined {
@@ -244,8 +251,9 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       break;
   }
 
-  // Replies are separate annotations (below), read back from there.
-  const { replies, ...rest } = a;
+  // Replies are separate annotations (below), read back from there; the status becomes
+  // a standard review state annotation, so it is kept out of the private model too.
+  const { replies, status, ...rest } = a;
   const model: Record<string, unknown> = { ...rest, rect0: rect };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
@@ -273,12 +281,24 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   }
   for (const r of replies ?? []) {
     // The reply's icon: a note at the comment's top-left corner (in the page's view), as PDF-XChange draws it.
-    const corner = pdfToView(g, { x: rect.x, y: rect.y + rect.h });
-    const far = pdfToView(g, { x: rect.x + rect.w, y: rect.y });
-    const at = viewToPdf(g, { x: Math.min(corner.x, far.x), y: Math.min(corner.y, far.y) });
+    const at = noteCorner(g, rect);
     const icon = await buildAppearance(ctx, { id: r.id, type: 'note', at, text: r.text, color: '#ffee58', opacity: 1, author: r.author, createdAt: r.createdAt }, g, opts);
     page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, icon)));
   }
+  // The review status, as Acrobat stores it: a /State reply annotation under StateModel
+  // 'Review', so other editors keep it too. Read back from there on import.
+  if (status && !opts.flatten) {
+    const at = noteCorner(g, rect);
+    const icon = await buildAppearance(ctx, { id: `state-${a.id}`, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: opts.author ?? a.author, createdAt: Date.now() }, g, opts);
+    page.node.addAnnot(pdf.register(stateDict(pdf, a, annotRef, icon, opts)));
+  }
+}
+
+/** Where reply and status icons sit: at the comment's top-left corner (in the page's view). */
+function noteCorner(g: PageGeom, rect: Rect): Pt {
+  const corner = pdfToView(g, { x: rect.x, y: rect.y + rect.h });
+  const far = pdfToView(g, { x: rect.x + rect.w, y: rect.y });
+  return viewToPdf(g, { x: Math.min(corner.x, far.x), y: Math.min(corner.y, far.y) });
 }
 
 /** A reply as other editors write it: a note "in reply to" its comment, with a note icon. */
@@ -296,6 +316,31 @@ function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, icon: 
     Contents: PDFHexString.fromText(r.text),
     CreationDate: PDFString.fromDate(new Date(r.createdAt)),
     M: PDFString.fromDate(new Date(r.createdAt)),
+    Name: 'Comment',
+    F: 4 | 8 | 16, // Print, NoZoom, NoRotate
+    C: [1, 0.93, 0.35],
+    Open: false,
+  }) as PDFDict;
+}
+
+/**
+ * The review status as other editors write it: a reply that carries /State and
+ * /StateModel 'Review' instead of text. It says nothing by itself, so it has no Contents.
+ */
+function stateDict(pdf: PDFDocument['context'], a: Annotation, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }, opts: AppearanceOptions): PDFDict {
+  const { rect } = icon;
+  return pdf.obj({
+    Type: 'Annot',
+    Subtype: 'Text',
+    Rect: [rect.x, rect.y, rect.x + rect.w, rect.y + rect.h],
+    AP: { N: icon.ref },
+    IRT: parent,
+    RT: 'R',
+    State: a.status,
+    StateModel: 'Review',
+    NM: PDFHexString.fromText(`state-${a.id}`),
+    T: PDFHexString.fromText(opts.author ?? a.author),
+    M: PDFString.fromDate(new Date()),
     Name: 'Comment',
     F: 4 | 8 | 16, // Print, NoZoom, NoRotate
     C: [1, 0.93, 0.35],
@@ -592,6 +637,24 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
     };
     for (const { dict, entry } of replies) {
       const root = rootOf(dict);
+      // A review status is not a reply: it says something about its comment and is read
+      // into it (state dicts of other editors become the status the same way).
+      const state = nameOrText(dict.lookup(PDFName.of('State')));
+      const model = nameOrText(dict.lookup(PDFName.of('StateModel')));
+      if (state && model === 'Review') {
+        if (root) {
+          if (state === 'None') delete root.status;
+          else if (REVIEW_STATES.includes(state)) root.status = state as ReviewStatus;
+        }
+        // An orphaned state says nothing: it is consumed either way.
+        remove.add(entry as PDFRef);
+        const popup = dict.get(PDFName.of('Popup'));
+        if (popup instanceof PDFRef) remove.add(popup);
+        continue;
+      }
+      // Another program's "seen" marker (StateModel 'Marked'): not a reply, it stays in
+      // the file instead of coming back as a ghost reply with empty text.
+      if (state && model === 'Marked') continue;
       // A reply to something we do not import stays in the file with it.
       if (!root) continue;
       const b = base(dict, env);

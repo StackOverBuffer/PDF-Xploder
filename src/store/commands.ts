@@ -96,7 +96,7 @@ export async function currentBytes(): Promise<Uint8Array> {
 
 /** The document with annotations and form values, unencrypted (for print, export, extract…). */
 export async function buildOutput(flatten = false): Promise<Uint8Array> {
-  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten });
+  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten, author: S().author });
 }
 
 /**
@@ -290,7 +290,7 @@ export async function extract(pages = targetPages()) {
   if (!requirePermission('copy')) return;
   await S().run('Extracting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
     const out = await ops.extractPages(output, pages);
     const label = pages.length === 1 ? `p${pages[0] + 1}` : `p${pages[0] + 1}-${pages[pages.length - 1] + 1}`;
     downloadBlob(out, `${baseName(s.fileName)}-${label}.pdf`);
@@ -301,7 +301,7 @@ export async function split(every: number) {
   if (every < 1 || !requirePermission('copy')) return;
   await S().run('Splitting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
     const parts = await ops.splitEvery(output, every);
     parts.forEach((p, i) => downloadBlob(p, `${baseName(s.fileName)}-part${i + 1}.pdf`));
   });
@@ -316,7 +316,7 @@ export async function exportPageImage(page = S().currentPage, dpi = 150) {
   if (!requirePermission('copy')) return;
   await S().run('Rendering image…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
     const { pdf } = await openPdf(output, () => null);
     try {
       const canvas = await renderToCanvas(await pdf.getPage(page + 1), dpi / 72);
