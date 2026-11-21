@@ -26,7 +26,7 @@ describe('zip', () => {
       } catch (e) {
         // Windows answers for a missing python3 with the Store alias, which fails
         // differently from a missing command: skip the check there too.
-        if ((e as NodeJS.ErrnoException).code === 'ENOENT' || (e as NodeJS.ErrnoException).code === '9009' || /Python was not found/.test(String((e as { stderr?: unknown }).stderr))) python = false;
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT' || (e as { status?: number }).status === 9009 || /Python was not found/.test(String((e as { stderr?: unknown }).stderr))) python = false;
         else throw e;
       }
       if (python) {

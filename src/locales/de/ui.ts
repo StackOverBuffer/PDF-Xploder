@@ -32,6 +32,7 @@ const DE: Record<string, string> = {
   Accepted: 'Angenommen', Rejected: 'Abgelehnt', Cancelled: 'Zurückgezogen', Completed: 'Erledigt', Reopened: 'Wieder geöffnet',
   'Not reviewed': 'Nicht geprüft', 'Review status': 'Prüfstatus', All: 'Alle',
   'Show only comments with this review status': 'Nur Kommentare mit diesem Prüfstatus anzeigen',
+  'No comments with this review status.': 'Keine Kommentare mit diesem Prüfstatus.',
   'Summarize comments': 'Kommentare zusammenfassen', 'Include replies': 'Antworten einbeziehen',
   'Generate a PDF listing every comment': 'Ein PDF erstellen, das jeden Kommentar auflistet',
   'Summarizing…': 'Zusammenfassung wird erstellt…',
