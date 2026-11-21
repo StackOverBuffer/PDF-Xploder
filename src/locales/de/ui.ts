@@ -89,7 +89,7 @@ const DE: Record<string, string> = {
   // fill & sign (Comment tab)
   'Fill & Sign': 'Ausfüllen & Signieren', Check: 'Häkchen', Cross: 'Kreuz', Date: 'Datum', Initials: 'Paraphe',
   'Keep as initials': 'Als Paraphe behalten',
-  'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichne oder tippe deine Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).',
+  'Draw or type your initials with the Signature tool first (Comment › Signature).': 'Zeichnen oder tippen Sie Ihre Paraphe zuerst mit dem Signaturwerkzeug (Anmerkungen › Signatur).',
   'The browser could not store the initials (storage full or disabled).': 'Der Browser konnte die Paraphe nicht speichern (Speicher voll oder deaktiviert).',
   // dynamic stamps
   'Approved (dynamic)': 'Genehmigt (dynamisch)', 'Reviewed (dynamic)': 'Geprüft (dynamisch)', 'Received (dynamic)': 'Eingegangen (dynamisch)',
