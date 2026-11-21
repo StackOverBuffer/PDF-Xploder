@@ -46,6 +46,11 @@ describe('measurement scales', () => {
     expect(measurementsCsv(rows, 'de').split('\r\n')[1]).toBe('1;area;12,5000;m²;1:100;Ann;"Room; north"');
     expect(measurementsCsv(rows, 'en').split('\r\n')[1]).toBe('1,area,12.5000,m²,1:100,Ann,Room; north');
   });
+
+  it('keeps formula-like comments and authors in the CSV as plain text', () => {
+    const rows = [{ page: 0, kind: 'distance' as const, value: 2, unit: 'm' as const, scale: '1:1', author: '@x', comment: '=HYPERLINK("http://x")' }];
+    expect(measurementsCsv(rows, 'en').split('\r\n')[1]).toBe(`1,distance,2.0000,m,1:1,'@x,"'=HYPERLINK(""http://x"")"`);
+  });
 });
 
 describe('barcodes', () => {

@@ -3,6 +3,7 @@ import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/
 import { importAnnotations, writeNativeAnnotation } from '../src/lib/annotIO';
 import { drawContext, exportWithAnnotations } from '../src/lib/pdfOps';
 import { commentSummaryMarkdown, commentsCsv, escapeMarkdownText } from '../src/lib/commentSummary';
+import { parseMarkdown } from '../src/lib/markdown';
 import type { Annotation, PageGeom } from '../src/lib/types';
 
 const g: PageGeom = { view: [0, 0, 300, 200], rotation: 0 };
@@ -90,12 +91,12 @@ it('writes no status dict for a flattened copy', async () => {
 });
 
 it('escapes markdown syntax in comment text', () => {
-  expect(escapeMarkdownText('# hi *bold* [link](x)')).toBe('\\# hi \\*bold\\* \\[link\\](x)');
+  expect(escapeMarkdownText('# hi *bold* [link](x)')).toBe('\\# hi \\*bold\\* \\[link\\]\\(x\\)');
 });
 
 it('builds one section per page with author, date and status', () => {
   const md = commentSummaryMarkdown('Plan.pdf', [{ page: 2, list: [note({ author: 'Jane', status: 'Accepted' })] }], { includeReplies: true }, 'en');
-  expect(md).toContain('# Comments — Plan.pdf');
+  expect(md).toContain('# Comments — Plan\\.pdf');
   expect(md).toContain('## Page 2');
   expect(md).toContain('Jane');
   expect(md).toContain('Accepted');
@@ -124,4 +125,14 @@ it('escapes markdown in author names and the document name of the summary', () =
   const md = commentSummaryMarkdown('*Plan*', [{ page: 1, list: [note({ author: '_Bo_' })] }], { includeReplies: true }, 'en');
   expect(md).toContain('\\*Plan\\*');
   expect(md).toContain('\\_Bo\\_');
+});
+
+it('keeps a multi-line comment inside its list item, whatever it contains', () => {
+  const md = commentSummaryMarkdown('doc', [
+    { page: 1, list: [note({ text: 'example:\n\n~~~\nx\n---\nsee https://example.com &amp; ~~this~~' })] },
+    { page: 2, list: [note({ id: 'n2', text: 'second' })] },
+  ], { includeReplies: true }, 'en');
+  const blocks = parseMarkdown(md).map((b) => b.type);
+  expect(blocks).toEqual(['heading', 'heading', 'list', 'heading', 'list']);
+  expect(md).toContain('https\\:');
 });
