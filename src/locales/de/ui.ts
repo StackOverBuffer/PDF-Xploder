@@ -163,7 +163,8 @@ const DE: Record<string, string> = {
   'this field type cannot be filled in here': 'dieser Feldtyp kann hier nicht ausgefüllt werden',
   'the document’s security settings do not allow filling in forms': 'die Sicherheitseinstellungen des Dokuments erlauben kein Ausfüllen von Formularen',
   '{name}: cannot be filled in because {reasons}.': '{name}: kann nicht ausgefüllt werden, da {reasons}.',
-  'Open this link in a new tab?': 'Diesen Link in einem neuen Tab öffnen?', 'Go to destination': 'Zum Ziel springen',
+  'Open this link in a new tab?': 'Diesen Link in einem neuen Tab öffnen?',
+  'This link is not opened: only web, e-mail and phone addresses are.': 'Dieser Link wird nicht geöffnet: Nur Web-, E-Mail- und Telefonadressen werden geöffnet.', 'Go to destination': 'Zum Ziel springen',
   locked: 'gesperrt', 'read-only': 'schreibgeschützt', required: 'erforderlich', 'Double-click to edit': 'Zum Bearbeiten doppelklicken',
 
   // content properties

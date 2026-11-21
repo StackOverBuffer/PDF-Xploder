@@ -12,7 +12,7 @@ import { fillBlockers } from '../lib/forms';
 import { tf, useT } from '../lib/i18n';
 import { useDocLang } from '../lib/docLang';
 import { KIND_LABEL } from './FieldProperties';
-import { openLinkAfterAsking } from '../lib/ask';
+import { openLinkAfterAsking, safeLinkUrl } from '../lib/ask';
 
 /** The subset of pdf.js annotation data used here. */
 interface AnnotData {
@@ -70,6 +70,8 @@ const toRect = (r: AnnotData['rect']): Rect => ({ x: Math.min(r[0], r[2]), y: Ma
 
 async function followLink(a: AnnotData) {
   const s = useStore.getState();
+  // pdf.js leaves `url` empty for addresses it does not consider safe; those are shown
+  // and refused in openLinkAfterAsking rather than opened.
   const url = a.url ?? a.unsafeUrl;
   if (url) {
     return openLinkAfterAsking(url);
@@ -119,12 +121,14 @@ export const WidgetLayer = memo(function WidgetLayer({ index, geom, scale }: Pro
         const style = { left: v.left * scale, top: v.top * scale, width: v.width * scale, height: v.height * scale };
         if (a.subtype === 'Link') {
           const target = a.url ?? a.unsafeUrl;
+          // Only a safe address goes into the href (a javascript: href would run on a middle click).
+          const href = safeLinkUrl(target);
           return (
             <a
               key={a.id}
               className="pdf-link"
               style={style}
-              href={target ?? '#'}
+              href={href ?? '#'}
               title={target ?? t('Go to destination')}
               onClick={(e) => {
                 e.preventDefault();
