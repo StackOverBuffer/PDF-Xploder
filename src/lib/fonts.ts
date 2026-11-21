@@ -96,6 +96,16 @@ const CHAINS: Record<'regular' | 'bold', FontKey[]> = {
   bold: ['sansBold', 'symbols', 'cjkBold', 'cjk', 'krBold', 'kr'],
 };
 
+/** The first font of the fallback chain that has every character of `text`. */
+export async function fontCovering(text: string): Promise<{ key: FontKey; bytes: Uint8Array } | undefined> {
+  const cps = [...text].map((c) => c.codePointAt(0)!).filter((cp) => !isSpace(cp));
+  for (const key of CHAINS.regular) {
+    const f = await parsed(key);
+    if (f && cps.every(f.has)) return { key, bytes: f.bytes };
+  }
+  return undefined;
+}
+
 /**
  * Build a text engine able to draw all of `texts`, embedding the fonts needed.
  * Falls back to Helvetica if the bundled fonts cannot be loaded at all.

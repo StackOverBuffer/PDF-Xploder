@@ -127,6 +127,27 @@ describe('document operations', () => {
     expect(acro.has(PDFName.of('DA'))).toBe(true);
     expect(fonts.has(PDFName.of('Helv'))).toBe(true);
   });
+
+  it('shows values Noto Sans lacks (✓) with a font that has them, and flattened forms embed only a subset', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const { writeFileSync, mkdtempSync } = await import('node:fs');
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    doc.getForm().createTextField('a').addToPage(page, { x: 10, y: 200, width: 200, height: 20 });
+    doc.getForm().createTextField('b').addToPage(page, { x: 10, y: 150, width: 200, height: 20 });
+    const out = await ops.setFormValues(await doc.save(), { a: 'Größe ✓', b: 'Čapek' }, { flatten: true });
+    expect(out.length).toBeLessThan(120_000);
+    const file = `${mkdtempSync('/tmp/form-')}/f.pdf`;
+    writeFileSync(file, out);
+    let text: string;
+    try {
+      text = execFileSync('pdftotext', [file, '-'], { encoding: 'utf8' });
+    } catch {
+      return; // poppler not installed
+    }
+    expect(text).toContain('Größe ✓');
+    expect(text).toContain('Čapek');
+  });
 });
 
 describe('export', () => {

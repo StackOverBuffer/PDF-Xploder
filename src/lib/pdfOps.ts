@@ -14,6 +14,7 @@ import {
   PDFRadioGroup,
   PDFRef,
   PDFTextField,
+  type PDFField,
   degrees,
   drawObject,
   popGraphicsState,
@@ -23,7 +24,8 @@ import { hexToRgb } from './color';
 import { normRot, viewRectToPdf, viewSize, viewToPdf, type VRect } from './geometry';
 import type { Annotation, PageGeom, Pt } from './types';
 import { buildAppearance, type DrawContext, type TextEngine } from './appearance';
-import { createTextEngine, loadFontBytes, loadFontkit } from './fonts';
+import { createTextEngine, fontCovering, loadFontBytes, loadFontkit, type FontKey } from './fonts';
+import { subsetFont } from './subset';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
 import { copyPages } from './pageCopy';
 
@@ -372,8 +374,41 @@ export async function setFormValues(
     const fontBytes = await loadFontBytes('sans');
     if (fontBytes) {
       doc.registerFontkit(await loadFontkit());
-      // Not subset: the font must contain every glyph a later edit of the field may need.
-      form.updateFieldAppearances(await doc.embedFont(fontBytes, { subset: false }));
+      // Not subset while the fields stay fillable: the font must contain every glyph a
+      // later edit may need. A flattened form keeps only the glyphs it shows.
+      let sansBytes = fontBytes;
+      if (opts.flatten) {
+        const shown = form.getFields().flatMap((f) => (f instanceof PDFTextField ? [f.getText() ?? ''] : f instanceof PDFDropdown || f instanceof PDFOptionList ? f.getSelected() : []));
+        try {
+          sansBytes = await subsetFont(fontBytes, new Set([...shown.join(''), ' ', '?'].map((c) => c.codePointAt(0)!)));
+        } catch {
+          /* the whole font */
+        }
+      }
+      form.updateFieldAppearances(await doc.embedFont(sansBytes, { subset: false }));
+      // Values Noto Sans cannot show (✓, Chinese, Japanese, Korean…) get the first font
+      // that has all their characters, cut down to the characters of the values using it.
+      const byFont = new Map<FontKey, { bytes: Uint8Array; fields: PDFField[]; text: string }>();
+      for (const [name, value] of Object.entries(values)) {
+        const text = [value].flat().filter((x): x is string => typeof x === 'string').join('');
+        const field = form.getFieldMaybe(name);
+        if (!text || !(field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList)) continue;
+        const pick = await fontCovering(text);
+        if (!pick || pick.key === 'sans') continue;
+        const e = byFont.get(pick.key) ?? byFont.set(pick.key, { bytes: pick.bytes, fields: [], text: '' }).get(pick.key)!;
+        e.fields.push(field);
+        e.text += text;
+      }
+      for (const { bytes, fields, text } of byFont.values()) {
+        let sub = bytes;
+        try {
+          sub = await subsetFont(bytes, new Set([...text, ' ', '?'].map((c) => c.codePointAt(0)!)));
+        } catch {
+          /* the whole font */
+        }
+        const font = await doc.embedFont(sub, { subset: false });
+        for (const f of fields) (f as PDFTextField).updateAppearances(font);
+      }
     }
   }
   if (opts.flatten) form.flatten();
