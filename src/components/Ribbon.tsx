@@ -304,7 +304,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
             <ToolBtn tool="snapshot" size="small" icon={<Camera size={I} />} label="Snapshot" keys="G" menu={[
               { label: 'Snapshot tool', icon: <Camera size={14} />, hint: 'G', disabled: !canCopy, onClick: () => S().setTool('snapshot') },
               { label: 'Copy page as image', icon: <ClipboardCopy size={14} />, disabled: !canCopy, onClick: () => extra.copyPageImage() },
-              { label: 'Save page as image', icon: <FileImage size={14} />, disabled: !canCopy, onClick: () => cmd.exportPageImage() },
+              { label: 'Save page as image', icon: <FileImage size={14} />, disabled: !canCopy, onClick: () => show('exportImage') },
             ]} />
             <Btn size="small" icon={<Clipboard size={I} />} label="Clipboard" disabled={noDoc} menu={[
               { label: 'Copy selected text', icon: <ClipboardCopy size={14} />, hint: 'Ctrl+C', disabled: !canCopy, onClick: extra.copySelectedText },
@@ -551,7 +551,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <Btn icon={<FileText size={L} />} label="From Markdown" title="Create a PDF from a Markdown or text file" onClick={cmd.newFromTextFiles} />
         </Group>
         <Group label="Convert">
-          <Btn icon={<FileImage size={L} />} label="To image" title="Save the current page as a PNG image" disabled={!canCopy} onClick={() => cmd.exportPageImage()} />
+          <Btn icon={<FileImage size={L} />} label="To image" title="Save pages as PNG, JPEG, WebP or TIFF images" disabled={!canCopy} onClick={() => show('exportImage')} />
           <ToolBtn tool="snapshot" icon={<Camera size={L} />} label="Region to image" title="Drag a box to copy that part of the page as an image" />
           <Btn icon={<Images size={L} />} label="Extract images" title="Save every image of the document in a ZIP file (JPEGs unchanged, others as PNG)" disabled={!canCopy} onClick={cleanup.extractAllImages} />
           <Btn icon={<Blend size={L} />} label="Greyscale" title="Convert pages, images and comments to shades of grey" disabled={!canModify} onClick={cleanup.greyscale} />

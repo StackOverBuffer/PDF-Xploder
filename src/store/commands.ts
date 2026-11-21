@@ -12,7 +12,10 @@ import { tf, tr } from '../lib/i18n';
 import { ask, askText } from '../lib/ask';
 import { droppedHandles, ensureWritable, pickPdfHandles, pickSaveHandle, writeToHandle } from '../lib/fileAccess';
 import type { SignOptions } from '../lib/signature';
-import { closePdf, openPdf, renderToCanvas } from '../lib/pdfjs';
+import { closePdf, openPdf, renderToCanvas, type PDFPageProxy } from '../lib/pdfjs';
+import { encodeTiff } from '../lib/tiff';
+import { zip, type ZipEntry } from '../lib/zip';
+import { IMAGE_MAX_AREA_BYTES } from '../lib/render/protocol';
 import type { Annotation, Rect } from '../lib/types';
 
 const S = () => useStore.getState();
@@ -312,20 +315,65 @@ export async function crop(m: OpsT.Margins, pages: number[]) {
   await S().run('Cropping…', async () => S().commitBytes(await ops.cropPages(S().bytes!, pages, m)));
 }
 
-export async function exportPageImage(page = S().currentPage, dpi = 150) {
+export type ImageFormat = 'png' | 'jpeg' | 'webp' | 'tiff';
+
+const MIME: Record<ImageFormat, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', tiff: 'image/tiff' };
+const EXT: Record<ImageFormat, string> = { png: 'png', jpeg: 'jpg', webp: 'webp', tiff: 'tiff' };
+
+/**
+ * The scale for rendering at `dpi`, at most as many pixels as a canvas may hold — the
+ * same limit the renderer enforces on images it decodes (IMAGE_MAX_AREA_BYTES in
+ * render/protocol.ts): 600 dpi on A3 would otherwise be 70 megapixels, which browsers
+ * refuse to hand out as one canvas.
+ */
+function scaleFor(page: PDFPageProxy, dpi: number): number {
+  const v = page.getViewport({ scale: 1 });
+  return Math.min(dpi / 72, Math.sqrt(IMAGE_MAX_AREA_BYTES / 4 / (v.width * v.height)));
+}
+
+/**
+ * Save pages as image files: PNG, JPEG, WebP or TIFF, one file or a ZIP of several.
+ * The pages are rendered exactly as the user sees them, comments included: their
+ * annotations are flattened into the picture first. `quality` is a percentage and only
+ * reaches JPEG and WebP.
+ */
+export async function exportPageImages(o: { pages: number[]; format: ImageFormat; dpi: number; quality?: number }) {
   if (!requirePermission('copy')) return;
   await S().run('Rendering image…', async () => {
     const s = S();
     const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s));
     const { pdf } = await openPdf(output, () => null);
+    const entries: ZipEntry[] = [];
+    // The resolution that had to come down to fit the browser's canvas limit, if any.
+    let capped = Infinity;
     try {
-      const canvas = await renderToCanvas(await pdf.getPage(page + 1), dpi / 72);
-      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
-      downloadBlob(blob, `${baseName(s.fileName)}-p${page + 1}.png`, 'image/png');
+      for (const [k, p] of o.pages.entries()) {
+        reportProgress(k, o.pages.length);
+        const page = await pdf.getPage(p + 1);
+        const scale = scaleFor(page, o.dpi);
+        if (scale < o.dpi / 72) capped = Math.min(capped, scale * 72);
+        const canvas = await renderToCanvas(page, scale);
+        // The browser encodes PNG, JPEG and WebP; TIFF is written from the pixels directly.
+        const bytes =
+          o.format === 'tiff'
+            ? encodeTiff(canvas.width, canvas.height, canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data, { dpi: Math.round(scale * 72) })
+            : new Uint8Array(
+                await (await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), MIME[o.format], o.quality === undefined ? undefined : o.quality / 100))).arrayBuffer(),
+              );
+        if (o.pages.length === 1) downloadBlob(bytes, `${baseName(s.fileName)}-p${p + 1}.${EXT[o.format]}`, MIME[o.format]);
+        else entries.push({ name: `page${String(p + 1).padStart(3, '0')}.${EXT[o.format]}`, data: bytes });
+      }
     } finally {
       closePdf(pdf);
     }
+    if (entries.length) downloadBlob(zip(entries), `${baseName(s.fileName)}-images.zip`, 'application/zip');
+    if (capped !== Infinity) S().notify(tf('The resolution was reduced to {n} dpi: the browser limits the size of an image.', { n: Math.floor(capped) }));
   });
+}
+
+/** File and snapshot menus: the current page as a PNG, as before. */
+export function exportPageImage(page = S().currentPage, dpi = 150) {
+  return exportPageImages({ pages: [page], format: 'png', dpi });
 }
 
 // ---------------------------------------------------------------- document

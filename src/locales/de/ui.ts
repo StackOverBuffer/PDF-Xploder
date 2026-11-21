@@ -475,6 +475,16 @@ const DE: Record<string, string> = {
   'Blank Document': 'Leeres Dokument',
   'From Markdown or Text File…': 'Aus Markdown- oder Textdatei…',
   'A Markdown or text file is converted to pages first.': 'Eine Markdown- oder Textdatei wird zuerst in Seiten umgewandelt.',
+
+  // image export dialog (Convert › To image)
+  'Export pages as images': 'Seiten als Bilder exportieren',
+  'No pages are selected in the thumbnail panel.': 'In der Miniaturenleiste sind keine Seiten ausgewählt.',
+  'Format': 'Format',
+  'WebP is not supported by this browser.': 'WebP wird von diesem Browser nicht unterstützt.',
+  'Resolution (DPI)': 'Auflösung (dpi)',
+  'Quality': 'Qualität',
+  'Save pages as PNG, JPEG, WebP or TIFF images': 'Seiten als PNG-, JPEG-, WebP- oder TIFF-Bilder speichern',
+  'The resolution was reduced to {n} dpi: the browser limits the size of an image.': 'Die Auflösung wurde auf {n} dpi reduziert: Der Browser begrenzt die Größe eines Bildes.',
 };
 
 export default DE;
