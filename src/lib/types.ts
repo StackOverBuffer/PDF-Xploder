@@ -198,6 +198,13 @@ export type Tool =
   | 'text'
   | 'note'
   | 'stamp'
+  /** Fill & Sign: a one-click vector mark (check or cross). */
+  | 'signCheck'
+  | 'signCross'
+  /** Fill & Sign: a text box with today's date. */
+  | 'signDate'
+  /** Fill & Sign: the saved initials image. */
+  | 'signInitials'
   | 'redact'
   /** Drag a box for a visible digital signature. */
   | 'sign'

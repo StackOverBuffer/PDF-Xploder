@@ -91,6 +91,10 @@ export const DEFAULT_STYLES: Record<string, ToolStyle> = {
   text: { color: '#111111', fill: null, width: 1, opacity: 1, fontSize: 14, stampLabel: '' },
   note: { color: '#fbc02d', fill: null, width: 1, opacity: 1, fontSize: 12, stampLabel: '' },
   stamp: { color: '#2e7d32', fill: null, width: 3, opacity: 0.9, fontSize: 12, stampLabel: 'Approved' },
+  signCheck: { color: '#2e7d32', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
+  signCross: { color: '#e53935', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
+  signDate: { color: '#111111', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
+  signInitials: { color: '#0d47a1', fill: null, width: 2, opacity: 1, fontSize: 12, stampLabel: '' },
   redact: { color: '#000000', fill: null, width: 1, opacity: 1, fontSize: 12, stampLabel: '' },
 };
 
