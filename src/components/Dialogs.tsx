@@ -34,8 +34,9 @@ const FontsTab = lazy(() => import('./PropertiesTabs').then((m) => ({ default: m
 const SecurityTab = lazy(() => import('./PropertiesTabs').then((m) => ({ default: m.SecurityTab })));
 const SanitizeDialog = lazy(() => import('./SanitizeDialog').then((m) => ({ default: m.SanitizeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
+const ExportImageDialog = lazy(() => import('./ExportImageDialog').then((m) => ({ default: m.ExportImageDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'sanitize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | 'commentSummary' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'sanitize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | 'commentSummary' | 'exportImage' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -478,6 +479,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'barcodes': return <BarcodesDialog close={close} />;
     case 'ocr': return <OcrDialog close={close} />;
     case 'print': return <PrintDialog close={close} />;
+    case 'exportImage': return <ExportImageDialog close={close} />;
     case 'measureScale': return <ScaleDialog close={close} />;
     case 'insertBarcode': return <BarcodeDialog close={close} />;
     case 'preferences': return <PrefsDialog close={close} />;
