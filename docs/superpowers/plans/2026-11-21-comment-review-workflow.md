@@ -240,20 +240,20 @@ git commit -m "Comment summary: generate a PDF document from the comments"
 - Consumes: `exportMeasurementsCsv` (`src/store/measureCommands.ts:44`) and `measurementsCsv` (`src/lib/measure.ts`) as the pattern (BOM, `downloadBlob`, language switch).
 - Produces: `export function commentsCsv(rows: { page: number; type: string; author: string; date: string; status: string; text: string }[], lang: 'en' | 'de'): string` and `export function exportCommentsCsv()` in `src/store/extras.ts`.
 
-- [ ] **Step 1: Failing test** — CSV quoting: a comment text with comma, quote and newline comes back quoted and doubled (`"a, ""b"""`), columns `page,type,author,date,status,text` in that order, first cell header row, no BOM inside the returned string (the store command adds the BOM like measurements does):
+- [x] **Step 1: Failing test** — CSV quoting: a comment text with comma, quote and newline comes back quoted and doubled (`"a, ""b"""`), columns `page,type,author,date,status,text` in that order, first cell header row, no BOM inside the returned string (the store command adds the BOM like measurements does):
 
 ```ts
 expect(commentsCsv([{ page: 1, type: 'Note', author: 'A', date: '2026-11-21', status: '', text: 'a, "b"\nc' }], 'en'))
   .toBe('page,type,author,date,status,text\r\n1,Note,A,2026-11-21,,"a, ""b""\nc"');
 ```
 
-- [ ] **Step 2: Run — expect FAIL. Implement** the writer (RFC 4180: quote fields containing `,` `"` `\r` `\n`, double the quotes; `\r\n` line endings) and the store command (notify `There are no comments to export.` when empty; filename `${baseName(S().fileName || 'document')}-comments.csv`; type `text/csv`; BOM prefix `'\\uFEFF'` like measurements).
+- [x] **Step 2: Run — expect FAIL. Implement** the writer (RFC 4180: quote fields containing `,` `"` `\r` `\n`, double the quotes; `\r\n` line endings) and the store command (notify `There are no comments to export.` when empty; filename `${baseName(S().fileName || 'document')}-comments.csv`; type `text/csv`; BOM prefix `'\\uFEFF'` like measurements).
 
-- [ ] **Step 3: Ribbon** — Review tab, Group "Comments": `<Btn icon={<FileSpreadsheet size={L} />} label="Export comments CSV" title="Save every comment as a CSV file" disabled={noDoc} onClick={extra.exportCommentsCsv} />` (import what is missing; the icon is already imported for measurements — reuse the same import).
+- [x] **Step 3: Ribbon** — Review tab, Group "Comments": `<Btn icon={<FileSpreadsheet size={L} />} label="Export comments CSV" title="Save every comment as a CSV file" disabled={noDoc} onClick={extra.exportCommentsCsv} />` (import what is missing; the icon is already imported for measurements — reuse the same import).
 
-- [ ] **Step 4: German strings**: `'Export comments CSV': 'Kommentare als CSV exportieren'`, `'There are no comments to export.': 'Es gibt keine Kommentare zu exportieren.'`.
+- [x] **Step 4: German strings**: `'Export comments CSV': 'Kommentare als CSV exportieren'`, `'There are no comments to export.': 'Es gibt keine Kommentare zu exportieren.'`.
 
-- [ ] **Step 5: Run `npm test` — green. Commit:**
+- [x] **Step 5: Run `npm test` — green. Commit:**
 
 ```bash
 git add src/lib/commentSummary.ts src/store/extras.ts src/components/Ribbon.tsx src/locales/de/ui.ts tests/commentWorkflow.test.ts

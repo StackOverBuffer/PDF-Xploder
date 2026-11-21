@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { importAnnotations, writeNativeAnnotation } from '../src/lib/annotIO';
 import { drawContext, exportWithAnnotations } from '../src/lib/pdfOps';
-import { commentSummaryMarkdown, escapeMarkdownText } from '../src/lib/commentSummary';
+import { commentSummaryMarkdown, commentsCsv, escapeMarkdownText } from '../src/lib/commentSummary';
 import type { Annotation, PageGeom } from '../src/lib/types';
 
 const g: PageGeom = { view: [0, 0, 300, 200], rotation: 0 };
@@ -106,4 +106,9 @@ it('omits replies when asked and localizes headings in German', () => {
   const md = commentSummaryMarkdown('Plan.pdf', [{ page: 1, list: [note({ replies: [{ id: 'r', author: 'B', text: 'done', createdAt: 0 }] })] }], { includeReplies: false }, 'de');
   expect(md).toContain('Kommentare');
   expect(md).not.toContain('done');
+});
+
+it('quotes commas, quotes and line breaks in the comments CSV', () => {
+  expect(commentsCsv([{ page: 1, type: 'Note', author: 'A', date: '2026-11-21', status: '', text: 'a, "b"\nc' }], 'en'))
+    .toBe('page,type,author,date,status,text\r\n1,Note,A,2026-11-21,,"a, ""b""\nc"');
 });
