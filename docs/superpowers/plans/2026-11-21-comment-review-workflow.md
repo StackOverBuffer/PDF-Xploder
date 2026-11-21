@@ -168,7 +168,7 @@ git commit -m "Comment review status: stored as a review state annotation in the
   - `export function commentSummaryMarkdown(docName: string, byPage: { page: number; list: Annotation[] }[], o: CommentSummaryOptions, lang: 'en' | 'de'): string`
   - `export async function summarizeComments(o: CommentSummaryOptions)` in `src/store/extras.ts`.
 
-- [ ] **Step 1: Write the failing test** in `tests/commentWorkflow.test.ts`:
+- [x] **Step 1: Write the failing test** in `tests/commentWorkflow.test.ts`:
 
 ```ts
 import { commentSummaryMarkdown, escapeMarkdownText } from '../src/lib/commentSummary';
@@ -195,12 +195,12 @@ it('omits replies when asked and localizes headings in German', () => {
 
 (Shape the exact heading words freely — pin whatever you implement; the assertions above are the required behaviour. The comment text must appear escaped so `*bold*` shows literally in the PDF.)
 
-- [ ] **Step 2: Run `npm test -- tests/commentWorkflow.test.ts` — expect FAIL.**
+- [x] **Step 2: Run `npm test -- tests/commentWorkflow.test.ts` — expect FAIL.**
 
-- [ ] **Step 3: Implement `commentSummary.ts`:** heading `# {Comments} — {docName}` (only when `byPage` has entries; the store command guards the empty case), one `## {Page {n}}` per page with comments, one list item per comment: `**{type label}** · {author} · {localized date} · {status}` then the escaped text on the next line; replies (when included) as indented sub-items `{author}: {text}`. Type labels: reuse the English `ANNOT_LABELS` names (`src/lib/annotGeom.ts`) as keys and translate the handful the summary needs for German inside this module (follow how `measurementsCsv` switches on `lang`).
+- [x] **Step 3: Implement `commentSummary.ts`:** heading `# {Comments} — {docName}` (only when `byPage` has entries; the store command guards the empty case), one `## {Page {n}}` per page with comments, one list item per comment: `**{type label}** · {author} · {localized date} · {status}` then the escaped text on the next line; replies (when included) as indented sub-items `{author}: {text}`. Type labels: reuse the English `ANNOT_LABELS` names (`src/lib/annotGeom.ts`) as keys and translate the handful the summary needs for German inside this module (follow how `measurementsCsv` switches on `lang`).
   Date: `new Intl.DateTimeFormat(lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })` is fine here (generated document, not a unit-pinned string — assert only that author/status/text appear).
 
-- [ ] **Step 4: Store command** in `src/store/extras.ts`:
+- [x] **Step 4: Store command** in `src/store/extras.ts`:
 
 ```ts
 export async function summarizeComments(o: { includeReplies: boolean }) {
@@ -216,11 +216,11 @@ export async function summarizeComments(o: { includeReplies: boolean }) {
 
 (match the module's existing import style — `S`, `useLang`, `baseName`, lazy `markdownToPdf` if extras loads it on demand like other heavy imports).
 
-- [ ] **Step 5: Dialog and ribbon** — in `Dialogs.tsx`: add `'commentSummary'` to the `DialogName` union and a case rendering a small modal (pattern: `GotoDialog`): a checkbox "Include replies" (default on) and OK → `extra.summarizeComments({ includeReplies })`. In `Ribbon.tsx` Review tab, Group "Comments": add `<Btn icon={<FileText size={L} />} label="Summarize comments" title="Generate a PDF listing every comment" disabled={noDoc} onClick={() => show('commentSummary')} />`.
+- [x] **Step 5: Dialog and ribbon** — in `Dialogs.tsx`: add `'commentSummary'` to the `DialogName` union and a case rendering a small modal (pattern: `GotoDialog`): a checkbox "Include replies" (default on) and OK → `extra.summarizeComments({ includeReplies })`. In `Ribbon.tsx` Review tab, Group "Comments": add `<Btn icon={<FileText size={L} />} label="Summarize comments" title="Generate a PDF listing every comment" disabled={noDoc} onClick={() => show('commentSummary')} />`.
 
-- [ ] **Step 6: German strings**: `'Summarize comments': 'Kommentare zusammenfassen'`, `'Include replies': 'Antworten einbeziehen'`, `'There are no comments to summarize.': 'Es gibt keine Kommentare zusammenzufassen.'`, plus the summary's own German words (`Comments`, `Page {n}` if not already present — check existing keys first, `Page {n}` exists).
+- [x] **Step 6: German strings**: `'Summarize comments': 'Kommentare zusammenfassen'`, `'Include replies': 'Antworten einbeziehen'`, `'There are no comments to summarize.': 'Es gibt keine Kommentare zusammenzufassen.'`, plus the summary's own German words (`Comments`, `Page {n}` if not already present — check existing keys first, `Page {n}` exists).
 
-- [ ] **Step 7: Run `npm test` and `npm run typecheck` — green. Commit:**
+- [x] **Step 7: Run `npm test` and `npm run typecheck` — green. Commit:**
 
 ```bash
 git add src/lib/commentSummary.ts src/store/extras.ts src/components/Dialogs.tsx src/components/Ribbon.tsx src/locales/de/ui.ts tests/commentWorkflow.test.ts

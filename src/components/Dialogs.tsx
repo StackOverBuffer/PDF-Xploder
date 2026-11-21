@@ -6,7 +6,7 @@ import { uid, useStore } from '../store/store';
 import { useCan } from '../store/permissions';
 import * as cmd from '../store/commands';
 import { getMetadata, type HeaderFooterOptions, type Metadata, type Position, type PageSelection } from '../lib/pdfOps';
-import { fixAccessibility, runAccessibilityCheck } from '../store/extras';
+import { fixAccessibility, runAccessibilityCheck, summarizeComments } from '../store/extras';
 import type { CheckResult } from '../lib/accessibility';
 import { tf, tr, useLang, useT } from '../lib/i18n';
 import type { SignPlacement } from './SecurityDialogs';
@@ -35,7 +35,7 @@ const SecurityTab = lazy(() => import('./PropertiesTabs').then((m) => ({ default
 const SanitizeDialog = lazy(() => import('./SanitizeDialog').then((m) => ({ default: m.SanitizeDialog })));
 const PrintDialog = lazy(() => import('./PrintDialog').then((m) => ({ default: m.PrintDialog })));
 
-export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'sanitize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | OrganizeDialogName | BookmarkDialogName;
+export type DialogName = 'watermark' | 'headerFooter' | 'crop' | 'split' | 'metadata' | 'signature' | 'shortcuts' | 'goto' | 'security' | 'permissions' | 'sign' | 'accessibility' | 'recompress' | 'optimize' | 'sanitize' | 'barcodes' | 'ocr' | 'print' | 'measureScale' | 'calibrate' | 'insertBarcode' | 'preferences' | 'commentSummary' | OrganizeDialogName | BookmarkDialogName;
 
 export const useDialog = create<{ open: DialogName | null; payload: unknown; show(d: DialogName, payload?: unknown): void; close(): void }>()((set) => ({
   open: null,
@@ -218,6 +218,16 @@ function MetadataDialog({ close }: { close: () => void }) {
         <label className="row" key={k}><span>{t(k[0].toUpperCase() + k.slice(1))}</span><input value={m[k]} onChange={(e) => setM({ ...m, [k]: e.target.value })} /></label>
       )))}
       {tab !== 'description' && <Suspense fallback={<p>{t('Loading…')}</p>}>{tab === 'fonts' ? <FontsTab /> : <SecurityTab />}</Suspense>}
+    </Modal>
+  );
+}
+
+function CommentSummaryDialog({ close }: { close: () => void }) {
+  const t = useT();
+  const [replies, setReplies] = useState(true);
+  return (
+    <Modal title={t('Summarize comments')} onClose={close} footer={<><button onClick={close}>{t('Cancel')}</button><button className="primary" onClick={() => { close(); summarizeComments({ includeReplies: replies }); }}>{t('OK')}</button></>}>
+      <label className="row"><span>{t('Include replies')}</span><input type="checkbox" checked={replies} onChange={(e) => setReplies(e.target.checked)} /></label>
     </Modal>
   );
 }
@@ -466,6 +476,7 @@ function dialogFor(open: DialogName | null, close: () => void) {
     case 'measureScale': return <ScaleDialog close={close} />;
     case 'insertBarcode': return <BarcodeDialog close={close} />;
     case 'preferences': return <PrefsDialog close={close} />;
+    case 'commentSummary': return <CommentSummaryDialog close={close} />;
     case 'calibrate': return <CalibrateDialog close={close} annotation={useDialog.getState().payload as Annotation} />;
     case 'sign': return <SignDialog close={close} placement={useDialog.getState().payload as SignPlacement | undefined} />;
     case 'orgInsertBlank': case 'orgInsertFile': case 'orgInterleave': case 'orgMerge': case 'orgImagePages': case 'orgDelete': case 'orgExtract': case 'orgMove': case 'orgSplit':
