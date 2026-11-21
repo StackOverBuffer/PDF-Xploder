@@ -28,6 +28,7 @@ import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
 import type { Annotation, PageGeom, Pt, Rect, Reply, StatusEntry } from './types';
 import { statusHistory } from './reviewStatus';
+import { drawsDifferently, foreignKey, readKeys, restoreKeys } from './foreignKeys';
 import { textString } from './pdfStrings';
 
 const PRIVATE = PDFName.of('AwesomePDF');
@@ -256,8 +257,11 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
 
   // Replies are separate annotations (below), read back from there; the status becomes
   // a standard review state annotation, so it is kept out of the private model too.
-  const { replies, status, statusLog, ...rest } = a;
-  const model: Record<string, unknown> = { ...rest, rect0: rect };
+  // Keys another program wrote, kept while the annotation is unchanged (foreignKeys).
+  restoreKeys(dict, a, pdf);
+  const { replies, status, statusLog, foreign, ...rest } = a;
+  void foreign;
+  const model: Record<string, unknown> = { ...rest, rect0: rect, std0: standardPrint(dict) };
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
   if (a.type === 'stamp' && a.kind) {
@@ -382,7 +386,23 @@ function base(dict: PDFDict, env: ParseEnv) {
 }
 
 /** Our private model, adjusted for edits another program made to the standard keys. */
-function fromPrivate(dict: PDFDict): Annotation | null {
+/**
+ * The standard keys other editors change when they resize, restyle or reshape an
+ * annotation. Saved with the private model: when they differ on import, those
+ * properties come from the standard keys instead.
+ */
+function standardPrint(dict: PDFDict): string {
+  const r = rectOf(dict);
+  const k = (name: string) => dict.lookup(PDFName.of(name))?.toString() ?? '';
+  const bs = dict.lookup(PDFName.of('BS'));
+  const w = bs instanceof PDFDict ? (bs.lookup(PDFName.of('W'))?.toString() ?? '') : '';
+  return JSON.stringify([r ? [Math.round(r.w * 2), Math.round(r.h * 2)] : 0, k('CA'), w, k('Vertices'), k('InkList'), k('L'), k('QuadPoints'), k('IC')]);
+}
+
+/** What another editor's reshaping changes in our model. */
+const SHAPE_KEYS = ['rect', 'rects', 'paths', 'p1', 'p2', 'vertices', 'at', 'width', 'opacity', 'fill'] as const;
+
+function fromPrivate(dict: PDFDict, env: ParseEnv): Annotation | null {
   const raw = text(dict.lookup(PRIVATE));
   if (!raw) return null;
   let a: Annotation & { rect0?: Rect };
@@ -393,9 +413,16 @@ function fromPrivate(dict: PDFDict): Annotation | null {
   }
   const now = rectOf(dict);
   const was = a.rect0;
+  const std0 = (a as { std0?: string }).std0;
   delete a.rect0;
-  // Another editor may have moved the annotation: follow its /Rect.
-  if (now && was && (Math.abs(now.x - was.x) > 0.5 || Math.abs(now.y - was.y) > 0.5) && Math.abs(now.w - was.w) < 0.5 && Math.abs(now.h - was.h) < 0.5) {
+  delete (a as { std0?: string }).std0;
+  const reshaped = std0 !== undefined && std0 !== standardPrint(dict);
+  if (reshaped) {
+    // Another editor resized it, changed its opacity, width or points: take those from
+    // the standard keys (the rest, such as the author and our extras, stays ours).
+    const s = fromStandard(dict, env) as Record<string, unknown> | null;
+    if (s) for (const k of SHAPE_KEYS) if (k in s && k in a && s[k] !== undefined) (a as unknown as Record<string, unknown>)[k] = s[k];
+  } else if (now && was && (Math.abs(now.x - was.x) > 0.5 || Math.abs(now.y - was.y) > 0.5) && Math.abs(now.w - was.w) < 0.5 && Math.abs(now.h - was.h) < 0.5) {
     a = { ...a, ...translate(a, now.x - was.x, now.y - was.y) } as Annotation;
   }
   const contents = text(dict.lookup(PDFName.of('Contents')));
@@ -601,7 +628,7 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
         replies.push({ dict, entry });
         continue;
       }
-      const own = fromPrivate(dict);
+      const own = fromPrivate(dict, env);
       const a = own ?? fromStandard(dict, env);
       if (!a) continue;
       // Another program's stamp: keep its own drawing (and leave it in the file if that fails).
@@ -620,6 +647,16 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
           a.appearanceOf = textBoxKey(a);
         }
       }
+      // Everything else the file says about it, written back while it is unchanged; and,
+      // where our drawing would differ, its own drawing too.
+      a.foreign = { keys: readKeys(dict), of: '' };
+      if (a.type !== 'stamp' && a.type !== 'text' && drawsDifferently(dict, a)) {
+        const ap = normalAppearance(dict);
+        const pdf = ap ? await appearanceToPdf(doc, ap).catch(() => undefined) : undefined;
+        const r = rectOf(dict);
+        if (pdf && r) Object.assign(a.foreign, { ap: pdf, rect: r });
+      }
+      a.foreign.of = foreignKey(a);
       // Its popup: where it is now (another editor may have moved it) and whether it is open.
       // A closed popup nobody placed (one written for other viewers) is left out.
       const pop = dict.lookup(PDFName.of('Popup'));

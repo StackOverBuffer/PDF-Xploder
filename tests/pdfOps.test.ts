@@ -15,6 +15,13 @@ async function makeDoc(n: number): Promise<Uint8Array> {
 
 const widths = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getPages().map((p) => p.getWidth());
 
+/** The model without what import keeps of the file's own keys (foreignKeys). */
+const model = <T extends object>(a: T): T => {
+  const { foreign, ...rest } = a as T & { foreign?: unknown };
+  void foreign;
+  return rest as T;
+};
+
 describe('page operations', () => {
   it('rotates selected pages', async () => {
     const out = await ops.rotatePages(await makeDoc(3), [0, 2], 90);
@@ -169,7 +176,7 @@ describe('export', () => {
       ]);
       const back = await ops.importForEditing(out, () => 'new');
       expect(back.count).toBe(withImage.length);
-      expect(back.annotations[0]).toEqual(withImage);
+      expect(back.annotations[0].map(model)).toEqual(withImage);
       // Imported annotations are removed from the page so they are not drawn twice.
       expect(await subtypes(back.bytes)).toEqual([]);
     });
@@ -199,7 +206,7 @@ describe('export', () => {
     expect(popups.map((d) => d.get(PDFName.of('Open'))?.toString())).toEqual(['true', 'false']);
     expect((popups[0].get(PDFName.of('Rect')) as PDFArray).asArray().map((x) => (x as PDFNumber).asNumber())).toEqual([60, 150, 280, 270]);
     const back = await ops.importForEditing(out, () => 'x');
-    expect(back.annotations[0]).toEqual([note, box]);
+    expect(back.annotations[0].map(model)).toEqual([note, box]);
   });
 
   it('leaves out closed popups nobody placed, and opens the ones another editor left open', async () => {
@@ -221,6 +228,18 @@ describe('export', () => {
     dict.set(PDFName.of('Contents'), PDFHexString.fromText('edited elsewhere'));
     const back = await ops.importForEditing(await doc.save(), () => 'x');
     expect(back.annotations[0][0]).toMatchObject({ type: 'rect', rect: { x: 60, y: 45, w: 30, h: 30 }, comment: 'edited elsewhere' });
+  });
+
+  it('follows a resize, opacity and width set by another editor', async () => {
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [[all[3]]]);
+    const doc = await PDFDocument.load(out);
+    const dict = doc.context.lookup(doc.getPage(0).node.Annots()!.get(0)) as PDFDict;
+    dict.set(PDFName.of('Rect'), doc.context.obj([40, 40, 140, 140]));
+    dict.set(PDFName.of('CA'), doc.context.obj(0.5));
+    dict.set(PDFName.of('BS'), doc.context.obj({ W: 5, S: 'S' }));
+    const back = (await ops.importForEditing(await doc.save(), () => 'x')).annotations[0][0];
+    expect(back).toMatchObject({ type: 'rect', opacity: 0.5, width: 5, id: all[3].id, author: all[3].author });
+    expect((back as { rect: { w: number } }).rect.w).toBeGreaterThan(90);
   });
 
   it('imports standard annotations written by other software', async () => {
