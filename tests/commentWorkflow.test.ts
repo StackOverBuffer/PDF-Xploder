@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-lib';
 import { importAnnotations, writeNativeAnnotation } from '../src/lib/annotIO';
 import { drawContext, exportWithAnnotations } from '../src/lib/pdfOps';
+import { commentSummaryMarkdown, escapeMarkdownText } from '../src/lib/commentSummary';
 import type { Annotation, PageGeom } from '../src/lib/types';
 
 const g: PageGeom = { view: [0, 0, 300, 200], rotation: 0 };
@@ -86,4 +87,23 @@ it('writes no status dict for a flattened copy', async () => {
   const bytes = await doc.save();
   const flat = await exportWithAnnotations(bytes, [[note({ status: 'Completed' })]], { flatten: true });
   expect(new TextDecoder().decode(flat)).not.toContain('StateModel');
+});
+
+it('escapes markdown syntax in comment text', () => {
+  expect(escapeMarkdownText('# hi *bold* [link](x)')).toBe('\\# hi \\*bold\\* \\[link\\](x)');
+});
+
+it('builds one section per page with author, date and status', () => {
+  const md = commentSummaryMarkdown('Plan.pdf', [{ page: 2, list: [note({ author: 'Jane', status: 'Accepted' })] }], { includeReplies: true }, 'en');
+  expect(md).toContain('# Comments — Plan.pdf');
+  expect(md).toContain('## Page 2');
+  expect(md).toContain('Jane');
+  expect(md).toContain('Accepted');
+  expect(md).toContain('hello');
+});
+
+it('omits replies when asked and localizes headings in German', () => {
+  const md = commentSummaryMarkdown('Plan.pdf', [{ page: 1, list: [note({ replies: [{ id: 'r', author: 'B', text: 'done', createdAt: 0 }] })] }], { includeReplies: false }, 'de');
+  expect(md).toContain('Kommentare');
+  expect(md).not.toContain('done');
 });

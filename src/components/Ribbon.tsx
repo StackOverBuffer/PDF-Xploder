@@ -583,6 +583,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <SidebarBtn tab="comments" icon={<MessageSquare size={L} />} label="Comments list" />
           <ToolBtn tool="note" icon={<StickyNote size={L} />} label="Note" />
           <ToolBtn tool="highlight" icon={<Highlighter size={L} />} label="Highlight" />
+          <Btn icon={<FileText size={L} />} label="Summarize comments" title="Generate a PDF listing every comment" disabled={noDoc} onClick={() => show('commentSummary')} />
         </Group>
         <Group label="Signatures">
           <SidebarBtn tab="signatures" icon={<ShieldCheck size={L} />} label="Validate" />

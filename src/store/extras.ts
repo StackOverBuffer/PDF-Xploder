@@ -6,8 +6,9 @@
 import { create } from 'zustand';
 import { annotationsByPage, useStore } from './store';
 import { requirePermission } from './permissions';
-import { tf, tr } from '../lib/i18n';
-import { ops } from '../lib/worker';
+import { tf, tr, useLang } from '../lib/i18n';
+import { ops, org } from '../lib/worker';
+import { commentSummaryMarkdown } from '../lib/commentSummary';
 import { buildFileForSave, currentBytes, normaliseImage, placeContentImage, placeImage } from './commands';
 import { baseName, downloadBlob, fileBytes, pickFile, readAsDataUrl } from '../lib/download';
 import { pageGeom, pdfRectToView, viewSize } from '../lib/geometry';
@@ -137,6 +138,20 @@ export async function insertImageBlob(blob: Blob, as: 'auto' | 'comment' | 'cont
   const img = await normaliseImage(await readAsDataUrl(blob));
   if (content) await placeContentImage(img);
   else placeImage(img.src, img.width * 0.75, img.height * 0.75);
+}
+
+// ---------------------------------------------------------------- comments
+
+/** The comments as a generated PDF document (Review → Summarize comments). */
+export async function summarizeComments(o: { includeReplies: boolean }) {
+  const s = S();
+  const byPage = s.pageIds.flatMap((id, i) => (s.annotations[id]?.length ? [{ page: i + 1, list: s.annotations[id] }] : []));
+  if (!byPage.length) return s.notify('There are no comments to summarize.');
+  await s.run('Summarizing…', async () => {
+    const name = baseName(s.fileName || 'document');
+    const md = commentSummaryMarkdown(name, byPage, o, useLang.getState().lang);
+    await s.openInNewTab(await org.markdownToPdf(md, { title: `${tr('Comments')} – ${name}` }), `${name}-comments.pdf`);
+  });
 }
 
 // ---------------------------------------------------------------- sharing
