@@ -36,6 +36,13 @@ export async function load(bytes: Uint8Array): Promise<PDFDocument> {
  * copied form widgets are registered in `dest`'s form, links to pages left behind are cut.
  */
 export { copyPages };
+import { clearSignatures } from './staleSignatures';
+
+/** A rewritten signed document: its signatures, which no longer match, become empty fields. */
+export async function dropStaleSignatures(bytes: Uint8Array): Promise<Uint8Array> {
+  const doc = await load(bytes);
+  return clearSignatures(doc) ? save(doc) : bytes;
+}
 
 async function save(doc: PDFDocument): Promise<Uint8Array> {
   return saveDoc(doc);

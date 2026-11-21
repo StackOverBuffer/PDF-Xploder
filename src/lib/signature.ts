@@ -216,7 +216,9 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
   const sig = ctx.obj({
     Type: 'Sig',
     Filter: 'Adobe.PPKLite',
-    SubFilter: 'adbe.pkcs7.detached',
+    // PAdES baseline (ETSI EN 319 142-1): CAdES with the signer's certificate bound by
+    // signing-certificate-v2, and the signing time in /M instead of a signed attribute.
+    SubFilter: 'ETSI.CAdES.detached',
     ByteRange: [0, PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER)],
     Contents: PDFHexString.of('0'.repeat(SIGNATURE_SPACE * 2)),
     M: PDFString.fromDate(date),
@@ -314,26 +316,61 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
     authenticatedAttributes: [
       { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
       { type: forge.pki.oids.messageDigest },
-      { type: forge.pki.oids.signingTime, value: date as never },
     ],
   });
   p7.sign({ detached: true });
   const asn1 = p7.toAsn1();
+  const certDer = fromBinary(forge.asn1.toDer(forge.pki.certificateToAsn1(o.identity.cert)).getBytes());
   // forge re-encodes the signer's issuer name from parsed attributes, which
   // double-encodes UTF-8 values; use the certificate's exact issuer bytes so
   // validators can match the signer to its certificate.
-  const certDer = fromBinary(forge.asn1.toDer(forge.pki.certificateToAsn1(o.identity.cert)).getBytes());
   const tbs = der.parseDer(certDer).children[0].children;
   const issuer = tbs[tbs[0].tag === 0xa0 ? 3 : 2];
   const signedData = (asn1.value as forgeType.asn1.Asn1[])[1].value as forgeType.asn1.Asn1[];
   const sdFields = signedData[0].value as forgeType.asn1.Asn1[];
   const signerInfo = (sdFields[sdFields.length - 1].value as forgeType.asn1.Asn1[])[0];
   const issuerAndSerial = (signerInfo.value as forgeType.asn1.Asn1[])[1];
+  padesAttributes(forge, signerInfo, o.identity.key, certDer);
   (issuerAndSerial.value as forgeType.asn1.Asn1[])[0] = forge.asn1.fromDer(toBinary(der.whole(certDer, issuer)));
   const cms = der.hex(fromBinary(forge.asn1.toDer(asn1).getBytes()));
   if (cms.length > SIGNATURE_SPACE * 2) throw new Error('The signature is too large for the space reserved in the file.');
   out.set(new TextEncoder().encode(cms), cStart + 1);
   return out;
+}
+
+/**
+ * Replace forge's signed attributes with the PAdES ones (content type, message digest,
+ * signing-certificate-v2) and sign them again. forge cannot encode signing-certificate-v2
+ * itself, so the attributes are built here.
+ */
+function padesAttributes(forge: Forge, signerInfo: forgeType.asn1.Asn1, key: forgeType.pki.rsa.PrivateKey, certDer: Uint8Array) {
+  const { asn1 } = forge;
+  const fields = signerInfo.value as forgeType.asn1.Asn1[];
+  // version, issuerAndSerialNumber, digestAlgorithm, [0] signedAttrs, signatureAlgorithm, signature
+  const attrs = fields[3];
+  if (attrs.tagClass !== asn1.Class.CONTEXT_SPECIFIC || attrs.type !== 0) throw new Error('Unexpected signer info layout.');
+  const oidOf = (a: forgeType.asn1.Asn1) => asn1.derToOid(((a.value as forgeType.asn1.Asn1[])[0].value as string));
+  const kept = (attrs.value as forgeType.asn1.Asn1[]).filter((a) => [forge.pki.oids.contentType, forge.pki.oids.messageDigest].includes(oidOf(a)));
+  const md = forge.md.sha256.create();
+  md.update(toBinary(certDer));
+  const seq = (v: forgeType.asn1.Asn1[]) => asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, v);
+  // SigningCertificateV2 ::= SEQUENCE { certs SEQUENCE OF ESSCertIDv2 }, ESSCertIDv2 ::= SEQUENCE { certHash } (SHA-256 by default)
+  const signingCertV2 = seq([
+    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer('1.2.840.113549.1.9.16.2.47').getBytes()),
+    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [seq([seq([seq([asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OCTETSTRING, false, md.digest().getBytes())])])])]),
+  ]);
+  const list = [...kept, signingCertV2];
+  // DER sorts SET OF elements by their encoding.
+  list.sort((x, y) => {
+    const a = asn1.toDer(x).getBytes();
+    const b = asn1.toDer(y).getBytes();
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  attrs.value = list;
+  // The signature covers the attributes encoded as a SET (tag 0x31), not as [0].
+  const digest = forge.md.sha256.create();
+  digest.update(asn1.toDer(asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, list)).getBytes());
+  (fields[5] as forgeType.asn1.Asn1).value = key.sign(digest);
 }
 
 // ---------------------------------------------------------------- verification

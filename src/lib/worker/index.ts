@@ -18,7 +18,7 @@ const IN_WORKER: Record<WorkerModule, Set<string>> = {
   ops: new Set([
     'exportWithAnnotations', 'extractPages', 'deletePages', 'setFormValues', 'insertDocument', 'splitEvery', 'rotatePages', 'reorderPages',
     'cropPages', 'setMetadata', 'getMetadata', 'replacePagesWithImages', 'insertBlankPage', 'flattenFormFields', 'duplicatePages', 'addWatermark',
-    'addHeaderFooter', 'getFormFields', 'importForEditing',
+    'addHeaderFooter', 'getFormFields', 'importForEditing', 'dropStaleSignatures',
   ]),
   org: new Set([
     'assemblePages', 'splitBySize', 'splitByRanges', 'splitByBookmarks', 'setPageLabels', 'getPageLabels', 'resizePages', 'removePageMarks',

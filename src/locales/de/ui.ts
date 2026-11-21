@@ -286,8 +286,8 @@ const DE: Record<string, string> = {
   'This document is damaged or uses unsupported encryption: it is open read-only.':
     'Dieses Dokument ist beschädigt oder verwendet eine nicht unterstützte Verschlüsselung: Es ist schreibgeschützt geöffnet.',
   'Please choose a PDF file.': 'Bitte wählen Sie eine PDF-Datei.', 'Discard unsaved changes?': 'Nicht gespeicherte Änderungen verwerfen?',
-  'This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?':
-    'Dieses Dokument ist digital signiert. Beim Speichern Ihrer Änderungen wird die Datei neu geschrieben, wodurch die vorhandenen Signaturen ungültig werden. Fortfahren?',
+  'This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures: they are removed, and their fields can be signed again. Continue?':
+    'Dieses Dokument ist digital signiert. Beim Speichern Ihrer Änderungen wird die Datei neu geschrieben, wodurch die vorhandenen Signaturen ungültig werden: Sie werden entfernt, und ihre Felder können erneut signiert werden. Fortfahren?',
   'File name': 'Dateiname', 'A document must keep at least one page.': 'Ein Dokument muss mindestens eine Seite behalten.',
   'Delete {n} page(s)?': '{n} Seite(n) löschen?', 'There are no annotations to flatten.': 'Es gibt keine Kommentare zum Reduzieren.',
   'Mark areas with the Redact tool first.': 'Markieren Sie zuerst Bereiche mit dem Schwärzungswerkzeug.',

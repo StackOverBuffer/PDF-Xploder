@@ -61,4 +61,21 @@ describe('digital signatures', () => {
   it('reports no signatures for unsigned documents', async () => {
     expect(await verifySignatures(await doc())).toEqual([]);
   });
+
+  it('clears signatures a full rewrite breaks, leaving fields that can be signed again', async () => {
+    const { dropStaleSignatures } = await import('../src/lib/pdfOps');
+    const { PDFName } = await import('@cantoo/pdf-lib');
+    const id = await readP12(p12, 'pw');
+    const signed = await signPdf(await doc(), { identity: id, visible: { page: 0, rect: { x: 20, y: 20, w: 200, h: 60 } } });
+    const rewritten = await dropStaleSignatures(signed);
+    expect(await verifySignatures(rewritten)).toEqual([]);
+    const d = await PDFDocument.load(rewritten);
+    const field = d.getForm().getFields()[0];
+    expect(field.constructor.name).toBe('PDFSignature');
+    expect(field.acroField.dict.has(PDFName.of('V'))).toBe(false);
+    expect(field.acroField.getWidgets()[0].dict.has(PDFName.of('AP'))).toBe(false);
+    // Signing it again works and verifies.
+    const again = await signPdf(rewritten, { identity: id });
+    expect((await verifySignatures(again)).map((v) => v.status)).toContain('valid');
+  });
 });

@@ -111,7 +111,10 @@ export async function buildOutput(flatten = false): Promise<Uint8Array> {
 export async function buildFileForSave(): Promise<Uint8Array> {
   const s = S();
   if (unchangedSinceOpen()) return s.originalBytes!;
-  const out = await buildOutput();
+  let out = await buildOutput();
+  // The user agreed to break the signatures (confirmBreakingSignatures): they are cleared
+  // rather than left behind as broken ones.
+  if (s.signatures.length) out = await ops.dropStaleSignatures(out);
   if (s.securityChanged) return s.security ? sec.encrypt(out, s.security) : out;
   // Untouched security: encrypt exactly like the opened file (works without the owner password).
   if (s.keepEncryption && s.originalBytes) return sec.reencryptLike(out, s.originalBytes, s.keepEncryption.password);
@@ -122,7 +125,7 @@ export async function buildFileForSave(): Promise<Uint8Array> {
 async function confirmBreakingSignatures(): Promise<boolean> {
   const s = S();
   if (!s.dirty || !s.signatures.length) return true;
-  return ask({ title: 'Signed document', message: tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'), ok: 'Save anyway', danger: true });
+  return ask({ title: 'Signed document', message: tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures: they are removed, and their fields can be signed again. Continue?'), ok: 'Save anyway', danger: true });
 }
 
 /** The opened bytes are still exactly the document (nothing edited or saved since). */
