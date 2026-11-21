@@ -473,6 +473,16 @@ export async function buildAppearance(
       }
       const fg = frameGeom(g, a.rot);
       const v = pdfRectToView(fg, a.rect);
+      if (a.kind) {
+        // A Fill & Sign mark: the glyph fills the rect in the stamp's own frame, no box.
+        const w = Math.max(1.5, Math.min(v.width, v.height) * 0.14);
+        const P = (fx: number, fy: number): Pt => ({ x: v.left + fx * v.width, y: v.top + fy * v.height });
+        const strokes = a.kind === 'check'
+          ? [[P(0.2, 0.55), P(0.38, 0.8), P(0.85, 0.2)]]
+          : [[P(0.2, 0.2), P(0.8, 0.8)], [P(0.8, 0.2), P(0.2, 0.8)]];
+        for (const pts of strokes) c.polyline(pts.map((p) => viewToPdf(fg, p)), { color: a.color, width: w, opacity: op });
+        break;
+      }
       c.rect(a.rect, { stroke: a.color, width: 3, opacity: op });
       const label = a.label.toUpperCase();
       let size = v.height * 0.55;
