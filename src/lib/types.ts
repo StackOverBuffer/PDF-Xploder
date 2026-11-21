@@ -32,12 +32,17 @@ export interface Reply {
   createdAt: number;
 }
 
+/** The review states of a comment, as Acrobat's StateModel 'Review' knows them. */
+export type ReviewStatus = 'Accepted' | 'Rejected' | 'Cancelled' | 'Completed' | 'Reopened';
+
 interface AnnotBase {
   id: string;
   color: string;
   opacity: number;
   author: string;
   createdAt: number;
+  /** Review status, stored as a /State reply annotation in the file — see annotIO. */
+  status?: ReviewStatus;
   /** Optional comment attached to any annotation. */
   comment?: string;
   /** The title other editors give a comment (/Subj, e.g. a stamp's name), kept as is. */

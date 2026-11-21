@@ -41,15 +41,15 @@
 - Consumes: `useStore` annotations model; `updateAnnotation(pageId, id, patch)` (store.ts:230).
 - Produces: `export type ReviewStatus = 'Accepted' | 'Rejected' | 'Cancelled' | 'Completed' | 'Reopened';` and `status?: ReviewStatus` on `AnnotBase` in `src/lib/types.ts` (comment: "Review status, stored as a /State reply annotation in the file — see annotIO.").
 
-- [ ] **Step 1:** Add `ReviewStatus` and the optional `status` field to `AnnotBase` in `src/lib/types.ts`.
+- [x] **Step 1:** Add `ReviewStatus` and the optional `status` field to `AnnotBase` in `src/lib/types.ts`.
 
-- [ ] **Step 2:** In `CommentsPanel.tsx`, inside each comment row (before the delete button), render a small `<select>` when `editable`, value `a.status ?? ''`, options: `''` → label `t('Not reviewed')`, then the five statuses (label `t(status)`); `onChange` → `updateAnnotation(pid, a.id, { status: v || undefined })`. Style it as `className="small-btn"`-sized inline select (keep the row's layout; a title attribute `t('Review status')` explains it).
+- [x] **Step 2:** In `CommentsPanel.tsx`, inside each comment row (before the delete button), render a small `<select>` when `editable`, value `a.status ?? ''`, options: `''` → label `t('Not reviewed')`, then the five statuses (label `t(status)`); `onChange` → `updateAnnotation(pid, a.id, { status: v || undefined })`. Style it as `className="small-btn"`-sized inline select (keep the row's layout; a title attribute `t('Review status')` explains it).
 
-- [ ] **Step 3:** In the panel header next to the count, add a filter `<select>`: `All`, `Not reviewed`, then the five statuses (state `filter: '' | ReviewStatus | 'none'` with `useState`; `'none'` = not reviewed). While a filter is active, render only matching comments and hide page groups with no matches (the header count stays the document total).
+- [x] **Step 3:** In the panel header next to the count, add a filter `<select>`: `All`, `Not reviewed`, then the five statuses (state `filter: '' | ReviewStatus | 'none'` with `useState`; `'none'` = not reviewed). While a filter is active, render only matching comments and hide page groups with no matches (the header count stays the document total).
 
-- [ ] **Step 4:** German strings in `de/ui.ts`: `Accepted: 'Angenommen'`, `Rejected: 'Abgelehnt'`, `Cancelled: 'Zurückgezogen'`, `Completed: 'Erledigt'`, `Reopened: 'Wieder geöffnet'`, `'Not reviewed': 'Nicht geprüft'`, `'Review status': 'Prüfstatus'`, `All: 'Alle'`.
+- [x] **Step 4:** German strings in `de/ui.ts`: `Accepted: 'Angenommen'`, `Rejected: 'Abgelehnt'`, `Cancelled: 'Zurückgezogen'`, `Completed: 'Erledigt'`, `Reopened: 'Wieder geöffnet'`, `'Not reviewed': 'Nicht geprüft'`, `'Review status': 'Prüfstatus'`, `All: 'Alle'`.
 
-- [ ] **Step 5:** `npm run typecheck` and `npm test` — green. Commit:
+- [x] **Step 5:** `npm run typecheck` and `npm test` — green. Commit:
 
 ```bash
 git add src/lib/types.ts src/components/CommentsPanel.tsx src/locales/de/ui.ts
