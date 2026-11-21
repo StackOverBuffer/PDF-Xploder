@@ -12,7 +12,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 2. ✅ **Optimize / compress documents**: done (File › Compress, Share › Compress): presets plus custom quality and resolution, images downsampled by their resolution on the page, CMYK/JPEG 2000 images converted through pdf.js (except for the print preset), duplicate fonts and images merged, unused objects, thumbnails and metadata removed, object streams; size before and after with Undo. Still open: subsetting fully embedded fonts.
 3. **Compare documents**: side by side, with changed text and changed areas marked.
 4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
-5. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
+5. 🟡 **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (review status, comment summary and CSV export done; FDF/XFDF still open).
 6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
 7. 🟡 **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize) and extract all images (Convert › Extract images, as a ZIP) are done. Still open: rasterize pages, export pages as JPEG/WebP/TIFF.
 
@@ -69,10 +69,10 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Export Measurements to CSV | ✅ |
 | Fit Box by Text Content | ⬜ |
 | Flatten Comments | ✅ |
-| Summarize Comments (with font customization) | ⬜ |
+| Summarize Comments (with font customization) | ✅ as a generated PDF document; font size and replies optional — see markdownToPdf options |
 | Open All Comment Popups that Contain Text | ✅ popups on the page (double-click a comment), open/close all, saved as /Popup with position and open state |
 | Comment Replies (threads) | ✅ shown, added and saved as standard /IRT replies |
-| Comment Review Status | ⬜ |
+| Comment Review Status | ✅ set in the comments panel, stored as standard review state annotations |
 | Support for Existing Screen Annotations | ⬜ |
 | Inline Captions for Line/Dimension Annotations | ⬜ |
 | Eraser Tool for Freehand Annotations | ⬜ |
