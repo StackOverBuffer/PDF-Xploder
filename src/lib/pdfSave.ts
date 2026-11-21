@@ -4,7 +4,7 @@
  * page's old content or a redacted page's original text would stay in the file
  * (and the file would grow with every edit).
  */
-import { decodePDFRawStream, PDFArray, PDFDict, PDFHexString, PDFName, PDFRawStream, PDFRef, PDFStream, PDFString, type PDFDocument, type PDFObject } from '@cantoo/pdf-lib';
+import { decodePDFRawStream, PDFArray, PDFDict, PDFHexString, PDFName, PDFNull, PDFRawStream, PDFRef, PDFStream, PDFString, type PDFDocument, type PDFObject } from '@cantoo/pdf-lib';
 
 /** Delete indirect objects that cannot be reached from the trailer. Returns how many were removed. */
 export function pruneUnreachable(doc: PDFDocument): number {
@@ -37,6 +37,150 @@ export function pruneUnreachable(doc: PDFDocument): number {
     }
   }
   return removed;
+}
+
+/**
+ * Cut every reference to a page object that is no longer in the page tree (a deleted,
+ * dropped or replaced page): bookmarks and links to it would otherwise point at nothing,
+ * and the reference alone would keep the whole page — its text included — in the file.
+ * Links that lead nowhere any more are removed; bookmarks stay, without a target.
+ */
+export function cutLostPageRefs(doc: PDFDocument): number {
+  const ctx = doc.context;
+  // Walked here rather than taken from doc.getPages(): callers that rebuild /Kids by hand
+  // leave pdf-lib's page cache stale.
+  const inTree = new Set<string>();
+  const leaves: PDFDict[] = [];
+  const visit = (ref: PDFObject | undefined, depth: number) => {
+    if (!(ref instanceof PDFRef) || inTree.has(ref.toString()) || depth > 64) return;
+    const node = ctx.lookup(ref);
+    if (!(node instanceof PDFDict)) return;
+    inTree.add(ref.toString());
+    const kids = node.lookup(PDFName.of('Kids'));
+    if (kids instanceof PDFArray) for (const k of kids.asArray()) visit(k, depth + 1);
+    else leaves.push(node);
+  };
+  visit(doc.catalog.get(PDFName.of('Pages')), 0);
+  const lost = new Set<string>();
+  for (const [ref, obj] of ctx.enumerateIndirectObjects()) {
+    if (obj instanceof PDFDict && obj.get(PDFName.of('Type'))?.toString() === '/Page' && !inTree.has(ref.toString())) lost.add(ref.toString());
+  }
+  const isLost = (o: PDFObject | undefined) => o instanceof PDFRef && lost.has(o.toString());
+  let cut = 0;
+  /** Dictionaries (widgets above all) whose page was cut. */
+  const orphaned = new Set<PDFDict>();
+  const seen = new Set<PDFObject>();
+  const stack: PDFObject[] = [];
+  const { Root, Info } = ctx.trailerInfo;
+  if (lost.size) for (const o of [Root, Info]) if (o) stack.push(o);
+  while (stack.length) {
+    let o = stack.pop()!;
+    if (o instanceof PDFRef) {
+      if (isLost(o)) continue;
+      const v = ctx.lookup(o);
+      if (!v) continue;
+      o = v;
+    }
+    if (seen.has(o)) continue;
+    seen.add(o);
+    if (o instanceof PDFStream) o = o.dict;
+    if (o instanceof PDFDict) {
+      for (const [k, v] of o.entries()) {
+        if (isLost(v)) {
+          o.delete(k);
+          if (k === PDFName.of('P')) orphaned.add(o);
+          cut++;
+        } else stack.push(v);
+      }
+    } else if (o instanceof PDFArray) {
+      for (let i = 0; i < o.size(); i++) {
+        if (isLost(o.get(i))) {
+          o.set(i, PDFNull);
+          cut++;
+        } else stack.push(o.get(i));
+      }
+    }
+  }
+  // A destination whose page is gone: no destination. A link without one goes entirely.
+  const deadDest = (d: PDFObject | undefined): boolean => {
+    const arr = d instanceof PDFRef ? ctx.lookup(d) : d;
+    const a = arr instanceof PDFDict ? arr.lookup(PDFName.of('D')) : arr;
+    if (!(a instanceof PDFArray) || !a.size()) return false;
+    const target = a.get(0);
+    // Cut above, or a reference to an object that no longer exists at all.
+    return target === PDFNull || (target instanceof PDFRef && !ctx.lookup(target));
+  };
+  /** Removes a destination that leads nowhere; true when there was one. */
+  const clearDest = (dict: PDFDict): boolean => {
+    let cleared = false;
+    if (deadDest(dict.get(PDFName.of('Dest')))) {
+      dict.delete(PDFName.of('Dest'));
+      cleared = true;
+    }
+    const action = dict.lookupMaybe(PDFName.of('A'), PDFDict);
+    if (action && deadDest(action.get(PDFName.of('D')))) {
+      dict.delete(PDFName.of('A'));
+      cleared = true;
+    }
+    return cleared;
+  };
+  for (const leaf of leaves) {
+    const annots = leaf.lookup(PDFName.of('Annots'));
+    if (!(annots instanceof PDFArray)) continue;
+    const kept = annots.asArray().filter((ref) => {
+      const a = ctx.lookup(ref);
+      if (!(a instanceof PDFDict)) return false;
+      // Only links whose target was cut here go (one without a target may be on purpose).
+      return !(clearDest(a) && a.get(PDFName.of('Subtype'))?.toString() === '/Link' && !a.has(PDFName.of('Dest')) && !a.has(PDFName.of('A')));
+    });
+    if (kept.length !== annots.size()) leaf.set(PDFName.of('Annots'), ctx.obj(kept));
+  }
+  // Form fields whose widgets were on those pages: the widgets go, and a field left
+  // without any goes too, so its value does not stay in the form data of the file.
+  const onPages = new Set<PDFObject>();
+  for (const leaf of leaves) for (const a of leaf.lookupMaybe(PDFName.of('Annots'), PDFArray)?.asArray() ?? []) onPages.add(ctx.lookup(a) ?? a);
+  const gone = (w: PDFDict) => {
+    if (onPages.has(w)) return false;
+    if (orphaned.has(w)) return true;
+    const p = w.get(PDFName.of('P'));
+    return p instanceof PDFRef && !ctx.lookup(p);
+  };
+  /** Prunes the field's kids; true when the field itself should go. */
+  const pruneField = (field: PDFDict, depth: number): boolean => {
+    const kids = field.lookup(PDFName.of('Kids'));
+    if (!(kids instanceof PDFArray) || depth > 32) return field.get(PDFName.of('Subtype'))?.toString() === '/Widget' && gone(field);
+    if (!kids.size()) return false;
+    const kept = kids.asArray().filter((k) => {
+      const kid = ctx.lookup(k);
+      return !(kid instanceof PDFDict) || !pruneField(kid, depth + 1);
+    });
+    if (kept.length === kids.size()) return false;
+    field.set(PDFName.of('Kids'), ctx.obj(kept));
+    return kept.length === 0;
+  };
+  const form = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
+  const fields = form?.lookup(PDFName.of('Fields'));
+  if (fields instanceof PDFArray) {
+    const kept = fields.asArray().filter((f) => {
+      const field = ctx.lookup(f);
+      return !(field instanceof PDFDict) || !pruneField(field, 0);
+    });
+    if (kept.length !== fields.size()) form!.set(PDFName.of('Fields'), ctx.obj(kept));
+  }
+  const outlines = doc.catalog.lookupMaybe(PDFName.of('Outlines'), PDFDict);
+  const walk = (item: PDFDict | undefined, depth: number) => {
+    const visited = new Set<PDFDict>();
+    while (item && !visited.has(item) && depth < 64) {
+      visited.add(item);
+      clearDest(item);
+      walk(item.lookupMaybe(PDFName.of('First'), PDFDict), depth + 1);
+      item = item.lookupMaybe(PDFName.of('Next'), PDFDict);
+    }
+  };
+  walk(outlines?.lookupMaybe(PDFName.of('First'), PDFDict), 0);
+  const open = doc.catalog.get(PDFName.of('OpenAction'));
+  if (deadDest(open) || (open !== undefined && deadDest(ctx.lookupMaybe(open, PDFDict)?.get(PDFName.of('D'))))) doc.catalog.delete(PDFName.of('OpenAction'));
+  return cut;
 }
 
 const xmlEscape = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -144,6 +288,7 @@ export async function saveDoc(doc: PDFDocument, opts: { useObjectStreams?: boole
   await doc.flush();
   syncXmp(doc);
   dropBrokenAppearances(doc);
+  cutLostPageRefs(doc);
   pruneUnreachable(doc);
   return doc.save({ useObjectStreams: opts.useObjectStreams ?? !isPdfA1(doc) });
 }

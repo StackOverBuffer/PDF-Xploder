@@ -25,27 +25,17 @@ import type { Annotation, PageGeom, Pt } from './types';
 import { buildAppearance, type DrawContext, type TextEngine } from './appearance';
 import { createTextEngine, loadFontBytes, loadFontkit } from './fonts';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
+import { copyPages } from './pageCopy';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
   return loadForEdit(bytes);
 }
 
 /**
- * `dest.copyPages(src, indices)`, with each copied annotation's /P pointing at its new page.
- * pdf-lib follows /P to the source page and writes a second, orphaned copy of it, so the
- * annotations (3D models, form fields, …) would belong to a page that is not in the document.
+ * Copy pages into `dest` without the pages they refer to: see pageCopy.ts. The fields of
+ * copied form widgets are registered in `dest`'s form, links to pages left behind are cut.
  */
-export async function copyPages(dest: PDFDocument, src: PDFDocument, indices: number[]): Promise<PDFPage[]> {
-  const pages = await dest.copyPages(src, indices);
-  const P = PDFName.of('P');
-  for (const page of pages) {
-    for (const ref of page.node.Annots()?.asArray() ?? []) {
-      const annot = dest.context.lookup(ref);
-      if (annot instanceof PDFDict && annot.has(P)) annot.set(P, page.ref);
-    }
-  }
-  return pages;
-}
+export { copyPages };
 
 async function save(doc: PDFDocument): Promise<Uint8Array> {
   return saveDoc(doc);
@@ -471,35 +461,46 @@ export async function replacePagesWithImages(
   images: { index: number; png: Uint8Array }[],
 ): Promise<{ bytes: Uint8Array; removedFields: string[] }> {
   const doc = await load(bytes);
-  // Form fields with a widget on a redacted page go entirely: their values would survive
-  // in the form data even though the page is now an image.
   const redacted = new Set(images.map(({ index }) => doc.getPage(index).ref.toString()));
+  const onRedactedPage = (w: { P(): PDFRef | undefined; dict: PDFDict }) => {
+    const p = w.P();
+    if (p && redacted.has(p.toString())) return true;
+    // Widgets without /P: look them up in the pages' annotation arrays.
+    const ref = doc.context.getObjectRef(w.dict);
+    return images.some(({ index }) => !!doc.getPage(index).node.Annots()?.asArray().some((a) => a === ref));
+  };
+  // A field whose every widget is on a redacted page goes entirely: its value would survive
+  // in the form data although the page is now an image. A field that also shows on other
+  // pages keeps its value (it is visible there anyway) and loses only those widgets.
   const removedFields: string[] = [];
   const form = doc.getForm();
   for (const field of form.getFields()) {
-    const onRedacted = field.acroField.getWidgets().some((w) => {
-      const p = w.P();
-      if (p && redacted.has(p.toString())) return true;
-      // Widgets without /P: look them up in the pages' annotation arrays.
-      return images.some(({ index }) => {
-        const annots = doc.getPage(index).node.Annots();
-        return !!annots && annots.asArray().some((a) => a === doc.context.getObjectRef(w.dict));
-      });
-    });
-    if (onRedacted) {
+    const widgets = field.acroField.getWidgets();
+    const hit = widgets.map(onRedactedPage);
+    if (!hit.some(Boolean)) continue;
+    if (hit.every(Boolean)) {
       removedFields.push(field.getName());
       form.removeField(field);
+    } else {
+      for (let k = widgets.length - 1; k >= 0; k--) if (hit[k]) field.acroField.removeWidget(k);
     }
   }
   for (const { index, png } of images) {
-    const old = doc.getPage(index);
-    const vs = viewSize(geomOf(old));
-    doc.removePage(index);
-    const page = doc.insertPage(index, [vs.width, vs.height]);
+    const page = doc.getPage(index);
+    const vs = viewSize(geomOf(page));
+    // The same page object with new content, so bookmarks, links and named destinations
+    // that point at the page keep working. Every other entry goes: thumbnails, actions,
+    // piece info and the annotations (links, widgets) could all leak what was on it.
+    const node = page.node;
+    for (const [key] of node.entries()) if (key !== PDFName.of('Type') && key !== PDFName.of('Parent')) node.delete(key);
+    node.set(PDFName.of('MediaBox'), doc.context.obj([0, 0, vs.width, vs.height]));
+    // Its own resources: inherited ones are shared with other pages.
+    node.set(PDFName.of('Resources'), doc.context.obj({}));
+    // pdf-lib remembers the old content stream and normalisation per page: start afresh.
+    (node as unknown as { normalized: boolean }).normalized = false;
+    Object.assign(page as unknown as Record<string, unknown>, { contentStream: undefined, contentStreamRef: undefined });
     const img = await doc.embedPng(png);
     page.drawImage(img, { x: 0, y: 0, width: vs.width, height: vs.height });
   }
-  // Strip any per-page annotations (links, widgets) that might leak hidden data on the new pages.
-  for (const { index } of images) doc.getPage(index).node.delete(PDFName.of('Annots'));
   return { bytes: await save(doc), removedFields };
 }

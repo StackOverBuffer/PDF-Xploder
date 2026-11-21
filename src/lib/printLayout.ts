@@ -9,6 +9,7 @@ import { load } from './pdfOps';
 import { uprightMatrix } from './organize';
 import { inv, mul, type M } from './content/matrix';
 import { normRot } from './geometry';
+import { pruneUnreachable } from './pdfSave';
 import type { PageGeom } from './types';
 
 export const PAPERS = {
@@ -250,5 +251,9 @@ export async function buildPrintPdf(source: Uint8Array | PDFDocument, sheets: Sh
       page.pushOperators(pushGraphicsState(), rectangle(x, y, w, h), clip(), endPath(), concatTransformationMatrix(...m), drawObject(name), popGraphicsState());
     }
   }
+  // Embedding copies each source page whole (its links lead to further pages); only the
+  // contents and resources are used, so everything else is dropped before saving.
+  await out.flush();
+  pruneUnreachable(out);
   return out.save({ useObjectStreams: true });
 }
