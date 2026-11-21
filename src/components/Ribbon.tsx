@@ -584,6 +584,7 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
           <ToolBtn tool="note" icon={<StickyNote size={L} />} label="Note" />
           <ToolBtn tool="highlight" icon={<Highlighter size={L} />} label="Highlight" />
           <Btn icon={<FileText size={L} />} label="Summarize comments" title="Generate a PDF listing every comment" disabled={noDoc} onClick={() => show('commentSummary')} />
+          <Btn icon={<FileSpreadsheet size={L} />} label="Export comments CSV" title="Save every comment as a CSV file" disabled={noDoc} onClick={extra.exportCommentsCsv} />
         </Group>
         <Group label="Signatures">
           <SidebarBtn tab="signatures" icon={<ShieldCheck size={L} />} label="Validate" />

@@ -36,6 +36,8 @@ const DE: Record<string, string> = {
   'Generate a PDF listing every comment': 'Ein PDF erstellen, das jeden Kommentar auflistet',
   'Summarizing…': 'Zusammenfassung wird erstellt…',
   'There are no comments to summarize.': 'Es gibt keine Kommentare zusammenzufassen.',
+  'Export comments CSV': 'Kommentare als CSV exportieren', 'Save every comment as a CSV file': 'Alle Kommentare als CSV-Datei speichern',
+  'There are no comments to export.': 'Es gibt keine Kommentare zu exportieren.',
   'Find text…': 'Text suchen…', 'Match case': 'Groß/Klein beachten', 'Highlight all matches': 'Alle Treffer hervorheben', 'Searching…': 'Suche läuft…',
   '{n} match(es)': '{n} Treffer', '{i} of {n}': '{i} von {n}', 'Highlighted {n} match(es).': '{n} Treffer hervorgehoben.',
   'Drag a box on the page for a visible signature': 'Ziehen Sie auf der Seite einen Rahmen für eine sichtbare Signatur auf', 'Sign…': 'Signieren…',
