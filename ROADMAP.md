@@ -11,7 +11,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 1. ✅ **Interleave duplex scans and booklet printing**: done (Organize › Interleave Pages… combines a front-sides and a back-sides scan, in reverse order too, for stacks that were re-fed; Print › Imposition: Booklet orders the pages so two-sided printing folds them into a saddle-stitched booklet; Poster tiles a page over several sheets with an overlap for gluing; Save as PDF stores every print layout — N-up, booklet, poster — as a file).
 2. ✅ **Optimize / compress documents**: done (File › Compress, Share › Compress): presets plus custom quality and resolution, images downsampled by their resolution on the page, CMYK/JPEG 2000 images converted through pdf.js (except for the print preset), duplicate fonts and images merged, unused objects, thumbnails and metadata removed, object streams; size before and after with Undo. Still open: subsetting fully embedded fonts.
 3. **Compare documents**: side by side, with changed text and changed areas marked.
-4. **Fill & Sign and dynamic stamps**: checkmark, cross, date and initials tools for forms without fields; stamps like "Approved – {name} – {date}".
+4. ✅ **Fill & Sign and dynamic stamps**: done (Comment › Fill & Sign: check, cross, date and initials tools for forms without fields; Stamp menu: dynamic variants of Approved, Reviewed and Received that fill in author and date when placed).
 5. **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (replies are done).
 6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
 7. 🟡 **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize) and extract all images (Convert › Extract images, as a ZIP) are done. Still open: rasterize pages, export pages as JPEG/WebP/TIFF.
@@ -62,7 +62,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Video/Sound Rich Media Annotations | ⬜ |
 | Clear Measurements / convert lines, polygons, polylines and rectangles to measurements | ⬜ (with measurement tools) |
 | Control the Thickness of Underline and Strikeout | ⬜ |
-| Create Customized Dynamic Stamps (and via JavaScript console) | ⬜ |
+| Create Customized Dynamic Stamps (and via JavaScript console) | 🟡 (dynamic variants of standard stamps; no appearance editor) |
 | Cross Section Support for 3D PDFs | ⬜ |
 | Customize/Localize the Fonts Used for Default Stamps | ⬜ |
 | Export Comments to Data File (FDF/XFDF) / Export Selected Comments | ⬜ |
@@ -328,7 +328,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 |---|---|
 | Enhanced OCR Engine | ✅ |
 | Create and Edit Fillable Forms | ✅ |
-| Create Customized Dynamic Stamps | ⬜ |
+| Create Customized Dynamic Stamps | 🟡 (dynamic variants of standard stamps; no appearance editor) |
 | Compare Documents | ⬜ |
 | Identify Forms Automatically | ⬜ |
 | Add Placeholder Tool | ⬜ |
