@@ -264,8 +264,11 @@ function SignatureDialog({ close }: { close: () => void }) {
   const [font, setFont] = useState(SIG_FONTS[0]);
   const [color, setColor] = useState('#0d47a1');
   const [upload, setUpload] = useState<string | null>(null);
-  /** Keep the cropped image for the Initials tool. */
-  const [keepInitials, setKeepInitials] = useState(true);
+  /**
+   * Keep the cropped image for the Initials tool. Off unless asked for: a full signature
+   * would otherwise replace the saved initials, and it stays in the browser's storage.
+   */
+  const [keepInitials, setKeepInitials] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   /** The box the strokes cover, kept while drawing (canvas pixels). */

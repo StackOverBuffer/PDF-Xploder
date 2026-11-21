@@ -180,7 +180,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     const store = useStore.getState();
     if (tool === 'signCheck' || tool === 'signCross') {
       const kind = tool === 'signCheck' ? 'check' : 'cross';
-      const rect = { ...viewToPdf(geom, { x: p.x - 9, y: p.y - 9 }), w: 18, h: 18 };
+      // Centred on the click: an 18 pt square in the view, converted as a whole (the
+      // view's top-left corner is not the PDF rect's bottom-left one, and pages rotate).
+      const rect = viewRectToPdf(geom, { left: p.x - 9, top: p.y - 9, width: 18, height: 18 });
       const a: Annotation = { ...base(tool), type: 'stamp', kind, rect, rot: geom.rotation, label: kind === 'check' ? 'Check' : 'Cross' };
       store.addAnnotation(index, a);
       store.setTool('select');
@@ -200,7 +202,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     }
     const saved = savedInitials();
     if (!saved) {
-      store.notify('Draw or type your initials with the Signature tool first (Comment › Signature).');
+      store.notify('Draw or type your initials with the Signature tool first (Comment › Signature) and tick “Keep as initials”.');
       store.setTool('select');
       return;
     }
