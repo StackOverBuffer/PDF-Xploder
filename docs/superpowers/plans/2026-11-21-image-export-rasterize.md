@@ -133,7 +133,10 @@ git commit -m "TIFF encoder: baseline uncompressed RGB or greyscale with resolut
   - `export function webpSupported(): boolean` — `document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp')` (guard `typeof document`, so node tests never touch it).
   - Dialog name `'exportImage'`.
 
-- [ ] **Step 1: Store command.** Replace the body of `exportPageImage` with the general version:
+- [x] **Step 1: Store command.** Replace the body of `exportPageImage` with the general version:
+
+  Note (builder): `quality` arrives as a percentage (the dialog's 10–100 slider) and is divided by 100 before `canvas.toBlob`, which takes a 0–1 fraction — the plan's literal `toBlob(…, quality)` would clamp to 1 and make the slider a no-op.
+  Note (builder, review focus 5): decided to clamp — `scaleFor` in `commands.ts` caps the render scale so a page's canvas stays within `IMAGE_MAX_AREA_BYTES / 4` pixels (the limit `src/lib/pdfjs.ts` already hands to pdf.js as `canvasMaxAreaInBytes`), and a toast names the reduced resolution when that happened; the TIFF records the resolution actually rendered.
 
 ```ts
 const MIME: Record<ImageFormat, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', tiff: 'image/tiff' };
@@ -142,13 +145,15 @@ const EXT: Record<ImageFormat, string> = { png: 'png', jpeg: 'jpg', webp: 'webp'
 
 Render each page once at `dpi / 72` from the annotation-flattened bytes (exactly the existing `exportPageImage` prelude); for `tiff` take `canvas.getContext('2d')!.getImageData(0, 0, c.width, c.height).data` into `encodeTiff(c.width, c.height, data, { dpi })`, for the others `await new Promise<Blob>(res => canvas.toBlob(b => res(b!), MIME[format], quality))` → `new Uint8Array(await blob.arrayBuffer())`. One page → `downloadBlob(bytes, `${base}-p${n}.${ext}`, MIME[format])`; several → `downloadBlob(zip([{ name, data }...]), `${base}-images.zip`, 'application/zip')`. Keep `reportProgress`-style feedback if the loop is long (see `applyRedactions`).
 
-- [ ] **Step 2: Dialog.** `src/components/ExportImageDialog.tsx` following the small-dialog pattern (Modal + rows): page choice (`Current page` / `Selected pages ({n})` disabled when the thumbnail selection is empty / `All pages`), format radios (PNG, JPEG, WebP — disabled with a title hint when `!webpSupported()` — TIFF), DPI number input (default 150, min 72, max 600), quality range 10–100 (default 85) shown only for JPEG/WebP. OK → `cmd.exportPageImages({ pages, format, dpi, quality })` and close. Register `'exportImage'` in the `DialogName` union and case list of `Dialogs.tsx` (direct import like `OrganizeDialogs`, or `lazy(() => import(...))` if that is the local pattern for similar dialogs — check and follow).
+- [x] **Step 2: Dialog.** `src/components/ExportImageDialog.tsx` following the small-dialog pattern (Modal + rows): page choice (`Current page` / `Selected pages ({n})` disabled when the thumbnail selection is empty / `All pages`), format radios (PNG, JPEG, WebP — disabled with a title hint when `!webpSupported()` — TIFF), DPI number input (default 150, min 72, max 600), quality range 10–100 (default 85) shown only for JPEG/WebP. OK → `cmd.exportPageImages({ pages, format, dpi, quality })` and close. Register `'exportImage'` in the `DialogName` union and case list of `Dialogs.tsx` (direct import like `OrganizeDialogs`, or `lazy(() => import(...))` if that is the local pattern for similar dialogs — check and follow).
 
-- [ ] **Step 3: Ribbon** — Convert tab: change the "To image" button to `onClick={() => show('exportImage')}` with title "Save pages as PNG, JPEG, WebP or TIFF images". File menu: point "Save page as image" at `show('exportImage')` as well (it presets the current page — pass nothing, the dialog defaults to current page).
+- [x] **Step 3: Ribbon** — Convert tab: change the "To image" button to `onClick={() => show('exportImage')}` with title "Save pages as PNG, JPEG, WebP or TIFF images". File menu: point "Save page as image" at `show('exportImage')` as well (it presets the current page — pass nothing, the dialog defaults to current page).
 
-- [ ] **Step 4: German strings** in `de/ui.ts` for every new key (labels, titles, `Current page`, `Selected pages`, `All pages`, `Resolution (DPI)`, `Quality`, `WebP is not supported by this browser.` …).
+- [x] **Step 4: German strings** in `de/ui.ts` for every new key (labels, titles, `Current page`, `Selected pages`, `All pages`, `Resolution (DPI)`, `Quality`, `WebP is not supported by this browser.` …).
 
-- [ ] **Step 5: `npm run typecheck` and `npm test` — green. Commit:**
+- [x] **Step 5: `npm run typecheck` and `npm test` — green. Commit:**
+
+  Note (builder): typecheck clean; of the suite only the two OCR tests fail here, both pre-existing in this environment and untouched by this feature (`git diff b7d799d -- src/lib/ocr tests/ocr.test.ts` is empty, and their import graph does not reach any file of this change): `tests/ocrEngine.test.ts` needs symlink rights that Windows denies without developer mode (EPERM), and `tests/ocr.test.ts`'s slant assertion (0.058 vs < 0.05) depends on `@napi-rs/canvas` text rasterisation. All 39 other test files pass.
 
 ```bash
 git add src/store/commands.ts src/components/ExportImageDialog.tsx src/components/Dialogs.tsx src/components/Ribbon.tsx src/locales/de/ui.ts
