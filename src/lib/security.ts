@@ -3,6 +3,10 @@ import { PDFArray, PDFDict, PDFDocument, PDFHeader, PDFHexString, PDFName, PDFNu
 import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
 import { saveDoc } from './pdfSave';
 import { loadForEdit } from './pageTree';
+import { installStringEncryption, type EncryptionScope } from './encryptStrings';
+
+// Strings in objects outside object streams are encrypted too (see encryptStrings.ts).
+installStringEncryption();
 
 export interface Permissions {
   printing: boolean;
@@ -262,13 +266,30 @@ export async function reencryptLike(plain: Uint8Array, original: Uint8Array, pas
 
   const doc = await PDFDocument.load(plain, { updateMetadata: false });
   const ctx = doc.context;
-  ctx.trailerInfo.Encrypt = ctx.register(enc.clone(ctx));
+  const dict = enc.clone(ctx);
+  // The writer encrypts with what V says (V 4: AES-128 for everything). Crypt filters can
+  // say otherwise (RC4 under V 4, Identity for streams or strings, plain metadata), and a
+  // file that declares one cipher and contains another opens as garbage: the dictionary
+  // is made to say exactly what is written. The file key, O, U and P stay as they are
+  // (crypt filters are not part of the key), so both passwords keep working.
+  const scope: EncryptionScope = { streams: true, strings: true, metadata: dict.lookup(PDFName.of('EncryptMetadata'))?.toString() !== 'false' };
+  let writeV = V;
+  if (V === 4) {
+    const std = dict.lookupMaybe(PDFName.of('CF'), PDFDict)?.lookupMaybe(PDFName.of('StdCF'), PDFDict);
+    const rc4 = std?.lookup(PDFName.of('CFM'))?.toString() === '/V2';
+    // RC4 inside V 4 is the V 2 algorithm; anything else is written as AES-128.
+    if (rc4) writeV = 2;
+    dict.set(PDFName.of('CF'), ctx.obj({ StdCF: { Type: 'CryptFilter', CFM: rc4 ? 'V2' : 'AESV2', AuthEvent: 'DocOpen', Length: rc4 ? key.length : 16 } }));
+    dict.set(PDFName.of('StmF'), PDFName.of('StdCF'));
+    dict.set(PDFName.of('StrF'), PDFName.of('StdCF'));
+    dict.delete(PDFName.of('EFF'));
+  }
+  ctx.trailerInfo.Encrypt = ctx.register(dict);
   ctx.trailerInfo.ID = ctx.obj([ids.get(0), ids.get(1) ?? ids.get(0)]);
   // A PDFSecurity carrying the existing key instead of a freshly generated one.
   const security = Object.create(PDFSecurity.prototype) as PDFSecurity;
-  Object.assign(security, { context: ctx, encryption: { V }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40 });
+  Object.assign(security, { context: ctx, encryption: { V: writeV }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40, xploder: scope });
   ctx.security = security;
   if (V >= 5) markAes256(doc);
-  // Object streams are required: strings are only encrypted as part of them.
   return saveDoc(doc);
 }

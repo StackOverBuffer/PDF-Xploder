@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, StandardFonts } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import * as sec from '../src/lib/security';
 
 async function plainDoc(): Promise<Uint8Array> {
@@ -82,5 +82,45 @@ describe('re-encrypting like the original', () => {
   it('decodes low-resolution printing', async () => {
     const enc = await sec.encrypt(await plainDoc(), { userPassword: '', ownerPassword: 'o', algorithm: 'AES-256', permissions: { ...sec.ALL_PERMISSIONS, highResPrinting: false } });
     expect((await sec.inspectEncryption(enc)).permissions).toMatchObject({ printing: true, highResPrinting: false });
+  });
+});
+
+describe('strings in encrypted files', () => {
+  async function withStrings(): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    doc.setTitle('Quarterly report');
+    doc.catalog.set(PDFName.of('Lang'), PDFString.of('en-GB'));
+    // Without object streams every object is written on its own (the PDF/A-1 case).
+    return doc.save({ useObjectStreams: false });
+  }
+
+  for (const algorithm of ['AES-256', 'AES-128'] as const) {
+    it(`encrypts strings outside object streams too (${algorithm})`, async () => {
+      const enc = await sec.encrypt(await withStrings(), { userPassword: 'u', ownerPassword: 'o', permissions: sec.ALL_PERMISSIONS, algorithm });
+      const raw = new TextDecoder('latin1').decode(enc);
+      expect(raw).not.toContain('en-GB');
+      expect(raw).not.toContain('Quarterly');
+      const plain = await PDFDocument.load(await sec.decrypt(enc, 'u'));
+      expect((plain.catalog.lookup(PDFName.of('Lang')) as PDFString).decodeText()).toBe('en-GB');
+      expect(plain.getTitle()).toBe('Quarterly report');
+    });
+  }
+
+  it('re-encrypting writes a dictionary that matches the cipher used', async () => {
+    const enc = await sec.encrypt(await withStrings(), { userPassword: 'u', ownerPassword: 'o', permissions: sec.ALL_PERMISSIONS, algorithm: 'AES-128' });
+    // Another program's variant: strings with RC4 under V 4.
+    const doc = await PDFDocument.load(enc, { ignoreEncryption: true, updateMetadata: false });
+    const dict = doc.context.lookup(doc.context.trailerInfo.Encrypt) as PDFDict;
+    dict.set(PDFName.of('StrF'), PDFName.of('Identity'));
+    dict.set(PDFName.of('EFF'), PDFName.of('Identity'));
+    const variant = await doc.save({ useObjectStreams: false });
+    const again = await sec.reencryptLike(await PDFDocument.create().then(async (d) => { d.addPage(); d.setTitle('Edited'); return d.save(); }), variant, 'u');
+    const out = await PDFDocument.load(again, { ignoreEncryption: true, updateMetadata: false });
+    const written = out.context.lookup(out.context.trailerInfo.Encrypt) as PDFDict;
+    expect(written.lookup(PDFName.of('StrF'))?.toString()).toBe('/StdCF');
+    expect(written.has(PDFName.of('EFF'))).toBe(false);
+    const plain = await PDFDocument.load(await sec.decrypt(again, 'u'));
+    expect(plain.getTitle()).toBe('Edited');
   });
 });
