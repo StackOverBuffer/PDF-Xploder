@@ -48,6 +48,8 @@ export function commentBody(a: Annotation): string {
 export function commentSummaryMarkdown(docName: string, byPage: { page: number; list: Annotation[] }[], o: CommentSummaryOptions, lang: 'en' | 'de'): string {
   const w = WORDS[lang];
   const date = new Intl.DateTimeFormat(lang === 'de' ? 'de-DE' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  // The store command notifies instead when there is nothing to summarize.
+  if (!byPage.length) return '';
   const lines: string[] = [`# ${w.comments} — ${docName}`];
   // `page` is the page's number as people count them (1-based), as the store passes it.
   for (const { page, list } of byPage) {
