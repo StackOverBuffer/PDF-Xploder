@@ -195,10 +195,14 @@ git commit -m "Rasterize pages: render them and replace their content with the i
 
 ### Task 4: Roadmap and README
 
-- [ ] **Step 1: ROADMAP.md** — Next up item 7 becomes ✅ ("greyscale, sanitize, extract images, rasterize and export as JPEG/WebP/TIFF done"). Rows: "Export PDFs to WebP / TIFF Images" (section 5) → ✅; "Rasterize Pages" (section 10) → ✅.
-- [ ] **Step 2: README.md** — extend the Convert/output section with one or two sentences (formats, ZIP, rasterize with the warning).
-- [ ] **Step 3: Commit** `git commit -m "Roadmap and README: image export formats and rasterize"` (add the two files).
+- [x] **Step 1: ROADMAP.md** — Next up item 7 becomes ✅ ("greyscale, sanitize, extract images, rasterize and export as JPEG/WebP/TIFF done"). Rows: "Export PDFs to WebP / TIFF Images" (section 5) → ✅; "Rasterize Pages" (section 10) → ✅.
+
+  Note (builder): also brought the stale "Export Documents to Images | ✅ PNG" row (section 12) to "PNG, JPEG, WebP or TIFF", since the new dialog is now that export path.
+- [x] **Step 2: README.md** — extend the Convert/output section with one or two sentences (formats, ZIP, rasterize with the warning).
+- [x] **Step 3: Commit** `git commit -m "Roadmap and README: image export formats and rasterize"` (add the two files).
 
 ### Task 5: Final verification
 
-- [ ] `npm run typecheck`, `npm test`, `npm run build` — all green. Check off completed steps in this plan as you go and commit the check-offs.
+- [x] `npm run typecheck`, `npm test`, `npm run build` — all green. Check off completed steps in this plan as you go and commit the check-offs.
+
+  Note (builder): typecheck and build are clean. `npm test` stays red on the two OCR tests, which fail on the pristine baseline of this branch in this environment too and lie outside this feature's import graph (see the note under Task 2 step 4). Everything else passes: 39 files, 268 tests.
