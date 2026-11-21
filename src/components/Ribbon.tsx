@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
   MonitorDown, QrCode, Ruler, LandPlot, Scale, FileSpreadsheet, History, ArchiveRestore, FileText, Trash2, Replace, SearchCheck, FilePlus, FolderOpen, Save, SaveAll, Printer, Image as ImageIcon, Info, X, Undo2, Redo2, Hand, MousePointer2,
-  ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus,
+  ZoomIn, ZoomOut, MoveHorizontal, Maximize, Highlighter, Underline, Strikethrough, Pencil, Square, Circle, Minus, Check, CalendarDays, PenLine,
   MoveUpRight, Type, StickyNote, Stamp, MessageSquare, Layers, RotateCcw, RotateCw,
   ImagePlus, Signature, FormInput, EraserIcon, ShieldCheck, Pentagon, Spline, Cloud,
   Lock, LockOpen, PencilLine, ListChecks, SquareDashedMousePointer, TypeOutline, PencilRuler, TextCursorInput, SquareCheck,
@@ -456,6 +456,12 @@ export function RibbonTab({ tab, showProps, toggleProps }: RibbonTabProps) {
             <Btn size="small" icon={<Signature size={I} />} label="Signature" disabled={!canAnnotate} onClick={() => show('signature')} />
             <Btn size="small" icon={<QrCode size={I} />} label="QR / Barcode" title="Insert a QR code or barcode (Code 128, EAN-13)" disabled={!canAnnotate} onClick={() => show('insertBarcode')} />
           </Stack>
+        </Group>
+        <Group label="Fill & Sign">
+          <ToolBtn tool="signCheck" icon={<Check size={L} />} label="Check" />
+          <ToolBtn tool="signCross" icon={<X size={L} />} label="Cross" />
+          <ToolBtn tool="signDate" icon={<CalendarDays size={L} />} label="Date" />
+          <ToolBtn tool="signInitials" icon={<PenLine size={L} />} label="Initials" />
         </Group>
         <Group label="Measure">
           <ToolBtn tool="measureDistance" icon={<Ruler size={L} />} label="Distance" keys="M" title="Drag to measure a distance (Shift: straight angles)" />

@@ -7,12 +7,13 @@ import type { Annotation, PageGeom, Pt, Tool } from '../lib/types';
 import { NOTE_SIZE } from '../lib/types';
 import { useDialog } from './Dialogs';
 import { addField } from '../store/commands';
-import { snapshotRegion } from '../store/extras';
+import { savedInitials, snapshotRegion } from '../store/extras';
 import { zoomAt, zoomToBox } from '../store/viewActions';
 import { stampViewSize, usePendingStamp } from '../store/contentActions';
 import { viewSize } from '../lib/geometry';
 import type { NewFieldKind } from '../lib/forms';
 import { useLang, useT } from '../lib/i18n';
+import { formatSignedDate } from '../lib/fillSign';
 import { formatMeasure, labelAnchor, measuredValue, type MeasureKind, type MeasureUnit } from '../lib/measure';
 import { useAppearanceImage } from '../lib/appearanceImage';
 import { keepsAppearance } from '../lib/foreignAppearance';
@@ -35,7 +36,7 @@ interface Props {
 const FIELD_TOOLS: Partial<Record<Tool, NewFieldKind>> = {
   fieldText: 'text', fieldCheckbox: 'checkbox', fieldDropdown: 'dropdown', fieldList: 'list', fieldRadio: 'radio',
 };
-const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'polyline', 'cloud', 'measureDistance', 'measurePerimeter', 'measureArea', 'text', 'note', 'stamp', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
+const DRAW_TOOLS: Tool[] = ['zoom', 'snapshot', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'polyline', 'cloud', 'measureDistance', 'measurePerimeter', 'measureArea', 'text', 'note', 'stamp', 'signCheck', 'signCross', 'signDate', 'signInitials', 'redact', 'sign', ...(Object.keys(FIELD_TOOLS) as Tool[])];
 const EMPTY: Annotation[] = [];
 /** Tools that collect clicked points (double-click to finish). */
 const PATH_TOOLS: Tool[] = ['polygon', 'polyline', 'cloud', 'measurePerimeter', 'measureArea'];
@@ -111,6 +112,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
       setDraft({ kind: 'path', points: draft?.kind === 'path' ? [...draft.points.slice(0, -1), p, p] : [p, p] });
     }
     else if (tool === 'note') createNote(p);
+    else if (tool === 'signCheck' || tool === 'signCross' || tool === 'signDate' || tool === 'signInitials') placeSign(p);
     else setDraft({ kind: 'box', start: p, end: p });
   };
 
@@ -171,6 +173,43 @@ export const AnnotationLayer = memo(function AnnotationLayer({ index, pageId, ge
     useStore.getState().select({ pageId, id: a.id });
     // Typed into its popup, as in PDF-XChange.
     setPopupOpen(pageId, a.id, true, { focus: true });
+  }
+
+  /** Fill & Sign tools: check, cross, date and initials are placed with one click. */
+  function placeSign(p: Pt) {
+    const store = useStore.getState();
+    if (tool === 'signCheck' || tool === 'signCross') {
+      const kind = tool === 'signCheck' ? 'check' : 'cross';
+      const rect = { ...viewToPdf(geom, { x: p.x - 9, y: p.y - 9 }), w: 18, h: 18 };
+      const a: Annotation = { ...base(tool), type: 'stamp', kind, rect, rot: geom.rotation, label: kind === 'check' ? 'Check' : 'Cross' };
+      store.addAnnotation(index, a);
+      store.setTool('select');
+      store.select({ pageId, id: a.id });
+      return;
+    }
+    if (tool === 'signDate') {
+      const size = styleFor('text').fontSize;
+      const rect = viewRectToPdf(geom, { left: p.x, top: p.y, width: 110, height: size * 1.6 });
+      const a: Annotation = { ...base('signDate'), type: 'text', rect, rot: geom.rotation, text: formatSignedDate(useLang.getState().lang), fontSize: size, border: false };
+      store.addAnnotation(index, a);
+      store.setTool('select');
+      store.select({ pageId, id: a.id });
+      // Edited in place, like any new text box.
+      store.setEditing(a.id);
+      return;
+    }
+    const saved = savedInitials();
+    if (!saved) {
+      store.notify('Draw or type your initials with the Signature tool first (Comment › Signature).');
+      store.setTool('select');
+      return;
+    }
+    // Fitted to 24 pt height, keeping the saved image's proportions.
+    const rect = viewRectToPdf(geom, { left: p.x, top: p.y, width: (24 * saved.width) / saved.height, height: 24 });
+    const a: Annotation = { ...base('signInitials'), type: 'image', rect, rot: geom.rotation, src: saved.src, signature: true };
+    store.addAnnotation(index, a);
+    store.setTool('select');
+    store.select({ pageId, id: a.id });
   }
 
   function placePendingStamp(p: Pt) {
