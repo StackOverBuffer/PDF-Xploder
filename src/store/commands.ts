@@ -322,7 +322,10 @@ export async function split(every: number) {
     const s = S();
     const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author, privateData: s.privateData });
     const parts = await ops.splitEvery(output, every);
-    parts.forEach((p, i) => downloadBlob(p, `${baseName(s.fileName)}-part${i + 1}.pdf`));
+    // Browsers ask to allow (or silently drop) every download but the first: pack several parts into one ZIP.
+    const base = baseName(s.fileName);
+    if (parts.length === 1) downloadBlob(parts[0], `${base}-part1.pdf`);
+    else downloadBlob(zip(parts.map((p, i) => ({ name: `${base}-part${i + 1}.pdf`, data: p }))), `${base}-parts.zip`, 'application/zip');
   });
 }
 
@@ -342,7 +345,7 @@ const EXT: Record<ImageFormat, string> = { png: 'png', jpeg: 'jpg', webp: 'webp'
  * render/protocol.ts): 600 dpi on A3 would otherwise be 70 megapixels, which browsers
  * refuse to hand out as one canvas.
  */
-function scaleFor(page: PDFPageProxy, dpi: number): number {
+export function scaleFor(page: PDFPageProxy, dpi: number): number {
   const v = page.getViewport({ scale: 1 });
   return Math.min(dpi / 72, Math.sqrt(IMAGE_MAX_AREA_BYTES / 4 / (v.width * v.height)));
 }
@@ -457,7 +460,8 @@ export async function applyRedactions() {
     try {
       for (const [k, i] of pages.entries()) {
         reportProgress(k, pages.length);
-        const canvas = await renderToCanvas(await pdf.getPage(i + 1), 200 / 72);
+        const page = await pdf.getPage(i + 1);
+        const canvas = await renderToCanvas(page, scaleFor(page, 200));
         const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
         images.push({ index: i, png: new Uint8Array(await blob.arrayBuffer()) });
       }

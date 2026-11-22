@@ -8,6 +8,7 @@ import { annotationsByPage, reportProgress, uid, useStore } from './store';
 import { requirePermission } from './permissions';
 import { currentBytes, deletePages, normaliseImage } from './commands';
 import { baseName, downloadBlob, fileBytes, readAsDataUrl } from '../lib/download';
+import { zip, type ZipEntry } from '../lib/zip';
 import { renderToCanvas } from '../lib/pdfjs';
 import { viewSize } from '../lib/geometry';
 import { tr } from '../lib/i18n';
@@ -215,8 +216,15 @@ export async function extractPageList(pages: number[], o: ExtractOptions) {
   await run('Extracting…', async () => {
     const name = baseName(S().fileName || 'document');
     const output = await outputBytes();
-    if (o.separate) for (const i of pages) downloadBlob(await ops.extractPages(output, [i]), `${name}-p${i + 1}.pdf`);
-    else downloadBlob(await ops.extractPages(output, pages), `${name}-p${org.rangeText(pages).replace(/, /g, '_')}.pdf`);
+    if (o.separate) {
+      // Browsers ask to allow (or silently drop) every download but the first: pack several into one ZIP.
+      if (pages.length === 1) downloadBlob(await ops.extractPages(output, pages), `${name}-p${pages[0] + 1}.pdf`);
+      else {
+        const entries: ZipEntry[] = [];
+        for (const i of pages) entries.push({ name: `${name}-p${i + 1}.pdf`, data: await ops.extractPages(output, [i]) });
+        downloadBlob(zip(entries), `${name}-pages.zip`, 'application/zip');
+      }
+    } else downloadBlob(await ops.extractPages(output, pages), `${name}-p${org.rangeText(pages).replace(/, /g, '_')}.pdf`);
     if (o.deleteAfter) {
       const ids = S().pageIds.filter((_, i) => !pages.includes(i));
       await S().commitBytes(await ops.deletePages(S().bytes!, pages), ids);
@@ -242,10 +250,13 @@ export async function splitDocument(m: SplitMethod) {
     else if (m.kind === 'bookmarks') parts = await org.splitByBookmarks(output);
     else parts = (await org.splitBySize(output, m.megabytes * 1024 * 1024)).map((bytes) => ({ bytes }));
     if (!parts.length) return S().notify(tr('No pages match.'), 'error');
-    parts.forEach((p, i) => {
+    const names = parts.map((p, i) => {
       const title = p.title?.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60);
-      downloadBlob(p.bytes, `${name}-${String(i + 1).padStart(String(parts.length).length, '0')}${title ? ` ${title}` : ''}.pdf`);
+      return `${name}-${String(i + 1).padStart(String(parts.length).length, '0')}${title ? ` ${title}` : ''}.pdf`;
     });
+    // Browsers ask to allow (or silently drop) every download but the first: pack several parts into one ZIP.
+    if (parts.length === 1) downloadBlob(parts[0].bytes, names[0]);
+    else downloadBlob(zip(parts.map((p, i) => ({ name: names[i], data: p.bytes }))), `${name}-parts.zip`, 'application/zip');
     S().notify(trf('Created {n} file(s).', { n: parts.length }));
   });
 }
