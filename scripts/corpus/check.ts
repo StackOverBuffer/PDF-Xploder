@@ -49,6 +49,10 @@ const fontFiles: Record<string, string> = {
 };
 setFontSource(async (key) => (fontFiles[key] ? new Uint8Array(await readFile(fontFiles[key])) : null));
 setSubsetWasmLoader(() => readFile(require.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')));
+// vite-node closes its server once this module has run, while the process keeps working
+// through IPC: modules the app loads on demand (import()) must be loaded now, or the first
+// file that needs one fails with "The server is being restarted or closed".
+await Promise.all([import('../../src/lib/sfnt'), import('../../src/lib/fontDonors'), import('../../src/lib/pngRebuild')]);
 
 const short = (e: unknown) => String((e as Error)?.message ?? e).split('\n')[0].slice(0, 200);
 
