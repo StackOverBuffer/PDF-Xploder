@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFString, type PDFContext } from '@cantoo/pdf-lib';
+import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRawStream, PDFRef, PDFString, decodePDFRawStream, type PDFContext, type PDFPage } from '@cantoo/pdf-lib';
 import { markdownToPdf, textToPdf } from '../src/lib/markdownPdf';
 import { checkAccessibility } from '../src/lib/accessibility';
 import { findMatches } from '../src/lib/content/ops';
@@ -73,6 +73,21 @@ function walkElems(ctx: PDFContext, root: PDFDict): { ref: PDFRef; d: PDFDict }[
   return out;
 }
 
+/** A page's content streams, decoded and joined. */
+async function contentOf(page: PDFPage): Promise<Uint8Array> {
+  const c = page.node.Contents();
+  const streams = c instanceof PDFArray ? c.asArray().map((r) => page.doc.context.lookup(r)) : [c];
+  const parts = streams.map((st) => (st instanceof PDFRawStream ? decodePDFRawStream(st).decode() : new Uint8Array()));
+  return new Uint8Array(parts.flatMap((p) => [...p, 10]));
+}
+
+/** The raw value of one parent-tree key (an element reference for annotations). */
+function parentEntry(root: PDFDict, key: number) {
+  const nums = (root.lookup(N('ParentTree')) as PDFDict).lookup(N('Nums')) as PDFArray;
+  for (let i = 0; i + 1 < nums.size(); i += 2) if ((nums.lookup(i) as PDFNumber).asNumber() === key) return nums.get(i + 1);
+  return undefined;
+}
+
 /** The parent tree of a tagged document, as key → array. */
 function parentTree(root: PDFDict): Map<number, PDFArray> {
   const tree = root.lookup(N('ParentTree'));
@@ -113,6 +128,11 @@ describe('Markdown PDF tagging', () => {
     // Table: rows with header and body cells that hold the cell's paragraphs.
     const tr = elem(ctx, kidsOf(elem(ctx, kidsOf(docElem!, 'K')[5])!, 'K')[0])!;
     expect(kids(tr)).toEqual(['/TH', '/TH']);
+    // Header cells say which cells they head.
+    for (const th of kidsOf(tr, 'K')) {
+      const a = elem(ctx, th)!.lookup(N('A')) as PDFDict;
+      expect([name(a.lookup(N('O'))), name(a.lookup(N('Scope')))]).toEqual(['/Table', '/Column']);
+    }
     const bodyRow = elem(ctx, kidsOf(elem(ctx, kidsOf(docElem!, 'K')[5])!, 'K')[1])!;
     expect(kids(bodyRow)).toEqual(['/TD', '/TD']);
     expect(kids(elem(ctx, kidsOf(bodyRow, 'K')[0])!)).toEqual(['/P']);
@@ -156,6 +176,24 @@ describe('Markdown PDF tagging', () => {
     }
   });
 
+  it('marks decoration (rules, backgrounds, borders, bullets) as artifacts, never inside tagged content', async () => {
+    const doc = await PDFDocument.load(await markdownToPdf(md));
+    for (const page of doc.getPages()) {
+      const text = new TextDecoder().decode(await contentOf(page));
+      // Outside marked content only the graphics state and marked content operators remain.
+      let depth = 0;
+      const stray: string[] = [];
+      for (const line of text.split('\n')) {
+        const t = line.trim();
+        if (/\b(BDC|BMC)$/.test(t)) depth++;
+        else if (t === 'EMC') depth--;
+        else if (depth === 0 && /\s(re|l|f|S|B|Tj|TJ|Do|c)$|^(f|S|B|BT)$/.test(t)) stray.push(t);
+      }
+      expect(stray).toEqual([]);
+      expect(text).toContain('/Artifact BMC');
+    }
+  });
+
   it('gives link annotations a Link element with an object reference', async () => {
     const doc = await PDFDocument.load(await markdownToPdf(md));
     const ctx = doc.context;
@@ -170,9 +208,15 @@ describe('Markdown PDF tagging', () => {
         if (name(d.lookup(N('Subtype'))) !== '/Link') continue;
         const sp = d.lookup(N('StructParent'));
         expect(sp).toBeInstanceOf(PDFNumber);
-        const owners = byKey.get((sp as PDFNumber).asNumber())!;
-        const e = elem(ctx, owners.get(0));
+        // An annotation's parent-tree entry is its element itself, not an array (ISO 32000-1, 14.7.4.4).
+        expect(byKey.has((sp as PDFNumber).asNumber())).toBe(false);
+        const entry = parentEntry(root, (sp as PDFNumber).asNumber());
+        expect(entry).toBeInstanceOf(PDFRef);
+        const e = elem(ctx, entry);
         expect(e && name(e.lookup(N('S')))).toBe('/Link');
+        // An alternate description for screen readers, and tab order by structure.
+        expect((d.lookup(N('Contents')) as PDFHexString | undefined)?.decodeText()).toBeTruthy();
+        expect(name(page.node.lookup(N('Tabs')))).toBe('/S');
         const objr = kidsOf(e!, 'K').find((k) => k instanceof PDFDict) as PDFDict;
         expect(name(objr.lookup(N('Type')))).toBe('/OBJR');
         // .get: the object entry stays the reference it is written as.
