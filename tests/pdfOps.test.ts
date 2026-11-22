@@ -21,14 +21,14 @@ const model = <T extends object>(a: T): T => {
   void foreign;
   // A PNG stamp's bytes are rebuilt from the appearance's samples on import (stored once),
   // so the data URL is not byte-identical; the image is, so compare its dimensions.
-  const src = (rest as { src?: string }).src;
-  if (typeof src === 'string' && src.startsWith('data:image/png;base64,')) {
+  const r = rest as { src?: string } & Record<string, unknown>;
+  if (typeof r.src === 'string' && r.src.startsWith('data:image/png;base64,')) {
     const dims = (url: string) => {
       const raw = Uint8Array.from(atob(url.slice(22)), (c) => c.charCodeAt(0));
       const v = new DataView(raw.buffer, 16, 8);
       return `${v.getUint32(0)}x${v.getUint32(4)}`;
     };
-    (rest as { src?: string }).src = `png:${dims(src)}` as unknown as T['src'];
+    r.src = `png:${dims(r.src)}`;
   }
   return rest as T;
 };
