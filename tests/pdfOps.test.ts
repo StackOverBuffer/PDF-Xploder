@@ -111,10 +111,11 @@ describe('page geometry as pdf.js displays it', () => {
 });
 
 describe('document operations', () => {
-  it('gives new documents a trailer /ID and the app as producer', async () => {
+  it('gives new documents a trailer /ID and the app as producer and creator', async () => {
     for (const bytes of [await ops.createBlankDocument(), await ops.extractPages(await makeDoc(1), [0])]) {
       const doc = await PDFDocument.load(bytes, { updateMetadata: false });
       expect(doc.getProducer()).toBe('PDF-Xploder');
+      expect(doc.getCreator()).toBe('PDF-Xploder');
       const id = doc.context.lookup(doc.context.trailerInfo.ID, PDFArray);
       // Two 16-byte strings (saveDoc may refresh the second one, see pdfSave).
       expect(id?.size()).toBe(2);
@@ -201,6 +202,19 @@ describe('document operations', () => {
     // And a default appearance for the whole form, with its font in /DR too.
     expect(acro.has(PDFName.of('DA'))).toBe(true);
     expect(fonts.has(PDFName.of('Helv'))).toBe(true);
+  });
+
+  it('names ZapfDingbats in check box /DA instead of pdf-lib\'s placeholder font', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    doc.getForm().createCheckBox('ok').addToPage(page, { x: 10, y: 200, width: 14, height: 14 });
+    const filled = await PDFDocument.load(await ops.setFormValues(await doc.save(), { ok: true }));
+    const acro = filled.catalog.lookup(PDFName.of('AcroForm'), PDFDict);
+    const fonts = acro.lookup(PDFName.of('DR'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+    const da = filled.getForm().getCheckBox('ok').acroField.getDefaultAppearance() ?? '';
+    expect(da).not.toContain('dummy__noop');
+    expect(da).toContain('/ZaDb 0 Tf');
+    expect(fonts.lookup(PDFName.of('ZaDb'), PDFDict).lookup(PDFName.of('BaseFont'))?.toString()).toBe('/ZapfDingbats');
   });
 
   it('shows values Noto Sans lacks (✓) with a font that has them, and flattened forms embed only a subset', async () => {

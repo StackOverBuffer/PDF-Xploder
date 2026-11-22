@@ -229,11 +229,19 @@ export function fillFormResources(doc: PDFDocument) {
     }
     return undefined;
   };
+  const zapf = () => ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'ZapfDingbats' }));
   const visit = (o: PDFObject | undefined, inheritedDa: string | undefined, depth: number) => {
     const dict = o instanceof PDFRef ? ctx.lookup(o) : o;
     if (!(dict instanceof PDFDict) || depth > 32) return;
     const own = dict.lookup(PDFName.of('DA'));
-    const da = own instanceof PDFString || own instanceof PDFHexString ? own.decodeText() : inheritedDa;
+    let da = own instanceof PDFString || own instanceof PDFHexString ? own.decodeText() : inheritedDa;
+    // pdf-lib gives check boxes and radio buttons "/dummy__noop 0 Tf", a font that exists
+    // nowhere; preflight reports it as missing. Acrobat names ZapfDingbats (ZaDb) there.
+    if (own && da?.includes('/dummy__noop ')) {
+      da = da.replace(/\/dummy__noop /g, '/ZaDb ');
+      dict.set(PDFName.of('DA'), PDFString.of(da));
+      if (!fonts?.has(PDFName.of('ZaDb'))) ensureFonts().set(PDFName.of('ZaDb'), zapf());
+    }
     const m = da?.match(/\/([^\s/]+)\s+[\d.]+\s+Tf/);
     if (m) {
       const name = PDFName.of(m[1]);

@@ -4,7 +4,8 @@ import { writeNativeAnnotation } from './annotIO';
 import type { Lang } from './i18n';
 import { paperScale } from './measure';
 import { setOutline, type OutlineNode } from './outline';
-import { drawContext, geomOf } from './pdfOps';
+import { drawContext, geomOf, stampNewDocument } from './pdfOps';
+import { saveDoc } from './pdfSave';
 import { SOURCE_URL } from './project';
 import { SAMPLE_TEXT, type SampleText } from './sampleText';
 import type { Annotation, Rect } from './types';
@@ -137,7 +138,7 @@ export async function createSampleDocument(lang: Lang = 'en', loadAsset: SampleA
   doc.setAuthor(t.workshop);
   doc.setSubject(t.docSubject);
   doc.setKeywords(t.keywords);
-  doc.setCreator('PDF-Xploder');
+  stampNewDocument(doc);
   doc.setLanguage(lang === 'de' ? 'de-DE' : 'en-GB');
   doc.setCreationDate(created);
   doc.setModificationDate(created);
@@ -575,5 +576,6 @@ export async function createSampleDocument(lang: Lang = 'en', loadAsset: SampleA
   ]);
   doc.catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
 
-  return doc.save();
+  // Saved like every file the app writes: trailer /ID, the form's /DR and /DA, no stray objects.
+  return saveDoc(doc);
 }

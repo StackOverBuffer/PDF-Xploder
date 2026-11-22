@@ -83,11 +83,13 @@ function displayedRotation(angle: number): number {
 }
 
 /**
- * Fresh documents: the app as Producer and a trailer /ID (two random 16-byte strings, the
- * way the fork's convertToPDFA writes one), not the defaults PDFDocument.create fills in.
+ * Fresh documents: the app as Producer and Creator and a trailer /ID (two random 16-byte
+ * strings, the way the fork's convertToPDFA writes one), not the defaults PDFDocument.create
+ * fills in (Acrobat shows Creator as the "Application").
  */
 export function stampNewDocument(doc: PDFDocument): void {
   doc.setProducer('PDF-Xploder');
+  doc.setCreator('PDF-Xploder');
   const ctx = doc.context;
   if (!ctx.lookup(ctx.trailerInfo.ID)) {
     const id = PDFHexString.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
