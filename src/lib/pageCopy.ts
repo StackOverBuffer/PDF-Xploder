@@ -217,6 +217,10 @@ function registerFields(pages: PDFPage[], env: Env) {
   }
   if (!widgets.size) return;
   const form = acroForm(env.dest);
+  // The form gains fields: XFA data (kept while a form is untouched, see loadForEdit)
+  // would no longer describe it.
+  form.delete(N('XFA'));
+  form.delete(N('NeedsRendering'));
   const fields = fieldsArray(form, env.dest);
   const present = new Set(fields.asArray().map((r) => r.toString()));
   const names = new Set(fields.asArray().map((r) => text(dictOf(ctx.lookup(r))?.lookup(N('T')))).filter((t): t is string => !!t));

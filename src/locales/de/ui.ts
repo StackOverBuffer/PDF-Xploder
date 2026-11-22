@@ -292,10 +292,10 @@ const DE: Record<string, string> = {
   'This document is password protected. Enter password:': 'Dieses Dokument ist kennwortgeschützt. Geben Sie das Kennwort ein:',
   'This did not work: the document contains something PDF-Xploder cannot process here. Technical details are in the browser console.':
     'Das hat nicht geklappt: Das Dokument enthält etwas, das PDF-Xploder hier nicht verarbeiten kann. Technische Details stehen in der Browser-Konsole.',
-  'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here, and saving changes removes them.':
-    'Dies ist ein XFA-Formular, ein Format, das nur Adobe-Programme vollständig unterstützen: Seine Felder können hier nicht angezeigt oder ausgefüllt werden, und beim Speichern von Änderungen werden sie entfernt.',
-  'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; saving changes removes the XFA part.':
-    'Dieses Formular enthält zusätzlich XFA-Daten, ein Format, das nur Adobe-Programme verwenden. PDF-Xploder füllt die normalen Formularfelder; beim Speichern von Änderungen wird der XFA-Teil entfernt.',
+  'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here. Saving keeps them unless you change the form fields.':
+    'Dies ist ein XFA-Formular, ein Format, das nur Adobe-Programme vollständig unterstützen: Seine Felder können hier nicht angezeigt oder ausgefüllt werden. Beim Speichern bleiben sie erhalten, solange Sie die Formularfelder nicht ändern.',
+  'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; filling or changing them removes the XFA part on save.':
+    'Dieses Formular enthält zusätzlich XFA-Daten, ein Format, das nur Adobe-Programme verwenden. PDF-Xploder füllt die normalen Formularfelder; werden sie ausgefüllt oder geändert, entfernt das Speichern den XFA-Teil.',
   'This document is damaged or uses unsupported encryption: it is open read-only.':
     'Dieses Dokument ist beschädigt oder verwendet eine nicht unterstützte Verschlüsselung: Es ist schreibgeschützt geöffnet.',
   'Please choose a PDF file.': 'Bitte wählen Sie eine PDF-Datei.', 'Discard unsaved changes?': 'Nicht gespeicherte Änderungen verwerfen?',

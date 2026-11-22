@@ -462,6 +462,8 @@ async function fromPrivate(dict: PDFDict, env: ParseEnv): Promise<Annotation | n
   }
   const c = toHex(numbers(dict.lookup(PDFName.of('C'))));
   if (c) a.color = c;
+  // The model no longer stores the colour: another editor that removed /C leaves the default.
+  a.color ??= '#e53935';
   if (a.type === 'image') {
     const src = dict.lookup(PRIVATE_SRC);
     if (!(src instanceof PDFRawStream)) return null;
@@ -474,7 +476,10 @@ async function fromPrivate(dict: PDFDict, env: ParseEnv): Promise<Annotation | n
       /* keep the raw bytes */
     }
     const mime = (a.src as string) || 'image/png';
-    if (samples && !/jpe?g/.test(mime)) {
+    // Only an image XObject holds samples; a stream of PNG file bytes (written when the
+    // appearance kept another drawing) that another tool compressed decodes to the file.
+    const isImage = src.dict.get(PDFName.of('Subtype'))?.toString() === '/Image';
+    if (samples && isImage && !/jpe?g/.test(mime)) {
       // The appearance's decoded image (the write path stores no PNG bytes): rebuild it.
       // The rebuilder is loaded on demand (pngRebuild.ts) to keep it out of the start-up
       // bundle; failing that, the stamp falls back to the standard import.

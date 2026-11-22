@@ -179,8 +179,9 @@ export async function extractPages(source: Uint8Array | PDFDocument, indices: nu
   if (title) out.setTitle(title);
   const lang = src.catalog.lookup(PDFName.of('Lang'));
   if (lang instanceof PDFString || lang instanceof PDFHexString) out.setLanguage(lang.decodeText());
-  const preferences = src.catalog.lookupMaybe(PDFName.of('ViewerPreferences'), PDFDict);
-  if (preferences) out.catalog.set(PDFName.of('ViewerPreferences'), PDFObjectCopier.for(src.context, out.context).copy(preferences) as PDFDict);
+  // Looked up without lookupMaybe, which throws on the wrong type (broken files).
+  const preferences = src.catalog.lookup(PDFName.of('ViewerPreferences'));
+  if (preferences instanceof PDFDict) out.catalog.set(PDFName.of('ViewerPreferences'), PDFObjectCopier.for(src.context, out.context).copy(preferences) as PDFDict);
   return save(out);
 }
 

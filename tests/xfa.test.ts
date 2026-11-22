@@ -73,3 +73,18 @@ describe('XFA round trips', () => {
     expect(acroOf(doc).has(N('NeedsRendering'))).toBe(false);
   });
 });
+
+it('drops XFA when inserted pages add fields to the form', async () => {
+  const { PDFDocument, PDFName } = await import('@cantoo/pdf-lib');
+  const ops = await import('../src/lib/pdfOps');
+  const base = await PDFDocument.create();
+  base.addPage([200, 200]);
+  base.getForm().createTextField('a').addToPage(base.getPage(0), { x: 10, y: 10, width: 100, height: 20 });
+  base.catalog.lookup(PDFName.of('AcroForm'), (await import('@cantoo/pdf-lib')).PDFDict).set(PDFName.of('XFA'), base.context.obj([]));
+  const other = await PDFDocument.create();
+  other.addPage([200, 200]);
+  other.getForm().createTextField('b').addToPage(other.getPage(0), { x: 10, y: 10, width: 100, height: 20 });
+  const { bytes } = await ops.insertDocument(await base.save(), await other.save(), 1);
+  const out = await PDFDocument.load(bytes);
+  expect(out.catalog.lookup(PDFName.of('AcroForm'), (await import('@cantoo/pdf-lib')).PDFDict).has(PDFName.of('XFA'))).toBe(false);
+});
