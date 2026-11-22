@@ -248,9 +248,10 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('Name', a.signature ? 'Signature' : 'Image');
       set('Rotate', a.rot ?? 0);
       if (priv) {
-        // A JPEG is embedded as it is: the appearance's image is the original, stored once.
-        const { bytes, mime } = dataUrlToBytes(a.src);
-        const shown = /jpe?g/.test(mime) ? ctx.images.get(a.src) : undefined;
+        // The appearance embedded the image (a JPEG as it is, a PNG as decoded samples):
+        // the private source is that same stream, so the pixels are stored once.
+        const { bytes } = dataUrlToBytes(a.src);
+        const shown = ctx.images.get(a.src);
         dict.set(PRIVATE_SRC, shown ? shown.ref : pdf.register(pdf.stream(bytes)));
       }
       break;
@@ -268,6 +269,14 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const { replies, status, statusLog, foreign, ...rest } = a;
   void foreign;
   const model: Record<string, unknown> = { ...rest, rect0: rect, std0: standardPrint(dict) };
+  // fromPrivate rebuilds these from the dictionary, so they are left out (the model goes
+  // into the file as a hex string, about twice its length).
+  delete model.color; // /C
+  delete model.subject; // /Subj, re-read on import
+  if (a.opacity === 1) delete model.opacity; // /CA, and 1 is what import assumes
+  if (!label) delete model.comment; // /Contents carries it unless a measure label was added
+  if (a.type === 'text' || a.type === 'note') delete model.text; // /Contents carries it
+  if ('fill' in a && a.fill === null) delete model.fill; // no fill is the shape default
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
   if (a.type === 'stamp' && a.kind) {
@@ -370,7 +379,10 @@ function stateDict(pdf: PDFDocument['context'], e: StatusEntry, parent: PDFRef, 
     CreationDate: PDFString.fromDate(new Date(e.at)),
     M: PDFString.fromDate(new Date(e.at)),
     Name: 'Comment',
-    F: 4 | 8 | 16, // Print, NoZoom, NoRotate
+    // NoView, NoZoom, NoRotate: a status is bookkeeping, not a comment, so no viewer
+    // draws or prints it (pdf.js leaves annotations with NoView out of page and print
+    // rendering entirely). Not /Hidden (2): that would make our own import skip it.
+    F: 8 | 16 | 32,
     C: [1, 0.93, 0.35],
     Open: false,
   }) as PDFDict;
@@ -414,7 +426,106 @@ function standardPrint(dict: PDFDict): string {
 /** What another editor's reshaping changes in our model. */
 const SHAPE_KEYS = ['rect', 'rects', 'paths', 'p1', 'p2', 'vertices', 'at', 'width', 'opacity', 'fill'] as const;
 
-function fromPrivate(dict: PDFDict, env: ParseEnv): Annotation | null {
+// The write path stores an image stamp only as the appearance's image XObject (JPEG bytes
+// as they are, a PNG as decoded samples): these rebuild the image on import.
+
+/** CRC-32, as PNG chunks end with it. */
+const crcTable = new Uint32Array(256).map((_, i) => {
+  let c = i;
+  for (let k = 0; k < 8; k++) c = c & 1 ? (0xedb88320 ^ (c >>> 1)) >>> 0 : c >>> 1;
+  return c >>> 0;
+});
+
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  dv.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+
+function crc32(b: Uint8Array): number {
+  let c = ~0;
+  for (let i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 255] ^ (c >>> 8);
+  return ~c >>> 0;
+}
+
+/** Deflate in the zlib container, which is what PNG image data uses. */
+async function deflateZlib(bytes: Uint8Array): Promise<Uint8Array | undefined> {
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The PNG behind an image XObject our writer embedded (embedPng: 8-bit DeviceRGB
+ * samples, alpha split into /SMask). Undefined when the stream is not that shape.
+ */
+async function pngFromSamples(stream: PDFRawStream, samples: Uint8Array): Promise<string | undefined> {
+  const d = stream.dict;
+  const w = n(d.get(PDFName.of('Width'))) ?? 0;
+  const h = n(d.get(PDFName.of('Height'))) ?? 0;
+  const cs = d.get(PDFName.of('ColorSpace'));
+  if (!w || !h || n(d.get(PDFName.of('BitsPerComponent'))) !== 8 || !(cs instanceof PDFName) || cs.decodeText() !== 'DeviceRGB') return undefined;
+  if (samples.length < w * h * 3) return undefined;
+  let alpha: Uint8Array | undefined;
+  const smask = d.lookup(PDFName.of('SMask'));
+  if (smask instanceof PDFRawStream) {
+    const sd = smask.dict;
+    const scs = sd.get(PDFName.of('ColorSpace'));
+    if (n(sd.get(PDFName.of('Width'))) !== w || n(sd.get(PDFName.of('Height'))) !== h || n(sd.get(PDFName.of('BitsPerComponent'))) !== 8 || !(scs instanceof PDFName) || scs.decodeText() !== 'DeviceGray') return undefined;
+    const dec = numbers(sd.get(PDFName.of('Decode')));
+    if (dec.length === 2 && (dec[0] !== 0 || dec[1] !== 1)) return undefined;
+    try {
+      alpha = decodePDFRawStream(smask).decode();
+    } catch {
+      return undefined;
+    }
+    if (alpha.length < w * h) return undefined;
+  }
+  // Each PNG row starts with a filter byte; we write plain rows ("no filter").
+  const bpp = alpha ? 4 : 3;
+  const raw = new Uint8Array((w * bpp + 1) * h);
+  for (let y = 0; y < h; y++) {
+    raw[y * (w * bpp + 1)] = 0;
+    for (let x = 0; x < w; x++) {
+      const s = (y * w + x) * 3;
+      const o = y * (w * bpp + 1) + 1 + x * bpp;
+      raw[o] = samples[s];
+      raw[o + 1] = samples[s + 1];
+      raw[o + 2] = samples[s + 2];
+      if (alpha) raw[o + 3] = alpha[y * w + x];
+    }
+  }
+  const idat = await deflateZlib(raw);
+  if (!idat) return undefined;
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, w);
+  dv.setUint32(4, h);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = alpha ? 6 : 2; // truecolour, with alpha when the image has any
+  const parts = [
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idat),
+    pngChunk('IEND', new Uint8Array(0)),
+  ];
+  const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return bytesToDataUrl(out, 'image/png');
+}
+
+async function fromPrivate(dict: PDFDict, env: ParseEnv): Promise<Annotation | null> {
   const raw = text(dict.lookup(PRIVATE));
   if (!raw) return null;
   let a: Annotation & { rect0?: Rect };
@@ -428,6 +539,10 @@ function fromPrivate(dict: PDFDict, env: ParseEnv): Annotation | null {
   const std0 = (a as { std0?: string }).std0;
   delete a.rect0;
   delete (a as { std0?: string }).std0;
+  // Defaults for keys the write path leaves out because the dictionary holds them —
+  // before the merge below, which only touches keys the model has.
+  a.opacity ??= 1;
+  if (a.type === 'rect' || a.type === 'ellipse' || a.type === 'polygon' || a.type === 'polyline' || a.type === 'cloud') a.fill ??= null;
   const reshaped = std0 !== undefined && std0 !== standardPrint(dict);
   if (reshaped) {
     // Another editor resized it, changed its opacity, width or points: take those from
@@ -447,12 +562,21 @@ function fromPrivate(dict: PDFDict, env: ParseEnv): Annotation | null {
     if (!(src instanceof PDFRawStream)) return null;
     // Another tool may have compressed the stream: decode its filters.
     let data = src.getContents();
+    let samples: Uint8Array | undefined;
     try {
-      if (src.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(src).decode();
+      if (src.dict.get(PDFName.of('Filter'))) samples = decodePDFRawStream(src).decode();
     } catch {
       /* keep the raw bytes */
     }
-    a.src = bytesToDataUrl(data, (a.src as string) || 'image/png');
+    const mime = (a.src as string) || 'image/png';
+    if (samples && !/jpe?g/.test(mime)) {
+      // The appearance's decoded image (the write path stores no PNG bytes): rebuild it.
+      const url = await pngFromSamples(src, samples);
+      if (!url) return null;
+      a.src = url;
+    } else {
+      a.src = bytesToDataUrl(samples ?? data, mime);
+    }
   }
   if ((a.type === 'stamp' || a.type === 'text') && a.appearance) {
     const ap = dict.lookup(PRIVATE_AP);
@@ -640,7 +764,7 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
         replies.push({ dict, entry });
         continue;
       }
-      const own = fromPrivate(dict, env);
+      const own = await fromPrivate(dict, env);
       const a = own ?? fromStandard(dict, env);
       if (!a) continue;
       // Another program's stamp: keep its own drawing (and leave it in the file if that fails).

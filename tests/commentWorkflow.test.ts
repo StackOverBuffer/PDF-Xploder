@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFNumber, PDFString } from '@cantoo/pdf-lib';
 import { importAnnotations, writeNativeAnnotation } from '../src/lib/annotIO';
 import { drawContext, exportWithAnnotations } from '../src/lib/pdfOps';
 import { commentSummaryMarkdown, commentsCsv, escapeMarkdownText } from '../src/lib/commentSummary';
@@ -23,6 +23,22 @@ it('writes the status as a review state annotation and reads it back', async () 
   expect(res.annotations[0][0]).toMatchObject({ status: 'Accepted' });
   // The state dict was consumed: the file holds no leftover reply for it.
   expect(res.annotations[0][0].replies ?? []).toEqual([]);
+});
+
+it('keeps the status reply off the page and out of prints, but readable', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 200]);
+  await writeNativeAnnotation(await drawContext(doc), doc.getPages()[0], g, note({ status: 'Accepted' }), { author: 'B' });
+  const bytes = await doc.save();
+  const loaded = await PDFDocument.load(bytes);
+  const state = (loaded.getPage(0).node.Annots()!.asArray().map((r) => loaded.context.lookup(r) as PDFDict))
+    .find((d) => d.has(PDFName.of('State')))!;
+  const f = (state.lookup(PDFName.of('F')) as PDFNumber).asNumber();
+  expect(f & 4).toBe(0); // not printed
+  expect(f & 32).toBe(32); // NoView: pdf.js leaves it out of page and print rendering
+  expect(f & 2).toBe(0); // not /Hidden — that would make our own import skip it
+  const res = await importAnnotations(await PDFDocument.load(bytes), [g], () => 'n2');
+  expect(res.annotations[0][0]).toMatchObject({ status: 'Accepted' });
 });
 
 it('maps another program\'s state annotation to the status, not to a reply', async () => {
