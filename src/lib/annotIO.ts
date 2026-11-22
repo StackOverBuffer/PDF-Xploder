@@ -455,7 +455,11 @@ async function fromPrivate(dict: PDFDict, env: ParseEnv): Promise<Annotation | n
   }
   const contents = text(dict.lookup(PDFName.of('Contents')));
   if (a.type === 'text' || a.type === 'note') a.text = contents ?? '';
-  else a.comment = contents || undefined;
+  else {
+    // Cleared in another editor: gone from the model too (older files kept it there).
+    a.comment = contents || undefined;
+    if (a.comment === undefined) delete a.comment;
+  }
   const c = toHex(numbers(dict.lookup(PDFName.of('C'))));
   if (c) a.color = c;
   if (a.type === 'image') {

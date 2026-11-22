@@ -19,6 +19,17 @@ const widths = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getP
 const model = <T extends object>(a: T): T => {
   const { foreign, ...rest } = a as T & { foreign?: unknown };
   void foreign;
+  // A PNG stamp's bytes are rebuilt from the appearance's samples on import (stored once),
+  // so the data URL is not byte-identical; the image is, so compare its dimensions.
+  const src = (rest as { src?: string }).src;
+  if (typeof src === 'string' && src.startsWith('data:image/png;base64,')) {
+    const dims = (url: string) => {
+      const raw = Uint8Array.from(atob(url.slice(22)), (c) => c.charCodeAt(0));
+      const v = new DataView(raw.buffer, 16, 8);
+      return `${v.getUint32(0)}x${v.getUint32(4)}`;
+    };
+    (rest as { src?: string }).src = `png:${dims(src)}` as unknown as T['src'];
+  }
   return rest as T;
 };
 
@@ -67,7 +78,71 @@ describe('page operations', () => {
   });
 });
 
+describe('page geometry as pdf.js displays it', () => {
+  /** One page of 500 × 700 whose /CropBox and /Rotate are set the way other writers may set them. */
+  async function pageWith(cropBox?: number[], rotate?: number): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([500, 700]);
+    if (cropBox) page.node.set(PDFName.of('CropBox'), doc.context.obj(cropBox));
+    if (rotate !== undefined) page.node.set(PDFName.of('Rotate'), doc.context.obj(rotate));
+    return doc.save();
+  }
+
+  const view = async (cropBox?: number[]) => ops.geomOf((await PDFDocument.load(await pageWith(cropBox))).getPage(0)).view;
+
+  it('clips the crop box to the media box, as pdf.js does', async () => {
+    // A crop box that sticks out past the media box: what is shown is the intersection.
+    expect(await view([-100, 0, 600, 800])).toEqual([0, 0, 500, 700]);
+    expect(await view([50, 60, 450, 640])).toEqual([50, 60, 450, 640]);
+    // A crop box that misses the media box entirely, and none at all: the media box.
+    expect(await view([600, 800, 700, 900])).toEqual([0, 0, 500, 700]);
+    expect(await view()).toEqual([0, 0, 500, 700]);
+  });
+
+  it('reads /Rotate like pdf.js: a value that is not a multiple of 90 counts as 0', async () => {
+    const rotation = async (rotate?: number) => ops.geomOf((await PDFDocument.load(await pageWith(undefined, rotate))).getPage(0)).rotation;
+    expect(await rotation(45)).toBe(0);
+    expect(await rotation(450)).toBe(90);
+    expect(await rotation(-90)).toBe(270);
+    // Normal files are unchanged.
+    expect(await rotation(90)).toBe(90);
+    expect(await rotation()).toBe(0);
+  });
+});
+
 describe('document operations', () => {
+  it('gives new documents a trailer /ID and the app as producer', async () => {
+    for (const bytes of [await ops.createBlankDocument(), await ops.extractPages(await makeDoc(1), [0])]) {
+      const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+      expect(doc.getProducer()).toBe('PDF-Xploder');
+      const id = doc.context.lookup(doc.context.trailerInfo.ID, PDFArray);
+      // Two 16-byte strings (saveDoc may refresh the second one, see pdfSave).
+      expect(id?.size()).toBe(2);
+      for (const entry of [id!.get(0), id!.get(1)]) {
+        expect(entry.toString()).toMatch(/^<[0-9a-fA-F]{32}>$/);
+        expect((entry as PDFHexString).asBytes()).toHaveLength(16);
+      }
+    }
+  });
+
+  it('keeps title, language and viewer preferences when extracting, with a fresh /ID', async () => {
+    const doc = await PDFDocument.load(await makeDoc(1));
+    doc.setTitle('Report');
+    doc.setLanguage('de-DE');
+    doc.catalog.set(PDFName.of('ViewerPreferences'), doc.context.register(doc.context.obj({ DisplayDocTitle: true, PrintScaling: 'None' })));
+    doc.context.trailerInfo.ID = doc.context.obj([PDFHexString.of('AABB'), PDFHexString.of('CCDD')]);
+    const out = await PDFDocument.load(await ops.extractPages(await doc.save(), [0]), { updateMetadata: false });
+    expect(out.getTitle()).toBe('Report');
+    expect((out.catalog.lookup(PDFName.of('Lang')) as PDFString).decodeText()).toBe('de-DE');
+    const preferences = out.catalog.lookup(PDFName.of('ViewerPreferences'), PDFDict);
+    expect(preferences.lookup(PDFName.of('DisplayDocTitle'))?.toString()).toBe('true');
+    expect(preferences.lookup(PDFName.of('PrintScaling'))?.toString()).toBe('/None');
+    // A fresh identifier: the part is a new document, not an update of the source.
+    const ids = out.context.lookup(out.context.trailerInfo.ID, PDFArray)!;
+    expect(ids.get(0).toString()).not.toBe('<AABB>');
+    expect(ids.get(0).toString()).toMatch(/^<[0-9a-fA-F]{32}>$/);
+  });
+
   it('round-trips metadata', async () => {
     const m = { title: 'T', author: 'A', subject: 'S', keywords: 'k1, k2', creator: 'C', producer: 'P' };
     const out = await ops.setMetadata(await makeDoc(1), m);
@@ -197,7 +272,7 @@ describe('export', () => {
       ]);
       const back = await ops.importForEditing(out, () => 'new');
       expect(back.count).toBe(withImage.length);
-      expect(back.annotations[0].map(model)).toEqual(withImage);
+      expect(back.annotations[0].map(model)).toEqual(withImage.map(model));
       // Imported annotations are removed from the page so they are not drawn twice.
       expect(await subtypes(back.bytes)).toEqual([]);
     });
