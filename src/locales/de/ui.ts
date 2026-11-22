@@ -26,6 +26,7 @@ const DE: Record<string, string> = {
   'Fill fields here or directly on the page.': 'Füllen Sie die Felder hier oder direkt auf der Seite aus.', 'Reset changes': 'Änderungen zurücksetzen',
   'Flatten form': 'Formular reduzieren', 'Flatten the form? Fields will no longer be editable.': 'Formular reduzieren? Die Felder können danach nicht mehr bearbeitet werden.',
   'Burn all annotations into the page content': 'Alle Kommentare fest in den Seiteninhalt einbetten', 'Flatten all': 'Alle reduzieren',
+  'Save a copy with comments burnt into the pages': 'Kopie speichern, deren Kommentare in die Seiten eingebrannt sind',
   'No comments yet. Use the Comment tab to highlight, draw, or add notes.':
     'Noch keine Kommentare. Verwenden Sie die Registerkarte „Anmerkungen“, um Text hervorzuheben, zu zeichnen oder Notizen hinzuzufügen.',
   // review status of a comment (comments pane, summary)
@@ -66,6 +67,11 @@ const DE: Record<string, string> = {
   'The signature dictionary is malformed.': 'Das Signaturverzeichnis ist fehlerhaft.', 'The signed byte range does not fit the file.': 'Der signierte Bytebereich passt nicht zur Datei.',
   'The signed revision is intact, but the document was changed after this signature was applied.':
     'Die signierte Version ist intakt, das Dokument wurde jedoch nach dem Anbringen dieser Signatur geändert.',
+  // The visible signature box is drawn in the interface language (src/lib/signature.ts).
+  'Digitally signed by {signer}': 'Digital signiert von {signer}',
+  'Date: {date}': 'Datum: {date}',
+  'Reason: {reason}': 'Grund: {reason}',
+  'Location: {location}': 'Ort: {location}',
 
   // status bar
   'First page': 'Erste Seite', 'Previous page': 'Vorherige Seite', 'Page number': 'Seitenzahl', 'Next page': 'Nächste Seite', 'Last page': 'Letzte Seite',
@@ -85,6 +91,10 @@ const DE: Record<string, string> = {
   'locked (lock icon): cannot be moved, resized, deleted or changed. Filling in is not affected.':
     'gesperrt (Schloss-Symbol): können nicht verschoben, in der Größe geändert, gelöscht oder geändert werden. Das Ausfüllen ist nicht betroffen.',
   'Make all fields editable': 'Alle Felder bearbeitbar machen', 'Only unlock (keep read-only)': 'Nur entsperren (Schreibschutz beibehalten)',
+  'Select, move and change form fields': 'Formularfelder auswählen, verschieben und ändern',
+  'Clear read-only, value locks and Locked on every field': 'Schreibschutz, Wertsperren und „Gesperrt“ bei allen Feldern aufheben',
+  'Clear only the Locked property of every field': 'Nur die Eigenschaft „Gesperrt“ aller Felder aufheben',
+  'Set the Locked property on every field': 'Die Eigenschaft „Gesperrt“ bei allen Feldern setzen',
   'Edit page content': 'Seiteninhalt bearbeiten',
   'Click an object on the page to select it, or drag around several. Double-click text to edit it.':
     'Klicken Sie auf ein Objekt, um es auszuwählen, oder ziehen Sie einen Rahmen um mehrere. Doppelklicken Sie auf Text, um ihn zu bearbeiten.',
@@ -139,6 +149,7 @@ const DE: Record<string, string> = {
   'Click to place a radio button; add more from its properties.': 'Klicken Sie, um ein Optionsfeld zu platzieren; weitere fügen Sie in seinen Eigenschaften hinzu.',
   'Drag a box where the signature should appear.': 'Ziehen Sie einen Rahmen an der Stelle auf, an der die Signatur erscheinen soll.',
   'Drag over content to mark it for redaction.': 'Ziehen Sie über Inhalte, um sie zum Schwärzen zu markieren.',
+  'Drag a box to copy that part of the page as an image': 'Ziehen Sie einen Rahmen auf, um diesen Seitenteil als Bild zu kopieren',
 
   // field properties
   'Text field': 'Textfeld', 'Check box': 'Kontrollkästchen', 'Radio buttons': 'Optionsfelder', Dropdown: 'Kombinationsfeld', 'List box': 'Listenfeld',
@@ -201,6 +212,7 @@ const DE: Record<string, string> = {
   'This places a visual signature image. Cryptographic (certificate-based) digital signatures are on the roadmap.':
     'Hiermit wird ein Bild der Unterschrift platziert. Kryptografische (zertifikatbasierte) digitale Signaturen sind geplant.',
   'Keyboard shortcuts': 'Tastenkürzel', Print: 'Drucken', 'Undo / Redo': 'Rückgängig / Wiederholen', Find: 'Suche', 'Zoom in / out': 'Vergrößern / Verkleinern',
+  'Undo (Ctrl+Z)': 'Rückgängig (Strg+Z)', 'Redo (Ctrl+Y)': 'Wiederholen (Strg+Y)',
   'Delete selected annotation': 'Ausgewählten Kommentar löschen', 'Select tool / deselect': 'Auswahlwerkzeug / Auswahl aufheben', 'Edit comments': 'Anmerkungen bearbeiten',
   'Select text': 'Textauswahl', Snapshot: 'Bildschirmfoto', Hand: 'Hand', 'Previous / next page': 'Vorherige / nächste Seite',
   'Accessibility check': 'Barrierefreiheit prüfen', 'Checking…': 'Wird geprüft…', '{n} of {count} checks need attention.': '{n} von {count} Prüfungen erfordern Aufmerksamkeit.',
@@ -235,6 +247,7 @@ const DE: Record<string, string> = {
   'Text access for screen readers': 'Textzugriff für Bildschirmleseprogramme', 'Allow all': 'Alles erlauben', 'Read & print only': 'Nur lesen und drucken',
   'Comments & forms only': 'Nur Kommentare und Formulare', 'Forms only': 'Nur Formulare',
   'Security settings will be applied when you save.': 'Die Sicherheitseinstellungen werden beim Speichern angewendet.',
+  'Passwords and encryption': 'Kennwörter und Verschlüsselung', 'What others may do with the document': 'Was andere mit dem Dokument tun dürfen',
   'Security will be removed when you save.': 'Die Sicherheit wird beim Speichern entfernt.',
   'Set a permissions password: it is needed to change these settings later.': 'Legen Sie ein Berechtigungskennwort fest: Es wird benötigt, um diese Einstellungen später zu ändern.',
   'The permissions password must differ from the open password.': 'Das Berechtigungskennwort muss sich vom Kennwort zum Öffnen unterscheiden.',
@@ -309,6 +322,7 @@ const DE: Record<string, string> = {
   'The browser blocked clipboard access. Press Ctrl+V on the page or insert the image from a file instead.':
     'Der Browser hat den Zugriff auf die Zwischenablage blockiert. Drücken Sie Strg+V auf der Seite oder fügen Sie das Bild stattdessen aus einer Datei ein.',
   'This browser cannot share files directly, so the PDF was downloaded for you to send.': 'Dieser Browser kann Dateien nicht direkt teilen, daher wurde die PDF-Datei zum Versenden heruntergeladen.',
+  'Send the PDF with another app (mail, messenger…)': 'Das PDF mit einer anderen App versenden (E-Mail, Messenger…)',
   'Remove the attachment “{name}”?': 'Dateianlage „{name}“ entfernen?', 'This browser cannot read text aloud.': 'Dieser Browser kann keinen Text vorlesen.',
   'This document’s security settings do not allow text extraction for accessibility.': 'Die Sicherheitseinstellungen dieses Dokuments erlauben keine Textextraktion für die Barrierefreiheit.',
   'Document language (e.g. de-DE, en-US):': 'Dokumentsprache (z. B. de-DE, en-US):', 'Document title:': 'Dokumenttitel:',
@@ -336,6 +350,10 @@ const DE: Record<string, string> = {
   'Wrong certificate password.': 'Falsches Zertifikatskennwort.', 'Only RSA certificates can be used for signing at the moment.': 'Zum Signieren können derzeit nur RSA-Zertifikate verwendet werden.',
   'Field names must be non-empty and contain no dots.': 'Feldnamen dürfen nicht leer sein und keine Punkte enthalten.', 'No such widget.': 'Dieses Widget gibt es nicht.',
   'The radio group has no buttons on a page.': 'Die Optionsfeldgruppe hat keine Schaltflächen auf einer Seite.', 'Nothing selected': 'Nichts ausgewählt',
+  'The pages of this file cannot be read for editing.': 'Die Seiten dieser Datei können nicht zum Bearbeiten gelesen werden.',
+  'The signature is too large for the space reserved in the file.': 'Die Signatur ist zu groß für den in der Datei reservierten Platz.',
+  'Could not read the certificate file: {msg}': 'Die Zertifikatsdatei konnte nicht gelesen werden: {msg}',
+  'Margins are larger than page {page}.': 'Die Ränder sind größer als Seite {page}.',
   // Bookmarks pane
   'Go to bookmark': 'Zum Lesezeichen gehen', 'Add bookmark': 'Lesezeichen hinzufügen', 'Add child bookmark': 'Untergeordnetes Lesezeichen hinzufügen',
   'Set destination to current view': 'Ziel auf aktuelle Ansicht setzen', Rename: 'Umbenennen', Bold: 'Fett', Italic: 'Kursiv',

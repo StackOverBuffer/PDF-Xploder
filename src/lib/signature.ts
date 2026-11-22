@@ -25,6 +25,7 @@ import { frameGeom, pdfRectToView, viewToPdf } from './geometry';
 import * as der from './der';
 import type { PageGeom, Rect } from './types';
 import { normRot } from './geometry';
+import { tf, tr, type Lang, useLang } from './i18n';
 
 /** Bytes reserved in the file for the PKCS#7 blob. */
 const SIGNATURE_SPACE = 16384;
@@ -76,7 +77,7 @@ export async function readP12(bytes: Uint8Array, password: string): Promise<Iden
     const msg = String((e as Error).message ?? e);
     if (/MAC could not be verified|Invalid password/i.test(msg)) throw new Error('Wrong certificate password.');
     if (/OID is not RSA/i.test(msg)) throw new Error('Only RSA certificates can be used for signing at the moment.');
-    throw new Error(`Could not read the certificate file: ${msg}`);
+    throw new Error(tf('Could not read the certificate file: {msg}', { msg }));
   }
   const keyBags = [
     ...(p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] ?? []),
@@ -167,17 +168,19 @@ function existingFieldNames(doc: PDFDocument): Set<string> {
   return names;
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+/** The signing date as the interface language writes it. */
+function formatDate(d: Date, lang: Lang): string {
+  return d.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
 }
 
-/** Draw the visible signature box: who signed, when, and why. */
+/** Draw the visible signature box: who signed, when, and why — in the interface language. */
 async function signatureAppearance(doc: PDFDocument, g: PageGeom, rect: Rect, o: SignOptions, date: Date) {
+  const lang = useLang.getState().lang;
   const lines = [
-    `Digitally signed by ${o.identity.name}`,
-    `Date: ${formatDate(date)}`,
-    ...(o.reason ? [`Reason: ${o.reason}`] : []),
-    ...(o.location ? [`Location: ${o.location}`] : []),
+    tf('Digitally signed by {signer}', { signer: o.identity.name }),
+    tf('Date: {date}', { date: formatDate(date, lang) }),
+    ...(o.reason ? [tf('Reason: {reason}', { reason: o.reason })] : []),
+    ...(o.location ? [tf('Location: {location}', { location: o.location })] : []),
   ];
   const engine = await createTextEngine(doc, lines);
   const fg = frameGeom(g, g.rotation);
@@ -333,7 +336,7 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
   padesAttributes(forge, signerInfo, o.identity.key, certDer);
   (issuerAndSerial.value as forgeType.asn1.Asn1[])[0] = forge.asn1.fromDer(toBinary(der.whole(certDer, issuer)));
   const cms = der.hex(fromBinary(forge.asn1.toDer(asn1).getBytes()));
-  if (cms.length > SIGNATURE_SPACE * 2) throw new Error('The signature is too large for the space reserved in the file.');
+  if (cms.length > SIGNATURE_SPACE * 2) throw new Error(tr('The signature is too large for the space reserved in the file.'));
   out.set(new TextEncoder().encode(cms), cStart + 1);
   return out;
 }
