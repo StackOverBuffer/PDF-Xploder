@@ -334,6 +334,27 @@ export function syncXmp(doc: PDFDocument): void {
   doc.context.assign(ref, out);
 }
 
+/** A fresh 16-byte file ID part (as pdfOps stamps new documents with). */
+const randomFileId = () => PDFHexString.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
+
+/**
+ * A save changes the document, so the file says so: a current /ModDate and a refreshed
+ * /ID[1]. pdf-lib stamps the date only when loading with updateMetadata — which this app
+ * never does — so without this an edit would keep the file's old date, and syncXmp would
+ * copy that stale date into the XMP. /ID[0] stays: encryption keys are derived from it.
+ * Runs before syncXmp so the XMP gets the new date. The signature path saves incrementally
+ * (signature.ts), not through here: signed byte ranges must not move.
+ */
+function touchSaveMetadata(doc: PDFDocument): void {
+  doc.setModificationDate(new Date());
+  const ctx = doc.context;
+  const fresh = randomFileId();
+  const id = ctx.trailerInfo.ID ? ctx.lookup(ctx.trailerInfo.ID) : undefined;
+  if (!(id instanceof PDFArray)) ctx.trailerInfo.ID = ctx.obj([fresh, fresh]);
+  else if (id.size() === 0) { id.push(fresh); id.push(fresh); }
+  else id.set(1, fresh);
+}
+
 /** The catalog's XMP metadata as text, if the file has any. */
 function catalogXmp(doc: PDFDocument): string | undefined {
   const stream = doc.catalog.lookup(PDFName.of('Metadata'));
@@ -377,6 +398,7 @@ export function dropBrokenAppearances(doc: PDFDocument): number {
 export async function saveDoc(doc: PDFDocument, opts: { useObjectStreams?: boolean } = {}): Promise<Uint8Array> {
   // Embedded fonts and images become objects only when flushed: do that before pruning.
   await doc.flush();
+  touchSaveMetadata(doc);
   syncXmp(doc);
   dropBrokenAppearances(doc);
   cutLostPageRefs(doc);

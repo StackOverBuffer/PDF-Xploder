@@ -6,6 +6,7 @@
  * with the attributes it inherited copied onto it. Saving writes the repaired tree.
  */
 import { PDFArray, PDFCatalog, PDFDict, PDFDocument, PDFName, PDFNumber, PDFPageLeaf, PDFPageTree, PDFRef, type PDFObject } from '@cantoo/pdf-lib';
+import { tr } from './i18n';
 
 const N = (s: string) => PDFName.of(s);
 const INHERITABLE = ['Resources', 'MediaBox', 'CropBox', 'Rotate'];
@@ -30,14 +31,18 @@ function pageTreeIsSound(doc: PDFDocument): boolean {
 const isBox = (o: PDFObject | undefined): o is PDFArray =>
   o instanceof PDFArray && o.size() === 4 && o.asArray().every((n) => n instanceof PDFNumber || n instanceof PDFRef);
 
-/** The pages under the catalog's /Pages, depth first, with what each inherits. Visits every node once. */
+/**
+ * The pages under the catalog's /Pages, depth first, with what each inherits. Page tree
+ * nodes are visited once (a shared subtree or a cycle would repeat their pages); a page
+ * itself comes back once per /Kids listing — viewers show one page per listing, so the
+ * repaired tree has to too.
+ */
 function collectPages(doc: PDFDocument): { ref: PDFRef; dict: PDFDict; inherited: Map<string, PDFObject> }[] {
   const ctx = doc.context;
   const out: { ref: PDFRef; dict: PDFDict; inherited: Map<string, PDFObject> }[] = [];
-  const seen = new Set<string>();
+  const visited = new Set<string>();
   const walk = (obj: PDFObject | undefined, inherited: Map<string, PDFObject>, depth: number) => {
-    if (!(obj instanceof PDFRef) || seen.has(obj.toString()) || depth > 64) return;
-    seen.add(obj.toString());
+    if (!(obj instanceof PDFRef) || depth > 64) return;
     const dict = ctx.lookup(obj);
     if (!(dict instanceof PDFDict)) return;
     const type = dict.get(N('Type'));
@@ -46,6 +51,8 @@ function collectPages(doc: PDFDocument): { ref: PDFRef; dict: PDFDict; inherited
       out.push({ ref: obj, dict, inherited });
       return;
     }
+    if (visited.has(obj.toString())) return;
+    visited.add(obj.toString());
     if (!(kids instanceof PDFArray)) return;
     const next = new Map(inherited);
     for (const key of INHERITABLE) {
@@ -101,11 +108,11 @@ function rebuild(doc: PDFDocument): boolean {
   const tree = PDFPageTree.withContext(ctx);
   const treeRef = ctx.register(tree);
   const placed = new Set<string>();
-  for (const { ref, dict, inherited } of pages) {
-    // A page listed twice keeps its first place (pdf-lib would otherwise draw it twice).
-    if (placed.has(ref.toString())) continue;
-    placed.add(ref.toString());
-    const leaf = dict instanceof PDFPageLeaf ? dict : PDFPageLeaf.fromMapWithContext(new Map(dict.entries()), ctx);
+  /** A leaf from `dict` with the attributes inherited at its position and the defaults filled in. */
+  const leafFrom = (dict: PDFDict, inherited: Map<string, PDFObject>, copy: boolean) => {
+    // The page at a listing's own ref can be fixed in place; every further listing needs
+    // its own dict, sharing the contents and resources with the first (they are not touched).
+    const leaf = !copy && dict instanceof PDFPageLeaf ? dict : PDFPageLeaf.fromMapWithContext(new Map(dict.entries()), ctx);
     for (const key of INHERITABLE) {
       if (!leaf.has(N(key)) && inherited.has(key)) leaf.set(N(key), inherited.get(key)!);
     }
@@ -113,8 +120,20 @@ function rebuild(doc: PDFDocument): boolean {
     if (!isBox(leaf.lookup(N('MediaBox')))) leaf.set(N('MediaBox'), ctx.obj(DEFAULT_MEDIA_BOX));
     if (!(leaf.lookup(N('Resources')) instanceof PDFDict)) leaf.set(N('Resources'), ctx.obj({}));
     leaf.set(N('Parent'), treeRef);
-    if (leaf !== dict) ctx.assign(ref, leaf);
-    tree.pushLeafNode(ref);
+    return leaf;
+  };
+  /** The reference format has 16 bits for the generation; a bigger one is unparseable for other tools. */
+  const genOk = (ref: PDFRef) => Number.isInteger(ref.generationNumber) && ref.generationNumber >= 0 && ref.generationNumber <= 0xffff;
+  for (const { ref, dict, inherited } of pages) {
+    const again = placed.has(ref.toString());
+    placed.add(ref.toString());
+    const leaf = leafFrom(dict, inherited, again);
+    // A repeated ref, or one whose generation is out of range, cannot go into the new tree
+    // as it is: the leaf moves to a fresh reference, and the old one is left out (a later
+    // save prunes it together with the rest of the broken tree).
+    const at = again || !genOk(ref) ? ctx.register(leaf) : ref;
+    if (at === ref && leaf !== dict) ctx.assign(ref, leaf);
+    tree.pushLeafNode(at);
   }
   doc.catalog.set(N('Pages'), treeRef);
   // pdf-lib caches the page list: start over with the new tree.
@@ -129,7 +148,7 @@ export async function loadForEdit(bytes: Uint8Array, opts: { password?: string }
   if (!repairPageTree(doc) && !pageTreeIsSound(doc)) {
     // No page pdf-lib can use (objects it cannot decode, no page objects at all): the app
     // opens the file read-only instead of failing at every edit.
-    throw new Error('The pages of this file cannot be read for editing.');
+    throw new Error(tr('The pages of this file cannot be read for editing.'));
   }
   return doc;
 }

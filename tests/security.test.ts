@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDict, PDFDocument, PDFName, PDFString, StandardFonts } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFNumber, PDFString, StandardFonts } from '@cantoo/pdf-lib';
 import * as sec from '../src/lib/security';
 
 async function plainDoc(): Promise<Uint8Array> {
@@ -50,6 +50,39 @@ describe('security', () => {
 
   it('reports unencrypted documents', async () => {
     expect(await sec.inspectEncryption(await plainDoc())).toEqual({ encrypted: false, permissions: sec.ALL_PERMISSIONS });
+  });
+});
+
+describe('/Extensions and AES-256', () => {
+  const settings = (algorithm: sec.Algorithm): sec.SecuritySettings => ({
+    userPassword: 'open', ownerPassword: 'owner', algorithm, permissions: sec.ALL_PERMISSIONS,
+  });
+  const extensionsOf = async (b: Uint8Array) =>
+    (await PDFDocument.load(b, { ignoreEncryption: true, updateMetadata: false })).catalog.lookup(PDFName.of('Extensions'), PDFDict);
+
+  it('merges the Adobe entry into a /Extensions dictionary the file already declares', async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    doc.addPage([200, 200]).drawText('Secret text', { x: 20, y: 100, size: 12, font });
+    // A developer extension declaration, as PDF/A-producing tools write one.
+    doc.catalog.set(PDFName.of('Extensions'), doc.context.obj({ ISO_19005_1: { BaseVersion: '1.4', ExtensionLevel: 1, Conformance: 'B' } }));
+    const enc = await sec.encrypt(await doc.save(), settings('AES-256'));
+
+    const ext = await extensionsOf(enc);
+    const iso = ext.lookup(PDFName.of('ISO_19005_1'), PDFDict);
+    expect(iso.lookup(PDFName.of('BaseVersion'))?.toString()).toBe('/1.4');
+    expect(iso.lookup(PDFName.of('Conformance'))?.toString()).toBe('/B');
+    expect(iso.lookup(PDFName.of('ExtensionLevel'))?.toString()).toBe('1');
+    const adbe = ext.lookup(PDFName.of('ADBE'), PDFDict);
+    expect(adbe.lookup(PDFName.of('BaseVersion'))?.toString()).toBe('/1.7');
+    expect((adbe.lookup(PDFName.of('ExtensionLevel')) as PDFNumber).asNumber()).toBe(8);
+    // Still there after decryption, where the catalog is written out plain again.
+    expect((await extensionsOf(await sec.decrypt(enc, 'open'))).has(PDFName.of('ISO_19005_1'))).toBe(true);
+  });
+
+  it('files without /Extensions still declare the Adobe extension level', async () => {
+    const ext = await extensionsOf(await sec.encrypt(await plainDoc(), settings('AES-256')));
+    expect(ext.lookup(PDFName.of('ADBE'), PDFDict).lookup(PDFName.of('BaseVersion'))?.toString()).toBe('/1.7');
   });
 });
 

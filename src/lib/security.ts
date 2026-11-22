@@ -240,10 +240,22 @@ export async function encrypt(bytes: Uint8Array, s: SecuritySettings): Promise<U
 /**
  * AES-256 (security handler revision 6) is a PDF 2.0 / Adobe extension level 8 feature:
  * declare it, as Acrobat does, so readers that check the version know what to expect.
+ * A dictionary the file already declares keeps its entries (a developer extension such as
+ * a PDF/A conformance must survive); only /ADBE is added or refreshed. AES-256 needs no
+ * Adobe extension on a PDF 2.0 file — there it is part of the base standard.
  */
 function markAes256(doc: PDFDocument) {
-  doc.catalog.set(PDFName.of('Extensions'), doc.context.obj({ ADBE: { BaseVersion: PDFName.of('1.7'), ExtensionLevel: 8 } }));
+  const extensions = PDFName.of('Extensions');
   const v = doc.context.header.toString().match(/%PDF-(\d+)\.(\d+)/);
+  const adbe = doc.context.obj({ BaseVersion: PDFName.of('1.7'), ExtensionLevel: 8 });
+  const current = doc.catalog.lookup(extensions);
+  if (current instanceof PDFDict) {
+    // PDF 2.0 has AES-256 in the base standard: no Adobe extension to declare there.
+    if (!(v && Number(v[1]) >= 2)) current.set(PDFName.of('ADBE'), adbe);
+  } else {
+    // No /Extensions (or a broken one, which no reader could make sense of anyway).
+    doc.catalog.set(extensions, doc.context.obj({ ADBE: adbe }));
+  }
   if (!v || Number(v[1]) * 10 + Number(v[2]) < 17) doc.context.header = PDFHeader.forVersion(1, 7);
 }
 
