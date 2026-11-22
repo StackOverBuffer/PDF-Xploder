@@ -19,7 +19,7 @@ import {
   StandardFonts,
 } from '@cantoo/pdf-lib';
 import type { Rect } from './types';
-import { saveDoc } from './pdfSave';
+import { dropXfa, saveDoc } from './pdfSave';
 import { loadForEdit } from './pageTree';
 
 // Annotation flags (ISO 32000-1, table 165).
@@ -214,6 +214,9 @@ export async function getFormFields(bytes: Uint8Array): Promise<FieldInfo[]> {
 
 /** Save after form changes, regenerating field appearances where pdf-lib needs to. */
 export async function saveForm(doc: PDFDocument, unicodeFont?: () => Promise<Uint8Array | null>): Promise<Uint8Array> {
+  // saveForm runs after the form changed (values, design, locks): the XFA data would
+  // disagree with the standard fields, so it goes.
+  dropXfa(doc);
   try {
     return await saveDoc(doc);
   } catch (e) {

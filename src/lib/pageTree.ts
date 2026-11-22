@@ -144,7 +144,10 @@ function rebuild(doc: PDFDocument): boolean {
 
 /** Load a document for editing, its page tree repaired if pdf-lib could not use it. */
 export async function loadForEdit(bytes: Uint8Array, opts: { password?: string } = {}): Promise<PDFDocument> {
-  const doc = await PDFDocument.load(bytes, { ...opts, updateMetadata: false });
+  // preserveXFA: pdf-lib cannot read or write XFA and would strip it at the first getForm();
+  // the app only drops it (pdfSave's dropXfa) where the form itself changes, so a document
+  // whose fields are untouched keeps its XFA data on save.
+  const doc = await PDFDocument.load(bytes, { ...opts, updateMetadata: false, preserveXFA: true });
   if (!repairPageTree(doc) && !pageTreeIsSound(doc)) {
     // No page pdf-lib can use (objects it cannot decode, no page objects at all): the app
     // opens the file read-only instead of failing at every edit.

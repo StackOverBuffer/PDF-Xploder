@@ -8,11 +8,14 @@ import {
   PDFDict,
   PDFDocument,
   PDFDropdown,
+  PDFHexString,
   PDFName,
   PDFOptionList,
+  PDFObjectCopier,
   PDFPage,
   PDFRadioGroup,
   PDFRef,
+  PDFString,
   PDFTextField,
   type PDFField,
   degrees,
@@ -28,6 +31,7 @@ import { createTextEngine, fontCovering, loadFontBytes, loadFontkit, type FontKe
 import { subsetFont } from './subset';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
 import { copyPages } from './pageCopy';
+import { tf } from './i18n';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
   return loadForEdit(bytes);
@@ -50,13 +54,50 @@ async function save(doc: PDFDocument): Promise<Uint8Array> {
   return saveDoc(doc);
 }
 
+/**
+ * The page as pdf.js displays it (the reference is Page.view/Page.rotate in pdf.js's core):
+ * the intersection of crop and media box — the media box when they do not overlap — and a
+ * /Rotate that is not a multiple of 90 read as 0. Edits must work on the box that is shown,
+ * or stamps and crops land somewhere else than they were placed. normRot stays in use for
+ * the rotate command, whose delta arithmetic rounds to the nearest quarter turn.
+ */
 export function geomOf(page: PDFPage): PageGeom {
-  const b = page.getCropBox();
-  return { view: [b.x, b.y, b.x + b.width, b.y + b.height], rotation: normRot(page.getRotation().angle) };
+  const m = page.getMediaBox();
+  // pdf.js ignores an empty media box and falls back to Letter.
+  const media = m.width > 0 && m.height > 0 ? m : { x: 0, y: 0, width: 612, height: 792 };
+  const c = page.getCropBox();
+  const x0 = Math.max(media.x, c.x);
+  const y0 = Math.max(media.y, c.y);
+  const x1 = Math.min(media.x + media.width, c.x + c.width);
+  const y1 = Math.min(media.y + media.height, c.y + c.height);
+  const view: PageGeom['view'] = x1 > x0 && y1 > y0 ? [x0, y0, x1, y1] : [media.x, media.y, media.x + media.width, media.y + media.height];
+  return { view, rotation: displayedRotation(page.getRotation().angle) };
+}
+
+/** /Rotate the way pdf.js reads it: a value that is not a multiple of 90 counts as 0. */
+function displayedRotation(angle: number): number {
+  if (angle % 90 !== 0) return 0;
+  if (angle >= 360) return angle % 360;
+  if (angle < 0) return (angle % 360 + 360) % 360;
+  return angle;
+}
+
+/**
+ * Fresh documents: the app as Producer and a trailer /ID (two random 16-byte strings, the
+ * way the fork's convertToPDFA writes one), not the defaults PDFDocument.create fills in.
+ */
+export function stampNewDocument(doc: PDFDocument): void {
+  doc.setProducer('PDF-Xploder');
+  const ctx = doc.context;
+  if (!ctx.lookup(ctx.trailerInfo.ID)) {
+    const id = PDFHexString.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
+    ctx.trailerInfo.ID = ctx.obj([id, id]);
+  }
 }
 
 export async function createBlankDocument(width = 595.28, height = 841.89): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  stampNewDocument(doc);
   doc.addPage([width, height]);
   return save(doc);
 }
@@ -129,8 +170,17 @@ export async function duplicatePages(bytes: Uint8Array, indices: number[]): Prom
 export async function extractPages(source: Uint8Array | PDFDocument, indices: number[]): Promise<Uint8Array> {
   const src = source instanceof Uint8Array ? await load(source) : source;
   const out = await PDFDocument.create();
+  stampNewDocument(out);
   const pages = await copyPages(out, src, indices);
   pages.forEach((p) => out.addPage(p));
+  // The part is a document of its own: keep the settings that describe it. It has no XMP
+  // of its own (the fresh catalog carries none), so the Info title cannot get out of sync.
+  const title = src.getTitle();
+  if (title) out.setTitle(title);
+  const lang = src.catalog.lookup(PDFName.of('Lang'));
+  if (lang instanceof PDFString || lang instanceof PDFHexString) out.setLanguage(lang.decodeText());
+  const preferences = src.catalog.lookupMaybe(PDFName.of('ViewerPreferences'), PDFDict);
+  if (preferences) out.catalog.set(PDFName.of('ViewerPreferences'), PDFObjectCopier.for(src.context, out.context).copy(preferences) as PDFDict);
   return save(out);
 }
 
@@ -186,7 +236,7 @@ export async function cropPages(bytes: Uint8Array, indices: number[], m: Margins
       width: vs.width - m.left - m.right,
       height: vs.height - m.top - m.bottom,
     };
-    if (v.width < 10 || v.height < 10) throw new Error(`Margins are larger than page ${i + 1}.`);
+    if (v.width < 10 || v.height < 10) throw new Error(tf('Margins are larger than page {page}.', { page: i + 1 }));
     const r = viewRectToPdf(g, v);
     page.setCropBox(r.x, r.y, r.w, r.h);
   }
@@ -348,7 +398,7 @@ export async function setMetadata(bytes: Uint8Array, m: Metadata): Promise<Uint8
 
 export { getFormFields, type FieldInfo } from './forms';
 import type { FieldValue } from './forms';
-import { saveDoc } from './pdfSave';
+import { dropXfa, saveDoc } from './pdfSave';
 import { addInsertedFileBookmark, copiedOutline, outlineOf } from './outline';
 import { loadForEdit } from './pageTree';
 export type { FieldValue };
@@ -360,6 +410,8 @@ export async function setFormValues(
 ): Promise<Uint8Array> {
   const doc = await load(bytes);
   const form = doc.getForm();
+  // Values now live in the standard fields: XFA data would disagree with them.
+  dropXfa(doc);
   for (const [name, value] of Object.entries(values)) {
     const f = form.getField(name);
     if (f instanceof PDFTextField) f.setText(String(value));
@@ -420,6 +472,8 @@ export async function flattenFormFields(bytes: Uint8Array): Promise<Uint8Array> 
   const doc = await load(bytes);
   const form = doc.getForm();
   if (!form.getFields().length) return bytes;
+  // The values burn into the pages; XFA data would still carry them as editable fields.
+  dropXfa(doc);
   form.flatten({ updateFieldAppearances: false });
   return save(doc);
 }
@@ -518,6 +572,7 @@ export async function replacePagesWithImages(
   // pages keeps its value (it is visible there anyway) and loses only those widgets.
   const removedFields: string[] = [];
   const form = doc.getForm();
+  let fieldRemoved = false;
   for (const field of form.getFields()) {
     const widgets = field.acroField.getWidgets();
     const hit = widgets.map(onRedactedPage);
@@ -525,6 +580,8 @@ export async function replacePagesWithImages(
     if (hit.every(Boolean)) {
       removedFields.push(field.getName());
       form.removeField(field);
+      // The field's value is gone from the form; XFA datasets would still carry it.
+      fieldRemoved = true;
     } else {
       for (let k = widgets.length - 1; k >= 0; k--) if (hit[k]) field.acroField.removeWidget(k);
     }
@@ -546,5 +603,6 @@ export async function replacePagesWithImages(
     const img = await doc.embedPng(png);
     page.drawImage(img, { x: 0, y: 0, width: vs.width, height: vs.height });
   }
+  if (fieldRemoved) dropXfa(doc);
   return { bytes: await save(doc), removedFields };
 }

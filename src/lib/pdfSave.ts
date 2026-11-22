@@ -355,6 +355,20 @@ function touchSaveMetadata(doc: PDFDocument): void {
   else id.set(1, fresh);
 }
 
+/**
+ * Remove XFA form data: pdf-lib cannot read or write it, and once fields change the XFA
+ * datasets would disagree with them (Adobe renders from the XFA model and would show old
+ * values). Documents whose fields are untouched keep their XFA (loadForEdit preserves it);
+ * everything that fills or reshapes the form calls this before saving.
+ */
+export function dropXfa(doc: PDFDocument): void {
+  const form = doc.catalog.lookup(PDFName.of('AcroForm'));
+  if (!(form instanceof PDFDict)) return;
+  form.delete(PDFName.of('XFA'));
+  // A dynamic form asks for regeneration on open; without its data that would hang or fail.
+  form.delete(PDFName.of('NeedsRendering'));
+}
+
 /** The catalog's XMP metadata as text, if the file has any. */
 function catalogXmp(doc: PDFDocument): string | undefined {
   const stream = doc.catalog.lookup(PDFName.of('Metadata'));
