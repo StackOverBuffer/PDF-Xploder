@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFile, writeFile } from 'node:fs/promises';
-import { PDFDocument } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
 import { createSampleDocument } from '../src/lib/sample';
 import { SAMPLE_TEXT } from '../src/lib/sampleText';
 import { getFormFields } from '../src/lib/forms';
@@ -60,6 +60,22 @@ describe.each(['en', 'de'] as const)('sample document (%s)', (lang) => {
     expect((await listAttachments(bytes)).map((a) => a.mimeType)).toEqual(['text/csv']);
     const images = await findImages(await PDFDocument.load(bytes));
     expect(images.length).toBe(1);
+  });
+
+  it('is saved like the files the app writes: /ID, the app as producer, form /DA and /DR', async () => {
+    // Signing a sample that was never edited signs these bytes as they are.
+    const doc = await PDFDocument.load(await sample(), { updateMetadata: false });
+    expect(doc.getProducer()).toBe('PDF-Xploder');
+    expect(doc.getCreator()).toBe('PDF-Xploder');
+    expect(doc.context.lookup(doc.context.trailerInfo.ID, PDFArray).size()).toBe(2);
+    const acro = doc.catalog.lookup(PDFName.of('AcroForm'), PDFDict);
+    expect(acro.lookup(PDFName.of('DA'))).toBeDefined();
+    const fonts = acro.lookup(PDFName.of('DR'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+    for (const f of doc.getForm().getFields()) {
+      const da = f.acroField.dict.lookup(PDFName.of('DA'));
+      const name = da && /\/([^\s/]+)\s+[\d.]+\s+Tf/.exec(da.toString())?.[1];
+      if (name) expect(fonts.has(PDFName.of(name)), `${f.getName()} /DA font ${name}`).toBe(true);
+    }
   });
 
   it('keeps clear of the usual tells of generated text', () => {

@@ -4,7 +4,7 @@
  * headings and links to them (#anchor) that work. The output is tagged
  * (structure tree, /Lang) so screen readers can follow the document's semantics.
  */
-import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNull, PDFNumber, PDFOperator, PDFOperatorNames, beginText, degrees, endMarkedContent, endText, rgb, rotateAndSkewTextRadiansAndTranslate, setFillingColor, setFontAndSize, showText, toRadians, type PDFDict, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNull, PDFNumber, PDFOperator, PDFOperatorNames, beginMarkedContent, beginText, degrees, endMarkedContent, endText, rgb, rotateAndSkewTextRadiansAndTranslate, setFillingColor, setFontAndSize, showText, toRadians, type PDFDict, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
 import { createTextEngine } from './fonts';
 import { useLang, type Lang } from './i18n';
 import type { TextEngine } from './appearance';
@@ -190,6 +190,8 @@ interface SElem {
   kids: ({ page: PDFRef; mcid: number } | { objr: PDFRef; page: PDFRef } | SElem)[];
   /** Alternative text (figures). */
   alt?: string;
+  /** Table header cells: the cells they head (/A << /O /Table /Scope … >>). */
+  scope?: 'Column' | 'Row';
   /** Keep the element even when it holds nothing (table cells keep the grid aligned). */
   keepEmpty?: boolean;
   /** The annotation a Link element stands for (set when the annotation is created). */
@@ -314,6 +316,7 @@ function setStructTree(doc: PDFDocument, tag: Tagger): void {
       Type: 'StructElem', S: n.s, P: parent,
       ...(pg ? { Pg: pg } : {}),
       ...(n.alt ? { Alt: PDFHexString.fromText(n.alt) } : {}),
+      ...(n.scope ? { A: ctx.obj({ O: 'Table', Scope: n.scope }) } : {}),
       K: kids.length === 1 ? kids[0] : ctx.obj(kids),
     }));
     for (const k of n.kids) {
@@ -339,7 +342,8 @@ function setStructTree(doc: PDFDocument, tag: Tagger): void {
   for (const n of tag.links) {
     if (!n.annot) continue;
     n.annot.dict.set(PDFName.of('StructParent'), PDFNumber.of(nextKey));
-    nums.push(PDFNumber.of(nextKey), ctx.register(ctx.obj([refs.get(n)!])));
+    // An annotation's entry is its element itself (arrays are for a page's content ids).
+    nums.push(PDFNumber.of(nextKey), refs.get(n)!);
     nextKey++;
   }
   ctx.assign(rootRef, ctx.obj({
@@ -367,6 +371,8 @@ interface PendingLink {
   page: number;
   rect: [number, number, number, number];
   href: string;
+  /** The link's text, for the annotation's /Contents (its alternate description). */
+  text: string;
   /** The link's structure element (missing for pieces with no text of their own). */
   node?: SElem;
 }
@@ -416,8 +422,15 @@ class Writer {
     if (this.y - h < this.bottom - 0.01 && !this.atTop()) this.newPage();
   }
 
+  /** Draw decoration (rules, backgrounds, borders, bullets) as an artifact: not part of the text, skipped by screen readers. */
+  artifact(draw: (page: PDFPage) => void) {
+    this.page.pushOperators(beginMarkedContent('Artifact'));
+    draw(this.page);
+    this.page.pushOperators(endMarkedContent());
+  }
+
   quoteBar(q: { x: number; from: number }, to: number) {
-    if (q.from - to > 0.5) this.page.drawRectangle({ x: q.x, y: to, width: 2.5, height: q.from - to, color: RULE });
+    if (q.from - to > 0.5) this.artifact((pg) => pg.drawRectangle({ x: q.x, y: to, width: 2.5, height: q.from - to, color: RULE }));
   }
 
   /** The resource name of `font` on `page`, registering it on first use (drawText does this itself). */
@@ -440,20 +453,25 @@ class Writer {
       const r = s * 0.17;
       const cx = m.x + s * 0.35;
       const d = m.marker.depth % 3;
-      if (d === 0) this.page.drawCircle({ x: cx, y: mid, size: r, color: TEXT });
-      else if (d === 1) this.page.drawCircle({ x: cx, y: mid, size: r, borderColor: TEXT, borderWidth: 0.7 });
-      else this.page.drawRectangle({ x: cx - r, y: mid - r, width: 2 * r, height: 2 * r, color: TEXT });
+      this.artifact((pg) => {
+        if (d === 0) pg.drawCircle({ x: cx, y: mid, size: r, color: TEXT });
+        else if (d === 1) pg.drawCircle({ x: cx, y: mid, size: r, borderColor: TEXT, borderWidth: 0.7 });
+        else pg.drawRectangle({ x: cx - r, y: mid - r, width: 2 * r, height: 2 * r, color: TEXT });
+      });
     } else if (m.marker.kind === 'number') {
       this.text(this.fonts.regular, m.marker.text, m.x, baseline, s, TEXT, false, m.lbl);
     } else {
       const b = s * 0.72;
       const x = m.x;
       const y = baseline - s * 0.08;
-      this.page.drawRectangle({ x, y, width: b, height: b, borderColor: TEXT, borderWidth: 0.7, color: m.marker.checked ? rgb(0.9, 0.93, 0.98) : undefined });
-      if (m.marker.checked) {
-        this.page.drawLine({ start: { x: x + b * 0.2, y: y + b * 0.5 }, end: { x: x + b * 0.42, y: y + b * 0.22 }, thickness: 1.1, color: TEXT });
-        this.page.drawLine({ start: { x: x + b * 0.42, y: y + b * 0.22 }, end: { x: x + b * 0.82, y: y + b * 0.8 }, thickness: 1.1, color: TEXT });
-      }
+      const checked = m.marker.checked;
+      this.artifact((pg) => {
+        pg.drawRectangle({ x, y, width: b, height: b, borderColor: TEXT, borderWidth: 0.7, color: checked ? rgb(0.9, 0.93, 0.98) : undefined });
+        if (checked) {
+          pg.drawLine({ start: { x: x + b * 0.2, y: y + b * 0.5 }, end: { x: x + b * 0.42, y: y + b * 0.22 }, thickness: 1.1, color: TEXT });
+          pg.drawLine({ start: { x: x + b * 0.42, y: y + b * 0.22 }, end: { x: x + b * 0.82, y: y + b * 0.8 }, thickness: 1.1, color: TEXT });
+        }
+      });
     }
   }
 
@@ -483,7 +501,8 @@ class Writer {
     let dx = 0;
     // Code backgrounds go under the whole line, before any text is drawn.
     for (const p of line.pieces) {
-      if (p.style.code) this.page.drawRectangle({ x: x + dx - 1.5, y: baseline - size * 0.27, width: p.w + 3, height: size * 1.12, color: CODE_BG });
+      const at = x + dx;
+      if (p.style.code) this.artifact((pg) => pg.drawRectangle({ x: at - 1.5, y: baseline - size * 0.27, width: p.w + 3, height: size * 1.12, color: CODE_BG }));
       dx += p.w;
     }
     const open = content ? this.tag.open(this.page, this.tag.top) : null;
@@ -525,7 +544,7 @@ class Writer {
       if (s.href) {
         const owner = this.tag.linkNode(s.href);
         if (p.text.trim()) this.page.drawLine({ start: { x: px, y: baseline - size * 0.13 }, end: { x: px + p.w, y: baseline - size * 0.13 }, thickness: 0.5, color: LINK });
-        this.links.push({ page: this.pages.length - 1, rect: [px, baseline - size * 0.3, px + p.w, baseline + size * 0.9], href: s.href, node: owner });
+        this.links.push({ page: this.pages.length - 1, rect: [px, baseline - size * 0.3, px + p.w, baseline + size * 0.9], href: s.href, text: p.text, node: owner });
       }
       if (s.strike) this.page.drawLine({ start: { x: px, y: baseline + size * 0.3 }, end: { x: px + p.w, y: baseline + size * 0.3 }, thickness: 0.6, color: s.href ? LINK : s.muted ? MUTED : color });
       dx += p.w;
@@ -596,7 +615,8 @@ class Layout {
         wr.paragraph(flatten(b.content, { bold: true, muted: b.level === 6 }), x, width, size, 1.3);
         if (b.level <= 2) {
           wr.y -= size * 0.15;
-          wr.page.drawLine({ start: { x, y: wr.y }, end: { x: x + width, y: wr.y }, thickness: b.level === 1 ? 0.8 : 0.5, color: RULE });
+          const y = wr.y;
+          wr.artifact((pg) => pg.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness: b.level === 1 ? 0.8 : 0.5, color: RULE }));
         }
         wr.y -= base * 0.35;
         wr.tag.pop();
@@ -681,7 +701,7 @@ class Layout {
         this.gap(first, depth.tight);
         wr.ensure(base);
         const y = wr.y - base * 0.5;
-        wr.page.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness: 1, color: RULE });
+        wr.artifact((pg) => pg.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness: 1, color: RULE }));
         wr.y -= base;
         return;
       }
@@ -712,7 +732,8 @@ class Layout {
       const fit = Math.max(1, Math.floor((wr.y - wr.bottom - 2 * pad) / lh));
       const n = Math.min(fit, lines.length - k);
       const h = n * lh + 2 * pad;
-      wr.page.drawRectangle({ x, y: wr.y - h, width, height: h, color: CODE_BG });
+      const boxTop = wr.y;
+      wr.artifact((pg) => pg.drawRectangle({ x, y: boxTop - h, width, height: h, color: CODE_BG }));
       for (let j = 0; j < n; j++) {
         const baseline = wr.y - pad - j * lh - size * 1.0;
         if (k === 0 && j === 0) wr.drawMarker(baseline);
@@ -787,12 +808,13 @@ class Layout {
     const headRow = drawRow(head, true);
     const paint = (row: ReturnType<typeof drawRow>) => {
       const top = wr.y;
-      if (row.header) wr.page.drawRectangle({ x, y: top - row.h, width: tableW, height: row.h, color: CODE_BG });
+      if (row.header) wr.artifact((pg) => pg.drawRectangle({ x, y: top - row.h, width: tableW, height: row.h, color: CODE_BG }));
       wr.tag.push('TR');
       let cx = x;
       row.wrapped.forEach((lines, c) => {
         // Cells stay in the tree even when empty, so the table keeps its grid.
-        wr.tag.push(row.header ? 'TH' : 'TD', true);
+        const cell = wr.tag.push(row.header ? 'TH' : 'TD', true);
+        if (row.header) cell.scope = 'Column';
         wr.tag.push('P');
         lines.forEach((line, j) => {
           const free = colW[c] - 2 * padX - line.width;
@@ -806,13 +828,15 @@ class Layout {
       });
       wr.tag.pop();
       const border = { thickness: 0.5, color: RULE };
-      wr.page.drawLine({ start: { x, y: top }, end: { x: x + tableW, y: top }, ...border });
-      wr.page.drawLine({ start: { x, y: top - row.h }, end: { x: x + tableW, y: top - row.h }, ...border });
-      let vx = x;
-      for (let c = 0; c <= cols; c++) {
-        wr.page.drawLine({ start: { x: vx, y: top }, end: { x: vx, y: top - row.h }, ...border });
-        vx += colW[c] ?? 0;
-      }
+      wr.artifact((pg) => {
+        pg.drawLine({ start: { x, y: top }, end: { x: x + tableW, y: top }, ...border });
+        pg.drawLine({ start: { x, y: top - row.h }, end: { x: x + tableW, y: top - row.h }, ...border });
+        let vx = x;
+        for (let c = 0; c <= cols; c++) {
+          pg.drawLine({ start: { x: vx, y: top }, end: { x: vx, y: top - row.h }, ...border });
+          vx += colW[c] ?? 0;
+        }
+      });
       wr.y -= row.h;
     };
     // The header stays with the first row.
@@ -880,6 +904,7 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
     const last = merged[merged.length - 1];
     if (last && last.page === l.page && last.href === l.href && Math.abs(last.rect[1] - l.rect[1]) < 0.5 && Math.abs(last.rect[2] - l.rect[0]) < 1) {
       last.rect[2] = l.rect[2];
+      last.text += l.text;
       last.node ??= l.node;
     } else merged.push({ ...l, rect: [...l.rect] });
   }
@@ -899,7 +924,9 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
       target = { A: { Type: 'Action', S: 'URI', URI: asciiString(l.href) } };
     } else continue; // Relative links have nothing to point to in a PDF.
     const page = wr.pages[l.page];
-    const annot = doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], F: 4, ...target }) as PDFDict;
+    // /Contents describes the link for screen readers (PDF/UA, Acrobat's accessibility check).
+    const contents = PDFHexString.fromText(l.text.replace(/\s+/g, ' ').trim() || l.href);
+    const annot = doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], F: 4, Contents: contents, ...target }) as PDFDict;
     const ref = doc.context.register(annot);
     // The link's structure element gets the annotation as an object reference, and a
     // parent-tree key for it, when the structure tree is written (setStructTree).
@@ -907,6 +934,8 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
     const annots = page.node.lookup(PDFName.of('Annots'));
     if (annots instanceof PDFArray) annots.push(ref);
     else page.node.set(PDFName.of('Annots'), doc.context.obj([ref as PDFRef]));
+    // Tab through the annotations in structure order.
+    page.node.set(PDFName.of('Tabs'), PDFName.of('S'));
   }
 }
 
