@@ -5,7 +5,7 @@
  */
 import { PDFDocument, PDFRef, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath } from '@cantoo/pdf-lib';
 import { baseName } from './download';
-import { load } from './pdfOps';
+import { load, stampNewDocument } from './pdfOps';
 import { uprightMatrix } from './organize';
 import { inv, mul, type M } from './content/matrix';
 import { normRot } from './geometry';
@@ -228,6 +228,7 @@ export async function buildPrintPdf(source: Uint8Array | PDFDocument, sheets: Sh
   const src = source instanceof Uint8Array ? await load(source) : source;
   const srcPages = src.getPages();
   const out = await PDFDocument.create();
+  stampNewDocument(out);
   const embedded = new Map<number, { ref: PDFRef; g: PageGeom }>();
   for (const sheet of sheets) {
     const page = out.addPage([sheet.width, sheet.height]);

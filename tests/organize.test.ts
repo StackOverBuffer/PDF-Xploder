@@ -136,6 +136,23 @@ describe('bookmarks and splitting', () => {
     expect(await org.topLevelBookmarks(await withOutline())).toEqual([{ title: 'Intro', page: 1 }, { title: 'Chapter', page: 3 }]);
   });
 
+  it('split parts carry the document settings and get their own file identifier', async () => {
+    const doc = await PDFDocument.load(await makeDoc(2));
+    doc.setTitle('Report');
+    doc.setLanguage('de-DE');
+    doc.catalog.set(PDFName.of('ViewerPreferences'), doc.context.register(doc.context.obj({ DisplayDocTitle: true })));
+    const parts = await org.splitByRanges(await doc.save(), [[0], [1]]);
+    expect(parts).toHaveLength(2);
+    for (const bytes of parts) {
+      const part = await PDFDocument.load(bytes, { updateMetadata: false });
+      expect(part.getTitle()).toBe('Report');
+      expect((part.catalog.lookup(PDFName.of('Lang')) as PDFString).decodeText()).toBe('de-DE');
+      expect(part.catalog.lookup(PDFName.of('ViewerPreferences'), PDFDict).lookup(PDFName.of('DisplayDocTitle'))?.toString()).toBe('true');
+      expect(part.context.lookup(part.context.trailerInfo.ID, PDFArray)?.size()).toBe(2);
+      expect(part.getProducer()).toBe('PDF-Xploder');
+    }
+  });
+
   it('splits by bookmarks, ranges and size', async () => {
     const bytes = await withOutline();
     const parts = await org.splitByBookmarks(bytes);

@@ -102,6 +102,15 @@ describe('print layout', () => {
     expect(printFileName({ imposition: 'none', perSheet: 1 }, 'Report.pdf')).toBe('Report.pdf');
   });
 
+  it('gives the printed document a trailer /ID and the app as producer', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([A4.width, A4.height]).drawText('one', { x: 50, y: 700 });
+    const sheets = planSheets(opts({ pages: [0] }), [A4]);
+    const out = await PDFDocument.load(await buildPrintPdf(await doc.save(), sheets), { updateMetadata: false });
+    expect(out.getProducer()).toBe('PDF-Xploder');
+    expect(out.context.lookup(out.context.trailerInfo.ID)).toBeDefined();
+  });
+
   it('builds one PDF page per sheet, with rotated pages upright', async () => {
     const doc = await PDFDocument.create();
     doc.addPage([A4.width, A4.height]).drawText('one', { x: 50, y: 700 });
