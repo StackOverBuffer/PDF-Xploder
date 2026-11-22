@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
-import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFNumber, PDFString } from '@cantoo/pdf-lib';
 import { importAnnotations, writeNativeAnnotation } from '../src/lib/annotIO';
 import { drawContext, exportWithAnnotations } from '../src/lib/pdfOps';
 import { commentSummaryMarkdown, commentsCsv, escapeMarkdownText } from '../src/lib/commentSummary';
+import { parseMarkdown } from '../src/lib/markdown';
 import type { Annotation, PageGeom } from '../src/lib/types';
 
 const g: PageGeom = { view: [0, 0, 300, 200], rotation: 0 };
@@ -22,6 +23,22 @@ it('writes the status as a review state annotation and reads it back', async () 
   expect(res.annotations[0][0]).toMatchObject({ status: 'Accepted' });
   // The state dict was consumed: the file holds no leftover reply for it.
   expect(res.annotations[0][0].replies ?? []).toEqual([]);
+});
+
+it('keeps the status reply off the page and out of prints, but readable', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 200]);
+  await writeNativeAnnotation(await drawContext(doc), doc.getPages()[0], g, note({ status: 'Accepted' }), { author: 'B' });
+  const bytes = await doc.save();
+  const loaded = await PDFDocument.load(bytes);
+  const state = (loaded.getPage(0).node.Annots()!.asArray().map((r) => loaded.context.lookup(r) as PDFDict))
+    .find((d) => d.has(PDFName.of('State')))!;
+  const f = (state.lookup(PDFName.of('F')) as PDFNumber).asNumber();
+  expect(f & 4).toBe(0); // not printed
+  expect(f & 32).toBe(32); // NoView: pdf.js leaves it out of page and print rendering
+  expect(f & 2).toBe(0); // not /Hidden — that would make our own import skip it
+  const res = await importAnnotations(await PDFDocument.load(bytes), [g], () => 'n2');
+  expect(res.annotations[0][0]).toMatchObject({ status: 'Accepted' });
 });
 
 it('maps another program\'s state annotation to the status, not to a reply', async () => {
@@ -90,12 +107,12 @@ it('writes no status dict for a flattened copy', async () => {
 });
 
 it('escapes markdown syntax in comment text', () => {
-  expect(escapeMarkdownText('# hi *bold* [link](x)')).toBe('\\# hi \\*bold\\* \\[link\\](x)');
+  expect(escapeMarkdownText('# hi *bold* [link](x)')).toBe('\\# hi \\*bold\\* \\[link\\]\\(x\\)');
 });
 
 it('builds one section per page with author, date and status', () => {
   const md = commentSummaryMarkdown('Plan.pdf', [{ page: 2, list: [note({ author: 'Jane', status: 'Accepted' })] }], { includeReplies: true }, 'en');
-  expect(md).toContain('# Comments — Plan.pdf');
+  expect(md).toContain('# Comments — Plan\\.pdf');
   expect(md).toContain('## Page 2');
   expect(md).toContain('Jane');
   expect(md).toContain('Accepted');
@@ -124,4 +141,49 @@ it('escapes markdown in author names and the document name of the summary', () =
   const md = commentSummaryMarkdown('*Plan*', [{ page: 1, list: [note({ author: '_Bo_' })] }], { includeReplies: true }, 'en');
   expect(md).toContain('\\*Plan\\*');
   expect(md).toContain('\\_Bo\\_');
+});
+
+it('keeps a multi-line comment inside its list item, whatever it contains', () => {
+  const md = commentSummaryMarkdown('doc', [
+    { page: 1, list: [note({ text: 'example:\n\n~~~\nx\n---\nsee https://example.com &amp; ~~this~~' })] },
+    { page: 2, list: [note({ id: 'n2', text: 'second' })] },
+  ], { includeReplies: true }, 'en');
+  const blocks = parseMarkdown(md).map((b) => b.type);
+  expect(blocks).toEqual(['heading', 'heading', 'list', 'heading', 'list']);
+  expect(md).toContain('https\\:');
+});
+
+it('keeps who set each review status and when, through a save by someone else', async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 200]);
+  const parent = doc.context.register(doc.context.obj({
+    Type: 'Annot', Subtype: 'Text', Rect: [10, 10, 30, 30], Contents: PDFHexString.fromText('the comment'),
+    NM: PDFHexString.fromText('c1'), T: PDFHexString.fromText('Bob'), F: 4, M: PDFString.fromDate(new Date(0)),
+  }));
+  const st = (state: string, who: string, at: number) => doc.context.register(doc.context.obj({
+    Type: 'Annot', Subtype: 'Text', IRT: parent, RT: 'R', State: state, StateModel: 'Review',
+    NM: PDFHexString.fromText(`s-${who}`), T: PDFHexString.fromText(who), F: 4, M: PDFString.fromDate(new Date(at)),
+  }));
+  // Listed newest first: the newest by date is the status, not the last listed.
+  page.node.set(PDFName.of('Annots'), doc.context.obj([parent, st('Completed', 'Dan', 2_000_000), st('Accepted', 'Alice', 1_000_000)]));
+  const res = await importAnnotations(doc, [g], () => 'x');
+  const a = res.annotations[0][0];
+  expect(a.status).toBe('Completed');
+  expect(a.statusLog?.map((e) => [e.state, e.author, e.at])).toEqual([['Accepted', 'Alice', 1_000_000], ['Completed', 'Dan', 2_000_000]]);
+
+  // Carol saves without touching the status: both changes are written as they were.
+  const out = await PDFDocument.create();
+  out.addPage([300, 200]);
+  await writeNativeAnnotation(await drawContext(out), out.getPages()[0], g, a, { author: 'Carol' });
+  const back = (await importAnnotations(await PDFDocument.load(await out.save()), [g], () => 'y')).annotations[0][0];
+  expect(back.statusLog?.map((e) => [e.state, e.author, e.at])).toEqual([['Accepted', 'Alice', 1_000_000], ['Completed', 'Dan', 2_000_000]]);
+  expect(back.status).toBe('Completed');
+});
+
+it('adds a status set in this session as a new change by the current author', async () => {
+  const { setStatus } = await import('../src/lib/reviewStatus');
+  const a = note({ status: 'Accepted', statusLog: [{ id: 's1', state: 'Accepted', author: 'Alice', at: 1000 }] });
+  const next = { ...a, ...setStatus(a, 'Rejected', 'Carol', 5000) };
+  expect(next.statusLog).toEqual([{ id: 's1', state: 'Accepted', author: 'Alice', at: 1000 }, { id: 'state-n1-1', state: 'Rejected', author: 'Carol', at: 5000 }]);
+  expect(setStatus(a, 'Accepted', 'Carol').statusLog).toBe(a.statusLog);
 });

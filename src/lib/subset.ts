@@ -1,7 +1,9 @@
 /**
- * Font subsetting with HarfBuzz's hb-subset (WebAssembly). pdf-lib's own
- * subsetter (fontkit 1.x) corrupts glyphs of modern fonts such as Noto Sans,
- * so fonts are subset here and then embedded whole.
+ * Font subsetting with HarfBuzz's hb-subset (WebAssembly), with the result's name tagged
+ * as a subset (ABCDEF+, see sfnt.ts). pdf-lib's own subsetter (fontkit 1.x) corrupts
+ * glyphs of modern fonts such as Noto Sans, so fonts are subset here and then embedded
+ * whole. The sfnt tools live in sfnt.ts, loaded on demand: this module is part of the
+ * start-up bundle, they are not.
  */
 import wasmUrl from 'harfbuzzjs/dist/harfbuzz-subset.wasm?url';
 
@@ -50,7 +52,8 @@ function hb(): Promise<HbExports> {
   return instance;
 }
 
-/** Return a font containing only the glyphs needed for `codepoints` (plus their layout data). */
+/** Return a font containing only the glyphs needed for `codepoints` (plus their layout data),
+ * with its name tagged as a subset (ABCDEF+). */
 export async function subsetFont(font: Uint8Array, codepoints: Iterable<number>): Promise<Uint8Array> {
   const ex = await hb();
   const ptr = ex.malloc(font.length);
@@ -73,10 +76,11 @@ export async function subsetFont(font: Uint8Array, codepoints: Iterable<number>)
     const result = new Uint8Array(ex.memory.buffer, data, len).slice();
     ex.hb_blob_destroy(out);
     ex.hb_face_destroy(sub);
-    return result;
+    return (await import('./sfnt')).tagSubset(result);
   } finally {
     if (input) ex.hb_subset_input_destroy(input);
     ex.hb_face_destroy(face);
     ex.free(ptr);
   }
 }
+

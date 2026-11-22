@@ -4,6 +4,7 @@
  * user space are points (1/72 in on paper), converted with that scale.
  */
 import type { Pt } from './types';
+import { csvCell } from './csv';
 
 export type MeasureKind = 'distance' | 'perimeter' | 'area';
 export type MeasureUnit = 'mm' | 'cm' | 'm' | 'km' | 'in' | 'ft' | 'yd' | 'mi';
@@ -111,8 +112,8 @@ const csvNumber = (v: number, lang: string) => (lang === 'de' ? v.toFixed(4).rep
 /** Measurements as CSV (semicolon-separated in German, as spreadsheets there expect). */
 export function measurementsCsv(rows: { page: number; kind: MeasureKind; value: number; unit: MeasureUnit; scale: string; author: string; comment?: string }[], lang: string): string {
   const sep = lang === 'de' ? ';' : ',';
-  const esc = (s: string) => (s.includes(sep) || /["\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   const head = ['Page', 'Type', 'Value', 'Unit', 'Scale', 'Author', 'Comment'];
-  const lines = rows.map((r) => [String(r.page + 1), r.kind, csvNumber(r.value, lang), r.kind === 'area' ? `${r.unit}²` : r.unit, r.scale, r.author, r.comment ?? ''].map(esc).join(sep));
+  // The number is the app's own (and may be negative); author, scale and comment are not.
+  const lines = rows.map((r) => [String(r.page + 1), r.kind, csvNumber(r.value, lang), r.kind === 'area' ? `${r.unit}²` : r.unit, r.scale, r.author, r.comment ?? ''].map((c, k) => csvCell(c, sep, k === 0 || k === 2 ? { formula: false } : {})).join(sep));
   return [head.join(sep), ...lines].join('\r\n');
 }

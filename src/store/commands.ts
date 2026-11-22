@@ -99,7 +99,7 @@ export async function currentBytes(): Promise<Uint8Array> {
 
 /** The document with annotations and form values, unencrypted (for print, export, extract…). */
 export async function buildOutput(flatten = false): Promise<Uint8Array> {
-  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten, author: S().author });
+  return ops.exportWithAnnotations(await currentBytes(), annotationsByPage(S()), { flatten, author: S().author, privateData: S().privateData });
 }
 
 /**
@@ -110,7 +110,10 @@ export async function buildOutput(flatten = false): Promise<Uint8Array> {
 export async function buildFileForSave(): Promise<Uint8Array> {
   const s = S();
   if (unchangedSinceOpen()) return s.originalBytes!;
-  const out = await buildOutput();
+  let out = await buildOutput();
+  // The user agreed to break the signatures (confirmBreakingSignatures): they are cleared
+  // rather than left behind as broken ones.
+  if (s.signatures.length) out = await ops.dropStaleSignatures(out);
   if (s.securityChanged) return s.security ? sec.encrypt(out, s.security) : out;
   // Untouched security: encrypt exactly like the opened file (works without the owner password).
   if (s.keepEncryption && s.originalBytes) return sec.reencryptLike(out, s.originalBytes, s.keepEncryption.password);
@@ -121,7 +124,7 @@ export async function buildFileForSave(): Promise<Uint8Array> {
 async function confirmBreakingSignatures(): Promise<boolean> {
   const s = S();
   if (!s.dirty || !s.signatures.length) return true;
-  return ask({ title: 'Signed document', message: tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures. Continue?'), ok: 'Save anyway', danger: true });
+  return ask({ title: 'Signed document', message: tr('This document is digitally signed. Saving your changes rewrites the file, which invalidates the existing signatures: they are removed, and their fields can be signed again. Continue?'), ok: 'Save anyway', danger: true });
 }
 
 /** The opened bytes are still exactly the document (nothing edited or saved since). */
@@ -130,10 +133,23 @@ function unchangedSinceOpen(): boolean {
   return !s.dirty && !s.savedOnce && !!s.originalBytes;
 }
 
+/**
+ * PDF/A-1 forbids transparency, which highlights and see-through comments need. The file
+ * still claims PDF/A-1, so validators reject it: say so instead of failing silently.
+ */
+function warnPdfA1Transparency() {
+  const s = S();
+  if (s.pdfA !== '1') return;
+  const all = Object.values(s.annotations).flat();
+  if (!all.some((a) => a.type === 'highlight' || a.opacity < 1)) return;
+  s.notify(tr('This file claims PDF/A-1, which does not allow transparency: its highlights and see-through comments make it fail PDF/A-1 validation.'), 'error');
+}
+
 /** Build the file and write it to `handle`, or download it as `name` when there is none or writing fails. */
 async function writeOut(handle: FileSystemFileHandle | null, name: string) {
   await S().run('Saving…', async () => {
     const out = await buildFileForSave();
+    warnPdfA1Transparency();
     if (handle) {
       try {
         await writeToHandle(handle, out);
@@ -293,7 +309,7 @@ export async function extract(pages = targetPages()) {
   if (!requirePermission('copy')) return;
   await S().run('Extracting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author, privateData: s.privateData });
     const out = await ops.extractPages(output, pages);
     const label = pages.length === 1 ? `p${pages[0] + 1}` : `p${pages[0] + 1}-${pages[pages.length - 1] + 1}`;
     downloadBlob(out, `${baseName(s.fileName)}-${label}.pdf`);
@@ -304,9 +320,12 @@ export async function split(every: number) {
   if (every < 1 || !requirePermission('copy')) return;
   await S().run('Splitting…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author, privateData: s.privateData });
     const parts = await ops.splitEvery(output, every);
-    parts.forEach((p, i) => downloadBlob(p, `${baseName(s.fileName)}-part${i + 1}.pdf`));
+    // Browsers ask to allow (or silently drop) every download but the first: pack several parts into one ZIP.
+    const base = baseName(s.fileName);
+    if (parts.length === 1) downloadBlob(parts[0], `${base}-part1.pdf`);
+    else downloadBlob(zip(parts.map((p, i) => ({ name: `${base}-part${i + 1}.pdf`, data: p }))), `${base}-parts.zip`, 'application/zip');
   });
 }
 
@@ -326,7 +345,7 @@ const EXT: Record<ImageFormat, string> = { png: 'png', jpeg: 'jpg', webp: 'webp'
  * render/protocol.ts): 600 dpi on A3 would otherwise be 70 megapixels, which browsers
  * refuse to hand out as one canvas.
  */
-function scaleFor(page: PDFPageProxy, dpi: number): number {
+export function scaleFor(page: PDFPageProxy, dpi: number): number {
   const v = page.getViewport({ scale: 1 });
   return Math.min(dpi / 72, Math.sqrt(IMAGE_MAX_AREA_BYTES / 4 / (v.width * v.height)));
 }
@@ -341,7 +360,7 @@ export async function exportPageImages(o: { pages: number[]; format: ImageFormat
   if (!requirePermission('copy')) return;
   await S().run('Rendering image…', async () => {
     const s = S();
-    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author });
+    const output = await ops.exportWithAnnotations(await currentBytes(), annotationsByPage(s), { author: s.author, privateData: s.privateData });
     const { pdf } = await openPdf(output, () => null);
     const entries: ZipEntry[] = [];
     // The resolution that had to come down to fit the browser's canvas limit, if any.
@@ -441,7 +460,8 @@ export async function applyRedactions() {
     try {
       for (const [k, i] of pages.entries()) {
         reportProgress(k, pages.length);
-        const canvas = await renderToCanvas(await pdf.getPage(i + 1), 200 / 72);
+        const page = await pdf.getPage(i + 1);
+        const canvas = await renderToCanvas(page, scaleFor(page, 200));
         const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'));
         images.push({ index: i, png: new Uint8Array(await blob.arrayBuffer()) });
       }
@@ -503,12 +523,20 @@ export async function normaliseImage(src: string): Promise<{ src: string; width:
   const img = new Image();
   img.src = src;
   await img.decode();
-  if (/^data:image\/(png|jpe?g)/.test(src)) return { src, width: img.naturalWidth, height: img.naturalHeight };
+  // PNG and JPEG are kept as they are, without their metadata (EXIF with GPS, XMP…).
+  let rotated = false;
+  if (/^data:image\/(png|jpe?g)/.test(src)) {
+    const { cleanImageDataUrl } = await import('../lib/imageMeta');
+    const clean = cleanImageDataUrl(src);
+    if (!clean.rotated) return { src: clean.src, width: img.naturalWidth, height: img.naturalHeight };
+    rotated = true;
+  }
+  // Other formats, and photos stored sideways (the browser draws them upright): re-encoded.
   const c = document.createElement('canvas');
   c.width = img.naturalWidth;
   c.height = img.naturalHeight;
   c.getContext('2d')!.drawImage(img, 0, 0);
-  return { src: c.toDataURL('image/png'), width: c.width, height: c.height };
+  return { src: rotated ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png'), width: c.width, height: c.height };
 }
 
 /** Place an image centred on the current page, fitted within `maxW` x `maxH` points. */

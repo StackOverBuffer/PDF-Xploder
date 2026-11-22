@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import DE_UI from '../src/locales/de/ui';
+import DE from '../src/locales/de';
 import { translate } from '../src/lib/i18n';
 
 describe('German UI strings', () => {
@@ -23,4 +25,28 @@ describe('German UI strings', () => {
     expect(translate('de', 'Try a sample')).toBe('Beispiel ausprobieren');
     expect(translate('en', 'Try a sample')).toBe('Try a sample');
   });
+});
+
+describe('every translated string has a German entry', () => {
+  // Tooltip titles are plain English literals; Btn and ToolBtn translate them themselves
+  // (ribbonParts). tr/tf in these lib files localise at the throw, so each key must be in
+  // the German tables, or the UI shows English.
+  const sources: [file: string, re: RegExp][] = [
+    ['src/components/Ribbon.tsx', /\btitle="([^"]+)"/g],
+    ['src/components/Ribbon.tsx', /\bt\('([^']+)'/g],
+    ['src/lib/pageTree.ts', /\b(?:tr|tf)\('([^']+)'/g],
+    ['src/lib/signature.ts', /\b(?:tr|tf)\('([^']+)'/g],
+    ['src/lib/pdfOps.ts', /\b(?:tr|tf)\('([^']+)'/g],
+  ];
+  for (const [file, re] of sources) {
+    it(file, () => {
+      const keys = [...readFileSync(file, 'utf8').matchAll(re)].map((m) => m[1]);
+      expect(keys.length, `scan found nothing in ${file}`).toBeGreaterThan(0);
+      for (const key of keys) {
+        expect(key, key).toBe(key.trim());
+        expect(DE[key], key).toBeTypeOf('string');
+        expect(DE[key].length, key).toBeGreaterThan(0);
+      }
+    });
+  }
 });

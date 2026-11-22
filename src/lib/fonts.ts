@@ -6,18 +6,38 @@
  *   Noto Sans Symbols 2 arrows, check marks, dingbats, … (bundled)
  *   Noto Sans SC        Chinese ideographs, Japanese kana   } fetched on demand from
  *   Noto Sans KR        Korean hangul                       } jsDelivr, only when needed
+ *
+ * Characters no chain font covers fall back to the bundled handwriting fonts (the
+ * typed-signature faces), and to '?' only when even those lack the character.
  */
 import { PDFDocument, PDFFont, StandardFonts } from '@cantoo/pdf-lib';
 import { singleFontEngine, type TextEngine } from './appearance';
 import { subsetFont } from './subset';
 
-export type FontKey = 'sans' | 'sansBold' | 'symbols' | 'cjk' | 'cjkBold' | 'kr' | 'krBold';
+export type FontKey =
+  | 'sans'
+  | 'sansBold'
+  | 'symbols'
+  | 'cjk'
+  | 'cjkBold'
+  | 'kr'
+  | 'krBold'
+  // The handwriting fonts of typed signatures (signatureFonts.css), as last-resort glyph donors.
+  | 'dancingLatin'
+  | 'dancingLatinExt'
+  | 'greatVibesLatin'
+  | 'greatVibesLatinExt'
+  | 'caveatLatin'
+  | 'caveatLatinExt'
+  | 'alluraLatin'
+  | 'alluraLatinExt';
 
 /** Returns font file bytes, or null when the font is unavailable (e.g. offline). */
 export type FontSource = (key: FontKey) => Promise<Uint8Array | null>;
 
 const CDN = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts';
-const FILES: Record<FontKey, string> = {
+
+const FILES: Partial<Record<FontKey, string>> = {
   sans: 'fonts/NotoSans-Regular.ttf',
   sansBold: 'fonts/NotoSans-Bold.ttf',
   symbols: 'fonts/NotoSansSymbols2-Regular.ttf',
@@ -27,9 +47,17 @@ const FILES: Record<FontKey, string> = {
   krBold: `${CDN}/noto-sans-kr@0.4.3/700Bold/NotoSansKR_700Bold.ttf`,
 };
 
+/** Where a donor font's bytes come from; the donor table loads on demand (fontDonors.ts). */
+const donorUrl = async (key: FontKey): Promise<string | undefined> => {
+  const d = (await import('./fontDonors')) as { DONOR_URLS: Partial<Record<FontKey, string>> };
+  return d.DONOR_URLS[key];
+};
+
 const fetchSource: FontSource = async (key) => {
-  const file = FILES[key];
-  const url = /^https?:/.test(file) ? file : `${import.meta.env.BASE_URL ?? '/'}${file}`;
+  const file = FILES[key] ?? (await donorUrl(key));
+  if (!file) return null;
+  // Bundled paths under public/ need the base URL; ?url assets and CDN addresses do not.
+  const url = /^(https?:|\/)/.test(file) ? file : `${import.meta.env.BASE_URL ?? '/'}${file}`;
   try {
     const res = await fetch(url);
     return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
@@ -54,8 +82,12 @@ function parsed(key: FontKey) {
   if (!p) {
     let b = bytesCache.get(key);
     if (!b) bytesCache.set(key, (b = source(key)));
-    p = Promise.all([b, loadFontkit()]).then(([bytes, fontkit]) => {
+    p = Promise.all([b, loadFontkit()]).then(async ([bytes, fontkit]) => {
       if (!bytes) return null;
+      // The handwriting fonts ship as WOFF; hb-subset and pdf-lib read plain sfnt. The
+      // unpacker lives in sfnt.ts, loaded on demand to keep it out of the start-up bundle.
+      const sfnt = await import('./sfnt');
+      if (sfnt.isWoff(bytes)) bytes = await sfnt.sfntFromWoff(bytes);
       const f = (fontkit as unknown as { create(b: Uint8Array): { hasGlyphForCodePoint(cp: number): boolean } }).create(bytes);
       return { bytes, has: (cp: number) => f.hasGlyphForCodePoint(cp) };
     }).catch(() => null);
@@ -90,11 +122,25 @@ export const loadFontkit = () => (fontkitPromise ??= import('@pdf-lib/fontkit').
 
 const isSpace = (cp: number) => cp === 10 || cp === 13 || cp === 9 || cp === 32;
 
+/** The name a font carries in its name table, or undefined if it has none. */
+const postscriptName = (fontkit: Parameters<PDFDocument['registerFontkit']>[0], bytes: Uint8Array): string | undefined =>
+  (fontkit as unknown as { create(b: Uint8Array): { postscriptName?: string | null } }).create(bytes).postscriptName || undefined;
+
 /** Fallback chain per weight; CJK is only consulted when the others miss a character. */
 const CHAINS: Record<'regular' | 'bold', FontKey[]> = {
   regular: ['sans', 'symbols', 'cjk', 'kr'],
   bold: ['sansBold', 'symbols', 'cjkBold', 'cjk', 'krBold', 'kr'],
 };
+
+/** The first font of the fallback chain that has every character of `text`. */
+export async function fontCovering(text: string): Promise<{ key: FontKey; bytes: Uint8Array } | undefined> {
+  const cps = [...text].map((c) => c.codePointAt(0)!).filter((cp) => !isSpace(cp));
+  for (const key of CHAINS.regular) {
+    const f = await parsed(key);
+    if (f && cps.every(f.has)) return { key, bytes: f.bytes };
+  }
+  return undefined;
+}
 
 /**
  * Build a text engine able to draw all of `texts`, embedding the fonts needed.
@@ -120,13 +166,28 @@ export async function createTextEngine(doc: PDFDocument, texts: string[], weight
     return singleFontEngine(await doc.embedFont(weight === 'bold' ? StandardFonts.HelveticaBold : StandardFonts.Helvetica));
   }
 
+  // Characters no chain font covers (offline the CJK fonts cannot be fetched): the bundled
+  // handwriting fonts are the last resort before a character degrades to '?'. Their table
+  // (and woff URLs) loads on demand, keeping it out of the start-up bundle.
+  if (missing.length) {
+    const donors = await import('./fontDonors');
+    for (const key of donors.DONOR_ORDER) {
+      if (!missing.length) break;
+      const f = await parsed(key);
+      if (!f || !missing.some(f.has)) continue;
+      chain.push({ key, ...f });
+      missing = missing.filter((cp) => !f.has(cp));
+    }
+  }
+
   // Decide each character's font up front.
   const pick = new Map<number, number>();
   for (const cp of chars) pick.set(cp, isSpace(cp) ? 0 : chain.findIndex((c) => c.has(cp)));
   const perFont = new Map<number, Set<number>>([[0, new Set([32, 63 /* '?' fallback */])]]);
   for (const [cp, i] of pick) if (i >= 0) (perFont.get(i) ?? perFont.set(i, new Set()).get(i)!).add(cp);
 
-  doc.registerFontkit(await loadFontkit());
+  const fontkit = await loadFontkit();
+  doc.registerFontkit(fontkit);
   const fonts: PDFFont[] = [];
   for (const [i, cps] of perFont) {
     let bytes = chain[i].bytes;
@@ -135,9 +196,11 @@ export async function createTextEngine(doc: PDFDocument, texts: string[], weight
     } catch (e) {
       console.warn('Subsetting failed; embedding the whole font', e);
     }
+    // Subset fonts carry the ABCDEF+ tag in their name table (see subset.ts); embedding under
+    // that exact name keeps BaseFont, FontDescriptor and the font program consistent for PDF/A.
     // No ligatures: pdf-lib draws them with the wrong spacing, and text copied or searched
     // from the page would miss their letters ("fi" in "file").
-    fonts[i] = await doc.embedFont(bytes, { subset: false, features: { liga: false, clig: false } });
+    fonts[i] = await doc.embedFont(bytes, { subset: false, customName: postscriptName(fontkit, bytes), features: { liga: false, clig: false } });
   }
 
   const runs = (text: string) => {

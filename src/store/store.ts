@@ -137,6 +137,8 @@ interface State {
   securityChanged: boolean;
   /** Re-encrypt like the opened file on save (see reencryptLike). */
   keepEncryption: { password: string } | null;
+  /** false after Sanitize removed hidden data: saving writes no private annotation model. */
+  privateData: boolean;
   /** What the document's security allows in this session. */
   permissions: Permissions;
   /** Whether security settings may be changed (owner password known, or nothing restricted). */
@@ -150,6 +152,8 @@ interface State {
    * fields, 'pure' with no standard fields at all. Saving changes leaves it out.
    */
   xfa: 'hybrid' | 'pure' | null;
+  /** The PDF/A part the file claims (pdfaid:part), e.g. '1'; null when it claims none. */
+  pdfA: string | null;
   /** The XFA notice was closed for this document. */
   xfaNoticeClosed: boolean;
   /** Where the document came from (File System Access API), so Save can write back to it. */
@@ -322,6 +326,7 @@ export function anyUnsavedUnprotected(backupOn: boolean): boolean {
 const initialDoc = {
   restrictionsLifted: false,
   xfa: null as State['xfa'],
+  pdfA: null as string | null,
   xfaNoticeClosed: false,
   fileHandle: null as FileSystemFileHandle | null,
   savedOnce: false,
@@ -341,6 +346,7 @@ const initialDoc = {
   security: null,
   securityChanged: false,
   keepEncryption: null,
+  privateData: true,
   permissions: ALL_PERMISSIONS,
   ownerAccess: true,
   lock: null,
@@ -478,6 +484,15 @@ export const useStore = create<Store>()((set, get) => {
     }
   }
 
+  async function pdfAPart(pdf: PDFDocumentProxy): Promise<string | null> {
+    try {
+      const { metadata } = await pdf.getMetadata();
+      return metadata?.get('pdfaid:part')?.toString() || null;
+    } catch {
+      return null;
+    }
+  }
+
   async function openDocumentImpl(bytes: Uint8Array, name: string, opts: OpenOptions = {}) {
     const original = bytes;
     let loaded;
@@ -578,10 +593,12 @@ export const useStore = create<Store>()((set, get) => {
     }
     // pdf-lib cannot keep XFA data: tell the user before they save changes.
     const xfa = await xfaKind(loaded.pdf);
+    const pdfA = await pdfAPart(loaded.pdf);
     closePdf(get().pdf);
     set({
       ...initialDoc,
       xfa,
+      pdfA,
       bytes,
       originalBytes: original,
       fileName: name,
@@ -595,6 +612,7 @@ export const useStore = create<Store>()((set, get) => {
       security,
       securityChanged: false,
       keepEncryption,
+      privateData: true,
       permissions,
       ownerAccess,
       lock,

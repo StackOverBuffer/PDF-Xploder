@@ -5,10 +5,11 @@
  */
 import { PDFDocument, PDFRef, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath } from '@cantoo/pdf-lib';
 import { baseName } from './download';
-import { load } from './pdfOps';
+import { load, stampNewDocument } from './pdfOps';
 import { uprightMatrix } from './organize';
 import { inv, mul, type M } from './content/matrix';
 import { normRot } from './geometry';
+import { pruneUnreachable } from './pdfSave';
 import type { PageGeom } from './types';
 
 export const PAPERS = {
@@ -227,6 +228,7 @@ export async function buildPrintPdf(source: Uint8Array | PDFDocument, sheets: Sh
   const src = source instanceof Uint8Array ? await load(source) : source;
   const srcPages = src.getPages();
   const out = await PDFDocument.create();
+  stampNewDocument(out);
   const embedded = new Map<number, { ref: PDFRef; g: PageGeom }>();
   for (const sheet of sheets) {
     const page = out.addPage([sheet.width, sheet.height]);
@@ -250,5 +252,9 @@ export async function buildPrintPdf(source: Uint8Array | PDFDocument, sheets: Sh
       page.pushOperators(pushGraphicsState(), rectangle(x, y, w, h), clip(), endPath(), concatTransformationMatrix(...m), drawObject(name), popGraphicsState());
     }
   }
+  // Embedding copies each source page whole (its links lead to further pages); only the
+  // contents and resources are used, so everything else is dropped before saving.
+  await out.flush();
+  pruneUnreachable(out);
   return out.save({ useObjectStreams: true });
 }

@@ -25,6 +25,7 @@ import { frameGeom, pdfRectToView, viewToPdf } from './geometry';
 import * as der from './der';
 import type { PageGeom, Rect } from './types';
 import { normRot } from './geometry';
+import { tf, tr, type Lang, useLang } from './i18n';
 
 /** Bytes reserved in the file for the PKCS#7 blob. */
 const SIGNATURE_SPACE = 16384;
@@ -76,7 +77,7 @@ export async function readP12(bytes: Uint8Array, password: string): Promise<Iden
     const msg = String((e as Error).message ?? e);
     if (/MAC could not be verified|Invalid password/i.test(msg)) throw new Error('Wrong certificate password.');
     if (/OID is not RSA/i.test(msg)) throw new Error('Only RSA certificates can be used for signing at the moment.');
-    throw new Error(`Could not read the certificate file: ${msg}`);
+    throw new Error(tf('Could not read the certificate file: {msg}', { msg }));
   }
   const keyBags = [
     ...(p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] ?? []),
@@ -167,17 +168,19 @@ function existingFieldNames(doc: PDFDocument): Set<string> {
   return names;
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+/** The signing date as the interface language writes it. */
+function formatDate(d: Date, lang: Lang): string {
+  return d.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
 }
 
-/** Draw the visible signature box: who signed, when, and why. */
+/** Draw the visible signature box: who signed, when, and why — in the interface language. */
 async function signatureAppearance(doc: PDFDocument, g: PageGeom, rect: Rect, o: SignOptions, date: Date) {
+  const lang = useLang.getState().lang;
   const lines = [
-    `Digitally signed by ${o.identity.name}`,
-    `Date: ${formatDate(date)}`,
-    ...(o.reason ? [`Reason: ${o.reason}`] : []),
-    ...(o.location ? [`Location: ${o.location}`] : []),
+    tf('Digitally signed by {signer}', { signer: o.identity.name }),
+    tf('Date: {date}', { date: formatDate(date, lang) }),
+    ...(o.reason ? [tf('Reason: {reason}', { reason: o.reason })] : []),
+    ...(o.location ? [tf('Location: {location}', { location: o.location })] : []),
   ];
   const engine = await createTextEngine(doc, lines);
   const fg = frameGeom(g, g.rotation);
@@ -216,7 +219,9 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
   const sig = ctx.obj({
     Type: 'Sig',
     Filter: 'Adobe.PPKLite',
-    SubFilter: 'adbe.pkcs7.detached',
+    // PAdES baseline (ETSI EN 319 142-1): CAdES with the signer's certificate bound by
+    // signing-certificate-v2, and the signing time in /M instead of a signed attribute.
+    SubFilter: 'ETSI.CAdES.detached',
     ByteRange: [0, PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER)],
     Contents: PDFHexString.of('0'.repeat(SIGNATURE_SPACE * 2)),
     M: PDFString.fromDate(date),
@@ -278,11 +283,11 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
   acroDict.set(PDFName.of('SigFlags'), PDFNumber.of(3));
 
   const update = await doc.saveIncremental(snapshot, { useObjectStreams: false });
-  const sep = bytes[bytes.length - 1] === 0x0a ? new Uint8Array(0) : new Uint8Array([0x0a]);
-  const out = new Uint8Array(bytes.length + sep.length + update.length);
+  // The update starts with its own line break, and its offsets count from the end of
+  // `bytes`: nothing may go in between (an extra newline put every xref entry 1 byte off).
+  const out = new Uint8Array(bytes.length + update.length);
   out.set(bytes, 0);
-  out.set(sep, bytes.length);
-  out.set(update, bytes.length + sep.length);
+  out.set(update, bytes.length);
 
   // Locate the placeholders in the update and fill in the byte range.
   const tailStart = bytes.length;
@@ -314,26 +319,61 @@ export async function signPdf(bytes: Uint8Array, o: SignOptions): Promise<Uint8A
     authenticatedAttributes: [
       { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
       { type: forge.pki.oids.messageDigest },
-      { type: forge.pki.oids.signingTime, value: date as never },
     ],
   });
   p7.sign({ detached: true });
   const asn1 = p7.toAsn1();
+  const certDer = fromBinary(forge.asn1.toDer(forge.pki.certificateToAsn1(o.identity.cert)).getBytes());
   // forge re-encodes the signer's issuer name from parsed attributes, which
   // double-encodes UTF-8 values; use the certificate's exact issuer bytes so
   // validators can match the signer to its certificate.
-  const certDer = fromBinary(forge.asn1.toDer(forge.pki.certificateToAsn1(o.identity.cert)).getBytes());
   const tbs = der.parseDer(certDer).children[0].children;
   const issuer = tbs[tbs[0].tag === 0xa0 ? 3 : 2];
   const signedData = (asn1.value as forgeType.asn1.Asn1[])[1].value as forgeType.asn1.Asn1[];
   const sdFields = signedData[0].value as forgeType.asn1.Asn1[];
   const signerInfo = (sdFields[sdFields.length - 1].value as forgeType.asn1.Asn1[])[0];
   const issuerAndSerial = (signerInfo.value as forgeType.asn1.Asn1[])[1];
+  padesAttributes(forge, signerInfo, o.identity.key, certDer);
   (issuerAndSerial.value as forgeType.asn1.Asn1[])[0] = forge.asn1.fromDer(toBinary(der.whole(certDer, issuer)));
   const cms = der.hex(fromBinary(forge.asn1.toDer(asn1).getBytes()));
-  if (cms.length > SIGNATURE_SPACE * 2) throw new Error('The signature is too large for the space reserved in the file.');
+  if (cms.length > SIGNATURE_SPACE * 2) throw new Error(tr('The signature is too large for the space reserved in the file.'));
   out.set(new TextEncoder().encode(cms), cStart + 1);
   return out;
+}
+
+/**
+ * Replace forge's signed attributes with the PAdES ones (content type, message digest,
+ * signing-certificate-v2) and sign them again. forge cannot encode signing-certificate-v2
+ * itself, so the attributes are built here.
+ */
+function padesAttributes(forge: Forge, signerInfo: forgeType.asn1.Asn1, key: forgeType.pki.rsa.PrivateKey, certDer: Uint8Array) {
+  const { asn1 } = forge;
+  const fields = signerInfo.value as forgeType.asn1.Asn1[];
+  // version, issuerAndSerialNumber, digestAlgorithm, [0] signedAttrs, signatureAlgorithm, signature
+  const attrs = fields[3];
+  if (attrs.tagClass !== asn1.Class.CONTEXT_SPECIFIC || attrs.type !== 0) throw new Error('Unexpected signer info layout.');
+  const oidOf = (a: forgeType.asn1.Asn1) => asn1.derToOid(((a.value as forgeType.asn1.Asn1[])[0].value as string));
+  const kept = (attrs.value as forgeType.asn1.Asn1[]).filter((a) => [forge.pki.oids.contentType, forge.pki.oids.messageDigest].includes(oidOf(a)));
+  const md = forge.md.sha256.create();
+  md.update(toBinary(certDer));
+  const seq = (v: forgeType.asn1.Asn1[]) => asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, v);
+  // SigningCertificateV2 ::= SEQUENCE { certs SEQUENCE OF ESSCertIDv2 }, ESSCertIDv2 ::= SEQUENCE { certHash } (SHA-256 by default)
+  const signingCertV2 = seq([
+    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer('1.2.840.113549.1.9.16.2.47').getBytes()),
+    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [seq([seq([seq([asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OCTETSTRING, false, md.digest().getBytes())])])])]),
+  ]);
+  const list = [...kept, signingCertV2];
+  // DER sorts SET OF elements by their encoding.
+  list.sort((x, y) => {
+    const a = asn1.toDer(x).getBytes();
+    const b = asn1.toDer(y).getBytes();
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  attrs.value = list;
+  // The signature covers the attributes encoded as a SET (tag 0x31), not as [0].
+  const digest = forge.md.sha256.create();
+  digest.update(asn1.toDer(asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, list)).getBytes());
+  (fields[5] as forgeType.asn1.Asn1).value = key.sign(digest);
 }
 
 // ---------------------------------------------------------------- verification

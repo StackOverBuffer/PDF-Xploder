@@ -92,7 +92,7 @@ describe('bookmarks and links', () => {
     const outlines = doc.catalog.lookup(PDFName.of('Outlines')) as import('@cantoo/pdf-lib').PDFDict;
     const first = outlines.lookup(PDFName.of('First')) as import('@cantoo/pdf-lib').PDFDict;
     const last = outlines.lookup(PDFName.of('Last')) as import('@cantoo/pdf-lib').PDFDict;
-    expect(first.lookup(PDFName.of('Title'))!.toString()).toContain('First');
+    expect((first.lookup(PDFName.of('Title')) as import('@cantoo/pdf-lib').PDFHexString).decodeText()).toContain('First');
     expect((first.lookup(PDFName.of('Next')) as import('@cantoo/pdf-lib').PDFDict).lookup(PDFName.of('Title'))).toEqual(last.lookup(PDFName.of('Title')));
     expect(outlines.lookup(PDFName.of('Count'))!.toString()).toBe('2');
   });

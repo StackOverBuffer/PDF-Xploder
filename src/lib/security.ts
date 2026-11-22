@@ -3,6 +3,10 @@ import { PDFArray, PDFDict, PDFDocument, PDFHeader, PDFHexString, PDFName, PDFNu
 import { CipherTransformFactory } from 'pdf-lib-internal/crypto';
 import { saveDoc } from './pdfSave';
 import { loadForEdit } from './pageTree';
+import { installStringEncryption, type EncryptionScope } from './encryptStrings';
+
+// Strings in objects outside object streams are encrypted too (see encryptStrings.ts).
+installStringEncryption();
 
 export interface Permissions {
   printing: boolean;
@@ -236,10 +240,22 @@ export async function encrypt(bytes: Uint8Array, s: SecuritySettings): Promise<U
 /**
  * AES-256 (security handler revision 6) is a PDF 2.0 / Adobe extension level 8 feature:
  * declare it, as Acrobat does, so readers that check the version know what to expect.
+ * A dictionary the file already declares keeps its entries (a developer extension such as
+ * a PDF/A conformance must survive); only /ADBE is added or refreshed. AES-256 needs no
+ * Adobe extension on a PDF 2.0 file — there it is part of the base standard.
  */
 function markAes256(doc: PDFDocument) {
-  doc.catalog.set(PDFName.of('Extensions'), doc.context.obj({ ADBE: { BaseVersion: PDFName.of('1.7'), ExtensionLevel: 8 } }));
+  const extensions = PDFName.of('Extensions');
   const v = doc.context.header.toString().match(/%PDF-(\d+)\.(\d+)/);
+  const adbe = doc.context.obj({ BaseVersion: PDFName.of('1.7'), ExtensionLevel: 8 });
+  const current = doc.catalog.lookup(extensions);
+  if (current instanceof PDFDict) {
+    // PDF 2.0 has AES-256 in the base standard: no Adobe extension to declare there.
+    if (!(v && Number(v[1]) >= 2)) current.set(PDFName.of('ADBE'), adbe);
+  } else {
+    // No /Extensions (or a broken one, which no reader could make sense of anyway).
+    doc.catalog.set(extensions, doc.context.obj({ ADBE: adbe }));
+  }
   if (!v || Number(v[1]) * 10 + Number(v[2]) < 17) doc.context.header = PDFHeader.forVersion(1, 7);
 }
 
@@ -262,13 +278,30 @@ export async function reencryptLike(plain: Uint8Array, original: Uint8Array, pas
 
   const doc = await PDFDocument.load(plain, { updateMetadata: false });
   const ctx = doc.context;
-  ctx.trailerInfo.Encrypt = ctx.register(enc.clone(ctx));
+  const dict = enc.clone(ctx);
+  // The writer encrypts with what V says (V 4: AES-128 for everything). Crypt filters can
+  // say otherwise (RC4 under V 4, Identity for streams or strings, plain metadata), and a
+  // file that declares one cipher and contains another opens as garbage: the dictionary
+  // is made to say exactly what is written. The file key, O, U and P stay as they are
+  // (crypt filters are not part of the key), so both passwords keep working.
+  const scope: EncryptionScope = { streams: true, strings: true, metadata: dict.lookup(PDFName.of('EncryptMetadata'))?.toString() !== 'false' };
+  let writeV = V;
+  if (V === 4) {
+    const std = dict.lookupMaybe(PDFName.of('CF'), PDFDict)?.lookupMaybe(PDFName.of('StdCF'), PDFDict);
+    const rc4 = std?.lookup(PDFName.of('CFM'))?.toString() === '/V2';
+    // RC4 inside V 4 is the V 2 algorithm; anything else is written as AES-128.
+    if (rc4) writeV = 2;
+    dict.set(PDFName.of('CF'), ctx.obj({ StdCF: { Type: 'CryptFilter', CFM: rc4 ? 'V2' : 'AESV2', AuthEvent: 'DocOpen', Length: rc4 ? key.length : 16 } }));
+    dict.set(PDFName.of('StmF'), PDFName.of('StdCF'));
+    dict.set(PDFName.of('StrF'), PDFName.of('StdCF'));
+    dict.delete(PDFName.of('EFF'));
+  }
+  ctx.trailerInfo.Encrypt = ctx.register(dict);
   ctx.trailerInfo.ID = ctx.obj([ids.get(0), ids.get(1) ?? ids.get(0)]);
   // A PDFSecurity carrying the existing key instead of a freshly generated one.
   const security = Object.create(PDFSecurity.prototype) as PDFSecurity;
-  Object.assign(security, { context: ctx, encryption: { V }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40 });
+  Object.assign(security, { context: ctx, encryption: { V: writeV }, encryptionKey: key, keyBits: V >= 5 ? 256 : length ?? 40, xploder: scope });
   ctx.security = security;
   if (V >= 5) markAes256(doc);
-  // Object streams are required: strings are only encrypted as part of them.
   return saveDoc(doc);
 }

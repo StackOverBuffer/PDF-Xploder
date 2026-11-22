@@ -15,6 +15,24 @@ async function makeDoc(n: number): Promise<Uint8Array> {
 
 const widths = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getPages().map((p) => p.getWidth());
 
+/** The model without what import keeps of the file's own keys (foreignKeys). */
+const model = <T extends object>(a: T): T => {
+  const { foreign, ...rest } = a as T & { foreign?: unknown };
+  void foreign;
+  // A PNG stamp's bytes are rebuilt from the appearance's samples on import (stored once),
+  // so the data URL is not byte-identical; the image is, so compare its dimensions.
+  const r = rest as { src?: string } & Record<string, unknown>;
+  if (typeof r.src === 'string' && r.src.startsWith('data:image/png;base64,')) {
+    const dims = (url: string) => {
+      const raw = Uint8Array.from(atob(url.slice(22)), (c) => c.charCodeAt(0));
+      const v = new DataView(raw.buffer, 16, 8);
+      return `${v.getUint32(0)}x${v.getUint32(4)}`;
+    };
+    r.src = `png:${dims(r.src)}`;
+  }
+  return rest as T;
+};
+
 describe('page operations', () => {
   it('rotates selected pages', async () => {
     const out = await ops.rotatePages(await makeDoc(3), [0, 2], 90);
@@ -60,7 +78,71 @@ describe('page operations', () => {
   });
 });
 
+describe('page geometry as pdf.js displays it', () => {
+  /** One page of 500 × 700 whose /CropBox and /Rotate are set the way other writers may set them. */
+  async function pageWith(cropBox?: number[], rotate?: number): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([500, 700]);
+    if (cropBox) page.node.set(PDFName.of('CropBox'), doc.context.obj(cropBox));
+    if (rotate !== undefined) page.node.set(PDFName.of('Rotate'), doc.context.obj(rotate));
+    return doc.save();
+  }
+
+  const view = async (cropBox?: number[]) => ops.geomOf((await PDFDocument.load(await pageWith(cropBox))).getPage(0)).view;
+
+  it('clips the crop box to the media box, as pdf.js does', async () => {
+    // A crop box that sticks out past the media box: what is shown is the intersection.
+    expect(await view([-100, 0, 600, 800])).toEqual([0, 0, 500, 700]);
+    expect(await view([50, 60, 450, 640])).toEqual([50, 60, 450, 640]);
+    // A crop box that misses the media box entirely, and none at all: the media box.
+    expect(await view([600, 800, 700, 900])).toEqual([0, 0, 500, 700]);
+    expect(await view()).toEqual([0, 0, 500, 700]);
+  });
+
+  it('reads /Rotate like pdf.js: a value that is not a multiple of 90 counts as 0', async () => {
+    const rotation = async (rotate?: number) => ops.geomOf((await PDFDocument.load(await pageWith(undefined, rotate))).getPage(0)).rotation;
+    expect(await rotation(45)).toBe(0);
+    expect(await rotation(450)).toBe(90);
+    expect(await rotation(-90)).toBe(270);
+    // Normal files are unchanged.
+    expect(await rotation(90)).toBe(90);
+    expect(await rotation()).toBe(0);
+  });
+});
+
 describe('document operations', () => {
+  it('gives new documents a trailer /ID and the app as producer', async () => {
+    for (const bytes of [await ops.createBlankDocument(), await ops.extractPages(await makeDoc(1), [0])]) {
+      const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+      expect(doc.getProducer()).toBe('PDF-Xploder');
+      const id = doc.context.lookup(doc.context.trailerInfo.ID, PDFArray);
+      // Two 16-byte strings (saveDoc may refresh the second one, see pdfSave).
+      expect(id?.size()).toBe(2);
+      for (const entry of [id!.get(0), id!.get(1)]) {
+        expect(entry.toString()).toMatch(/^<[0-9a-fA-F]{32}>$/);
+        expect((entry as PDFHexString).asBytes()).toHaveLength(16);
+      }
+    }
+  });
+
+  it('keeps title, language and viewer preferences when extracting, with a fresh /ID', async () => {
+    const doc = await PDFDocument.load(await makeDoc(1));
+    doc.setTitle('Report');
+    doc.setLanguage('de-DE');
+    doc.catalog.set(PDFName.of('ViewerPreferences'), doc.context.register(doc.context.obj({ DisplayDocTitle: true, PrintScaling: 'None' })));
+    doc.context.trailerInfo.ID = doc.context.obj([PDFHexString.of('AABB'), PDFHexString.of('CCDD')]);
+    const out = await PDFDocument.load(await ops.extractPages(await doc.save(), [0]), { updateMetadata: false });
+    expect(out.getTitle()).toBe('Report');
+    expect((out.catalog.lookup(PDFName.of('Lang')) as PDFString).decodeText()).toBe('de-DE');
+    const preferences = out.catalog.lookup(PDFName.of('ViewerPreferences'), PDFDict);
+    expect(preferences.lookup(PDFName.of('DisplayDocTitle'))?.toString()).toBe('true');
+    expect(preferences.lookup(PDFName.of('PrintScaling'))?.toString()).toBe('/None');
+    // A fresh identifier: the part is a new document, not an update of the source.
+    const ids = out.context.lookup(out.context.trailerInfo.ID, PDFArray)!;
+    expect(ids.get(0).toString()).not.toBe('<AABB>');
+    expect(ids.get(0).toString()).toMatch(/^<[0-9a-fA-F]{32}>$/);
+  });
+
   it('round-trips metadata', async () => {
     const m = { title: 'T', author: 'A', subject: 'S', keywords: 'k1, k2', creator: 'C', producer: 'P' };
     const out = await ops.setMetadata(await makeDoc(1), m);
@@ -103,6 +185,43 @@ describe('document operations', () => {
     ]);
     const flat = await ops.setFormValues(filled, {}, { flatten: true });
     expect(await ops.getFormFields(flat)).toEqual([]);
+  });
+
+  it('puts every font a field names in the form\'s default resources', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    doc.getForm().createTextField('name').addToPage(page, { x: 10, y: 200, width: 200, height: 20 });
+    const filled = await PDFDocument.load(await ops.setFormValues(await doc.save(), { name: 'Ada' }));
+    const acro = filled.catalog.lookup(PDFName.of('AcroForm'), PDFDict);
+    const fonts = acro.lookup(PDFName.of('DR'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+    const widget = filled.getForm().getTextField('name').acroField.getWidgets()[0];
+    const da = widget.getDefaultAppearance() ?? filled.getForm().getTextField('name').acroField.getDefaultAppearance() ?? '';
+    const name = da.match(/\/(\S+) [\d.]+ Tf/)![1];
+    expect(fonts.has(PDFName.of(name))).toBe(true);
+    // And a default appearance for the whole form, with its font in /DR too.
+    expect(acro.has(PDFName.of('DA'))).toBe(true);
+    expect(fonts.has(PDFName.of('Helv'))).toBe(true);
+  });
+
+  it('shows values Noto Sans lacks (✓) with a font that has them, and flattened forms embed only a subset', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const { writeFileSync, mkdtempSync } = await import('node:fs');
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 300]);
+    doc.getForm().createTextField('a').addToPage(page, { x: 10, y: 200, width: 200, height: 20 });
+    doc.getForm().createTextField('b').addToPage(page, { x: 10, y: 150, width: 200, height: 20 });
+    const out = await ops.setFormValues(await doc.save(), { a: 'Größe ✓', b: 'Čapek' }, { flatten: true });
+    expect(out.length).toBeLessThan(120_000);
+    const file = `${mkdtempSync('/tmp/form-')}/f.pdf`;
+    writeFileSync(file, out);
+    let text: string;
+    try {
+      text = execFileSync('pdftotext', [file, '-'], { encoding: 'utf8' });
+    } catch {
+      return; // poppler not installed
+    }
+    expect(text).toContain('Größe ✓');
+    expect(text).toContain('Čapek');
   });
 });
 
@@ -153,7 +272,7 @@ describe('export', () => {
       ]);
       const back = await ops.importForEditing(out, () => 'new');
       expect(back.count).toBe(withImage.length);
-      expect(back.annotations[0]).toEqual(withImage);
+      expect(back.annotations[0].map(model)).toEqual(withImage.map(model));
       // Imported annotations are removed from the page so they are not drawn twice.
       expect(await subtypes(back.bytes)).toEqual([]);
     });
@@ -183,7 +302,7 @@ describe('export', () => {
     expect(popups.map((d) => d.get(PDFName.of('Open'))?.toString())).toEqual(['true', 'false']);
     expect((popups[0].get(PDFName.of('Rect')) as PDFArray).asArray().map((x) => (x as PDFNumber).asNumber())).toEqual([60, 150, 280, 270]);
     const back = await ops.importForEditing(out, () => 'x');
-    expect(back.annotations[0]).toEqual([note, box]);
+    expect(back.annotations[0].map(model)).toEqual([note, box]);
   });
 
   it('leaves out closed popups nobody placed, and opens the ones another editor left open', async () => {
@@ -205,6 +324,18 @@ describe('export', () => {
     dict.set(PDFName.of('Contents'), PDFHexString.fromText('edited elsewhere'));
     const back = await ops.importForEditing(await doc.save(), () => 'x');
     expect(back.annotations[0][0]).toMatchObject({ type: 'rect', rect: { x: 60, y: 45, w: 30, h: 30 }, comment: 'edited elsewhere' });
+  });
+
+  it('follows a resize, opacity and width set by another editor', async () => {
+    const out = await ops.exportWithAnnotations(await makeDoc(1), [[all[3]]]);
+    const doc = await PDFDocument.load(out);
+    const dict = doc.context.lookup(doc.getPage(0).node.Annots()!.get(0)) as PDFDict;
+    dict.set(PDFName.of('Rect'), doc.context.obj([40, 40, 140, 140]));
+    dict.set(PDFName.of('CA'), doc.context.obj(0.5));
+    dict.set(PDFName.of('BS'), doc.context.obj({ W: 5, S: 'S' }));
+    const back = (await ops.importForEditing(await doc.save(), () => 'x')).annotations[0][0];
+    expect(back).toMatchObject({ type: 'rect', opacity: 0.5, width: 5, id: all[3].id, author: all[3].author });
+    expect((back as { rect: { w: number } }).rect.w).toBeGreaterThan(90);
   });
 
   it('imports standard annotations written by other software', async () => {

@@ -24,6 +24,7 @@ import { isName, name as nm, parseContent, writeContent, type Op } from './synta
 import { hexToRgbTuple } from '../color';
 import type { Rect } from '../types';
 import { loadForEdit } from '../pageTree';
+import { textString } from '../pdfStrings';
 
 // ---------------------------------------------------------------- reading
 
@@ -628,7 +629,7 @@ export function findLayer(doc: PDFDocument, ref: string): PDFRef | undefined {
 /** Create a visible layer and list it in the viewer's layer order. */
 export function createLayer(doc: PDFDocument, name: string): PDFRef {
   const ctx = doc.context;
-  const ref = ctx.register(ctx.obj({ Type: 'OCG', Name: PDFString.of(name) }));
+  const ref = ctx.register(ctx.obj({ Type: 'OCG', Name: textString(name) }));
   let oc = doc.catalog.lookup(PDFName.of('OCProperties'));
   if (!(oc instanceof PDFDict)) {
     oc = ctx.obj({ OCGs: [], D: { Order: [] } });

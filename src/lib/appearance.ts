@@ -44,6 +44,7 @@ import { cloudEdges, cloudRadius } from './annotGeom';
 import type { Annotation, PageGeom, Pt, Rect } from './types';
 import { NOTE_SIZE } from './types';
 import { fromBase64, keepsAppearance } from './foreignAppearance';
+import { keptAppearance } from './foreignKeys';
 
 /** Text shaping: how a string is split over fonts and how wide it is. */
 export interface TextEngine {
@@ -382,6 +383,8 @@ export interface AppearanceOptions {
   author?: string;
   /** A flattened copy has no editable comments left, so it gets no status annotations either. */
   flatten?: boolean;
+  /** false: no private model (/AwesomePDF…) is written, as after Sanitize removed hidden data. */
+  privateData?: boolean;
 }
 
 /** Another program's drawing (a one-page PDF, base64), embedded once per document. */
@@ -403,6 +406,13 @@ export async function buildAppearance(
   opts: AppearanceOptions = {},
 ): Promise<{ ref: PDFRef; rect: Rect }> {
   const c = new Canvas();
+  // Another program's drawing the model cannot reproduce (a squiggle, closed arrows, a
+  // dashed border…): kept while the annotation is unchanged.
+  const kept = keptAppearance(a);
+  if (kept) {
+    c.page(await embedAppearance(ctx, kept.ap), kept.rect, 1);
+    return { ref: c.toXObject(ctx.doc, kept.rect), rect: kept.rect };
+  }
   const op = a.opacity;
   switch (a.type) {
     case 'highlight':

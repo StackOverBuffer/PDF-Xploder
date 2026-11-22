@@ -26,7 +26,11 @@ import { SIGN_MARK_NAMES } from './fillSign';
 import { buildAppearance, measureLabel, type AppearanceOptions, type DrawContext } from './appearance';
 import { normRot, pdfToView, viewToPdf } from './geometry';
 import { appearanceToPdf, fromBase64, keepsAppearance, normalAppearance, textBoxKey, toBase64 } from './foreignAppearance';
-import type { Annotation, PageGeom, Pt, Rect, Reply, ReviewStatus } from './types';
+import type { Annotation, PageGeom, Pt, Rect, Reply, StatusEntry } from './types';
+import { statusHistory } from './reviewStatus';
+import { tagAnnotation, untagAnnotations } from './tagAnnots';
+import { drawsDifferently, foreignKey, readKeys, restoreKeys } from './foreignKeys';
+import { textString } from './pdfStrings';
 
 const PRIVATE = PDFName.of('AwesomePDF');
 const PRIVATE_SRC = PDFName.of('AwesomePDFSrc');
@@ -136,11 +140,11 @@ const SUBTYPE: Record<Annotation['type'], string> = {
 function writeMeasure(dict: PDFDict, m: Measure, pdf: PDFDocument['context']) {
   const it = m.kind === 'distance' ? 'LineDimension' : m.kind === 'perimeter' ? 'PolyLineDimension' : 'PolygonDimension';
   dict.set(PDFName.of('IT'), PDFName.of(it));
-  const fmt = (unit: string, c: number) => pdf.obj({ Type: 'NumberFormat', U: PDFString.of(unit), C: c, D: 100, F: 'D' });
+  const fmt = (unit: string, c: number) => pdf.obj({ Type: 'NumberFormat', U: textString(unit), C: c, D: 100, F: 'D' });
   const measure = pdf.obj({
     Type: 'Measure',
     Subtype: 'RL',
-    R: PDFString.of(m.scale.label),
+    R: textString(m.scale.label),
     X: [fmt(m.scale.unit, m.scale.perPoint)],
     D: [fmt(m.scale.unit, 1)],
     A: [fmt(`${m.scale.unit}²`, 1)],
@@ -170,6 +174,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
   const pdf = doc.context;
   const { ref, rect } = await buildAppearance(ctx, a, g, opts);
   const color = hexToRgbTuple(a.color);
+  const priv = opts.privateData !== false;
   const dict = pdf.obj({
     Type: 'Annot',
     Subtype: SUBTYPE[a.type],
@@ -228,7 +233,7 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
       set('DA', PDFString.of(`/Helv ${a.fontSize} Tf ${color.map((v) => v.toFixed(3)).join(' ')} rg`));
       set('BS', { W: a.border ? 1 : 0 });
       set('Rotate', a.rot ?? 0);
-      if (keepsAppearance(a)) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
+      if (keepsAppearance(a) && priv) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'note':
       set('Name', 'Comment');
@@ -237,13 +242,18 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     case 'stamp':
       set('Name', a.kind ? SIGN_MARK_NAMES[a.kind] : (a.name ?? (a.label.replace(/[^A-Za-z0-9]/g, '') || 'Stamp')));
       set('Rotate', a.rot ?? 0);
-      if (a.appearance) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
+      if (a.appearance && priv) dict.set(PRIVATE_AP, pdf.register(pdf.stream(fromBase64(a.appearance))));
       break;
     case 'image': {
       set('Name', a.signature ? 'Signature' : 'Image');
       set('Rotate', a.rot ?? 0);
-      const { bytes } = dataUrlToBytes(a.src);
-      dict.set(PRIVATE_SRC, pdf.register(pdf.stream(bytes)));
+      if (priv) {
+        // The appearance embedded the image (a JPEG as it is, a PNG as decoded samples):
+        // the private source is that same stream, so the pixels are stored once.
+        const { bytes } = dataUrlToBytes(a.src);
+        const shown = ctx.images.get(a.src);
+        dict.set(PRIVATE_SRC, shown ? shown.ref : pdf.register(pdf.stream(bytes)));
+      }
       break;
     }
     case 'redact':
@@ -254,8 +264,19 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
 
   // Replies are separate annotations (below), read back from there; the status becomes
   // a standard review state annotation, so it is kept out of the private model too.
-  const { replies, status, ...rest } = a;
-  const model: Record<string, unknown> = { ...rest, rect0: rect };
+  // Keys another program wrote, kept while the annotation is unchanged (foreignKeys).
+  restoreKeys(dict, a, pdf);
+  const { replies, status, statusLog, foreign, ...rest } = a;
+  void foreign;
+  const model: Record<string, unknown> = { ...rest, rect0: rect, std0: standardPrint(dict) };
+  // fromPrivate rebuilds these from the dictionary, so they are left out (the model goes
+  // into the file as a hex string, about twice its length).
+  delete model.color; // /C
+  delete model.subject; // /Subj, re-read on import
+  if (a.opacity === 1) delete model.opacity; // /CA, and 1 is what import assumes
+  if (!label) delete model.comment; // /Contents carries it unless a measure label was added
+  if (a.type === 'text' || a.type === 'note') delete model.text; // /Contents carries it
+  if ('fill' in a && a.fill === null) delete model.fill; // no fill is the shape default
   if (a.type === 'image') model.src = dataUrlToBytes(a.src).mime;
   if (a.type === 'stamp' && a.appearance) model.appearance = 'pdf';
   if (a.type === 'stamp' && a.kind) {
@@ -267,9 +288,11 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     if (keepsAppearance(a)) model.appearance = 'pdf';
     else delete model.appearance, delete model.appearanceOf;
   }
-  dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
+  if (priv) dict.set(PRIVATE, PDFHexString.fromText(JSON.stringify(model)));
   const annotRef = pdf.register(dict);
   page.node.addAnnot(annotRef);
+  // Tagged documents: the annotation gets its structure element (described by its text).
+  tagAnnotation(doc, page.ref, annotRef, contents || a.subject || SUBTYPE[a.type]);
   // A popup for the text (where it was placed here, open or closed as it is now): some
   // viewers (Preview, mobile apps) show comments only through it.
   if ((contents || a.popup) && a.type !== 'redact') {
@@ -288,14 +311,22 @@ export async function writeNativeAnnotation(ctx: DrawContext, page: PDFPage, g: 
     // The reply's icon: a note at the comment's top-left corner (in the page's view), as PDF-XChange draws it.
     const at = noteCorner(g, rect);
     const icon = await buildAppearance(ctx, { id: r.id, type: 'note', at, text: r.text, color: '#ffee58', opacity: 1, author: r.author, createdAt: r.createdAt }, g, opts);
-    page.node.addAnnot(pdf.register(replyDict(pdf, r, annotRef, icon)));
+    const replyRef = pdf.register(replyDict(pdf, r, annotRef, icon));
+    page.node.addAnnot(replyRef);
+    tagAnnotation(doc, page.ref, replyRef, r.text);
   }
   // The review status, as Acrobat stores it: a /State reply annotation under StateModel
   // 'Review', so other editors keep it too. Read back from there on import.
-  if (status && !opts.flatten) {
-    const at = noteCorner(g, rect);
-    const icon = await buildAppearance(ctx, { id: `state-${a.id}`, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: opts.author ?? a.author, createdAt: Date.now() }, g, opts);
-    page.node.addAnnot(pdf.register(stateDict(pdf, a, annotRef, icon, opts)));
+  // Each change keeps who made it and when; only a change made in this session gets
+  // the current author and time.
+  if (!opts.flatten) {
+    for (const e of statusHistory({ id: a.id, status, statusLog }, opts.author ?? a.author, Date.now())) {
+      const at = noteCorner(g, rect);
+      const icon = await buildAppearance(ctx, { id: e.id, type: 'note', at, text: '', color: '#ffee58', opacity: 1, author: e.author, createdAt: e.at }, g, opts);
+      const stateRef = pdf.register(stateDict(pdf, e, annotRef, icon));
+      page.node.addAnnot(stateRef);
+      tagAnnotation(doc, page.ref, stateRef, `${e.state} (${e.author})`);
+    }
   }
 }
 
@@ -332,7 +363,7 @@ function replyDict(pdf: PDFDocument['context'], r: Reply, parent: PDFRef, icon: 
  * The review status as other editors write it: a reply that carries /State and
  * /StateModel 'Review' instead of text. It says nothing by itself, so it has no Contents.
  */
-function stateDict(pdf: PDFDocument['context'], a: Annotation, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }, opts: AppearanceOptions): PDFDict {
+function stateDict(pdf: PDFDocument['context'], e: StatusEntry, parent: PDFRef, icon: { ref: PDFRef; rect: Rect }): PDFDict {
   const { rect } = icon;
   return pdf.obj({
     Type: 'Annot',
@@ -341,13 +372,17 @@ function stateDict(pdf: PDFDocument['context'], a: Annotation, parent: PDFRef, i
     AP: { N: icon.ref },
     IRT: parent,
     RT: 'R',
-    State: a.status,
+    State: e.state,
     StateModel: 'Review',
-    NM: PDFHexString.fromText(`state-${a.id}`),
-    T: PDFHexString.fromText(opts.author ?? a.author),
-    M: PDFString.fromDate(new Date()),
+    NM: PDFHexString.fromText(e.id),
+    T: PDFHexString.fromText(e.author),
+    CreationDate: PDFString.fromDate(new Date(e.at)),
+    M: PDFString.fromDate(new Date(e.at)),
     Name: 'Comment',
-    F: 4 | 8 | 16, // Print, NoZoom, NoRotate
+    // NoView, NoZoom, NoRotate: a status is bookkeeping, not a comment, so no viewer
+    // draws or prints it (pdf.js leaves annotations with NoView out of page and print
+    // rendering entirely). Not /Hidden (2): that would make our own import skip it.
+    F: 8 | 16 | 32,
     C: [1, 0.93, 0.35],
     Open: false,
   }) as PDFDict;
@@ -375,7 +410,23 @@ function base(dict: PDFDict, env: ParseEnv) {
 }
 
 /** Our private model, adjusted for edits another program made to the standard keys. */
-function fromPrivate(dict: PDFDict): Annotation | null {
+/**
+ * The standard keys other editors change when they resize, restyle or reshape an
+ * annotation. Saved with the private model: when they differ on import, those
+ * properties come from the standard keys instead.
+ */
+function standardPrint(dict: PDFDict): string {
+  const r = rectOf(dict);
+  const k = (name: string) => dict.lookup(PDFName.of(name))?.toString() ?? '';
+  const bs = dict.lookup(PDFName.of('BS'));
+  const w = bs instanceof PDFDict ? (bs.lookup(PDFName.of('W'))?.toString() ?? '') : '';
+  return JSON.stringify([r ? [Math.round(r.w * 2), Math.round(r.h * 2)] : 0, k('CA'), w, k('Vertices'), k('InkList'), k('L'), k('QuadPoints'), k('IC')]);
+}
+
+/** What another editor's reshaping changes in our model. */
+const SHAPE_KEYS = ['rect', 'rects', 'paths', 'p1', 'p2', 'vertices', 'at', 'width', 'opacity', 'fill'] as const;
+
+async function fromPrivate(dict: PDFDict, env: ParseEnv): Promise<Annotation | null> {
   const raw = text(dict.lookup(PRIVATE));
   if (!raw) return null;
   let a: Annotation & { rect0?: Rect };
@@ -386,27 +437,58 @@ function fromPrivate(dict: PDFDict): Annotation | null {
   }
   const now = rectOf(dict);
   const was = a.rect0;
+  const std0 = (a as { std0?: string }).std0;
   delete a.rect0;
-  // Another editor may have moved the annotation: follow its /Rect.
-  if (now && was && (Math.abs(now.x - was.x) > 0.5 || Math.abs(now.y - was.y) > 0.5) && Math.abs(now.w - was.w) < 0.5 && Math.abs(now.h - was.h) < 0.5) {
+  delete (a as { std0?: string }).std0;
+  // Defaults for keys the write path leaves out because the dictionary holds them —
+  // before the merge below, which only touches keys the model has.
+  a.opacity ??= 1;
+  if (a.type === 'rect' || a.type === 'ellipse' || a.type === 'polygon' || a.type === 'polyline' || a.type === 'cloud') a.fill ??= null;
+  const reshaped = std0 !== undefined && std0 !== standardPrint(dict);
+  if (reshaped) {
+    // Another editor resized it, changed its opacity, width or points: take those from
+    // the standard keys (the rest, such as the author and our extras, stays ours).
+    const s = fromStandard(dict, env) as Record<string, unknown> | null;
+    if (s) for (const k of SHAPE_KEYS) if (k in s && k in a && s[k] !== undefined) (a as unknown as Record<string, unknown>)[k] = s[k];
+  } else if (now && was && (Math.abs(now.x - was.x) > 0.5 || Math.abs(now.y - was.y) > 0.5) && Math.abs(now.w - was.w) < 0.5 && Math.abs(now.h - was.h) < 0.5) {
     a = { ...a, ...translate(a, now.x - was.x, now.y - was.y) } as Annotation;
   }
   const contents = text(dict.lookup(PDFName.of('Contents')));
   if (a.type === 'text' || a.type === 'note') a.text = contents ?? '';
-  else a.comment = contents || undefined;
+  else {
+    // Cleared in another editor: gone from the model too (older files kept it there).
+    a.comment = contents || undefined;
+    if (a.comment === undefined) delete a.comment;
+  }
   const c = toHex(numbers(dict.lookup(PDFName.of('C'))));
   if (c) a.color = c;
+  // The model no longer stores the colour: another editor that removed /C leaves the default.
+  a.color ??= '#e53935';
   if (a.type === 'image') {
     const src = dict.lookup(PRIVATE_SRC);
     if (!(src instanceof PDFRawStream)) return null;
     // Another tool may have compressed the stream: decode its filters.
     let data = src.getContents();
+    let samples: Uint8Array | undefined;
     try {
-      if (src.dict.get(PDFName.of('Filter'))) data = decodePDFRawStream(src).decode();
+      if (src.dict.get(PDFName.of('Filter'))) samples = decodePDFRawStream(src).decode();
     } catch {
       /* keep the raw bytes */
     }
-    a.src = bytesToDataUrl(data, (a.src as string) || 'image/png');
+    const mime = (a.src as string) || 'image/png';
+    // Only an image XObject holds samples; a stream of PNG file bytes (written when the
+    // appearance kept another drawing) that another tool compressed decodes to the file.
+    const isImage = src.dict.get(PDFName.of('Subtype'))?.toString() === '/Image';
+    if (samples && isImage && !/jpe?g/.test(mime)) {
+      // The appearance's decoded image (the write path stores no PNG bytes): rebuild it.
+      // The rebuilder is loaded on demand (pngRebuild.ts) to keep it out of the start-up
+      // bundle; failing that, the stamp falls back to the standard import.
+      const url = await import('./pngRebuild').then((m) => m.pngFromSamples(src, samples)).catch(() => undefined);
+      if (!url) return null;
+      a.src = url;
+    } else {
+      a.src = bytesToDataUrl(samples ?? data, mime);
+    }
   }
   if ((a.type === 'stamp' || a.type === 'text') && a.appearance) {
     const ap = dict.lookup(PRIVATE_AP);
@@ -429,6 +511,7 @@ function fromPrivate(dict: PDFDict): Annotation | null {
   const subject = text(dict.lookup(PDFName.of('Subj')));
   if (subject) a.subject = subject;
   delete a.replies;
+  delete a.statusLog;
   return a;
 }
 
@@ -593,7 +676,7 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
         replies.push({ dict, entry });
         continue;
       }
-      const own = fromPrivate(dict);
+      const own = await fromPrivate(dict, env);
       const a = own ?? fromStandard(dict, env);
       if (!a) continue;
       // Another program's stamp: keep its own drawing (and leave it in the file if that fails).
@@ -612,6 +695,16 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
           a.appearanceOf = textBoxKey(a);
         }
       }
+      // Everything else the file says about it, written back while it is unchanged; and,
+      // where our drawing would differ, its own drawing too.
+      a.foreign = { keys: readKeys(dict), of: '' };
+      if (a.type !== 'stamp' && a.type !== 'text' && drawsDifferently(dict, a)) {
+        const ap = normalAppearance(dict);
+        const pdf = ap ? await appearanceToPdf(doc, ap).catch(() => undefined) : undefined;
+        const r = rectOf(dict);
+        if (pdf && r) Object.assign(a.foreign, { ap: pdf, rect: r });
+      }
+      a.foreign.of = foreignKey(a);
       // Its popup: where it is now (another editor may have moved it) and whether it is open.
       // A closed popup nobody placed (one written for other viewers) is left out.
       const pop = dict.lookup(PDFName.of('Popup'));
@@ -648,9 +741,10 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
       const state = nameOrText(dict.lookup(PDFName.of('State')));
       const model = nameOrText(dict.lookup(PDFName.of('StateModel')));
       if (state && model === 'Review') {
-        if (root) {
-          if (state === 'None') delete root.status;
-          else if (REVIEW_STATES.includes(state)) root.status = state as ReviewStatus;
+        if (root && (state === 'None' || REVIEW_STATES.includes(state))) {
+          const b = base(dict, env);
+          const at = parsePdfDate(text(dict.lookup(PDFName.of('M'))) ?? text(dict.lookup(PDFName.of('CreationDate')))) ?? b.createdAt;
+          (root.statusLog ??= []).push({ id: b.id, state: state as StatusEntry['state'], author: b.author, at });
         }
         // An orphaned state says nothing: it is consumed either way.
         remove.add(entry as PDFRef);
@@ -669,8 +763,18 @@ export async function importAnnotations(doc: PDFDocument, geoms: PageGeom[], new
       const popup = dict.get(PDFName.of('Popup'));
       if (popup instanceof PDFRef) remove.add(popup);
     }
-    for (const a of out) a.replies?.sort((x, y) => x.createdAt - y.createdAt);
+    for (const a of out) {
+      a.replies?.sort((x, y) => x.createdAt - y.createdAt);
+      // The newest change is the current status (a stable sort keeps file order on ties).
+      if (a.statusLog) {
+        a.statusLog.sort((x, y) => x.at - y.at);
+        const last = a.statusLog[a.statusLog.length - 1].state;
+        if (last === 'None') delete a.status;
+        else a.status = last;
+      }
+    }
     if (!remove.size) continue;
+    untagAnnotations(doc, [...remove].filter((r): r is PDFRef => r instanceof PDFRef));
     const kept = annots.asArray().filter((e) => !remove.has(e as PDFRef));
     if (kept.length) page.node.set(PDFName.of('Annots'), doc.context.obj(kept));
     else page.node.delete(PDFName.of('Annots'));

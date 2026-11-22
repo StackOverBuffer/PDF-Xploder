@@ -16,9 +16,6 @@
   "poppler-742-0-fuzzed.pdf": [
     "render"
   ],
-  "poppler-85140-0.pdf": [
-    "reopen"
-  ],
   "poppler-90-0-fuzzed.pdf": [
     "render"
   ],

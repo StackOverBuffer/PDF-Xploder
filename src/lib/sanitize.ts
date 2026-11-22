@@ -166,6 +166,20 @@ export function sanitizeDocument(doc: PDFDocument, o: SanitizeOptions): Sanitize
       page.node.delete(N(k));
       report.hiddenData++;
     }
+    // Our own private annotation model (authors, marked text, original images): the
+    // standard keys and the appearance carry what other viewers need.
+    for (const page of doc.getPages()) {
+      for (const r of page.node.Annots()?.asArray() ?? []) {
+        const d = doc.context.lookup(r);
+        if (!(d instanceof PDFDict)) continue;
+        let had = false;
+        for (const k of ['AwesomePDF', 'AwesomePDFSrc', 'AwesomePDFAppearance']) if (d.has(N(k))) {
+          d.delete(N(k));
+          had = true;
+        }
+        if (had) report.hiddenData++;
+      }
+    }
   }
   return report;
 }

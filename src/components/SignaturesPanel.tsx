@@ -57,7 +57,7 @@ export function SignaturesPanel() {
   );
 }
 
-/** A form with XFA data (an Adobe-only format), which saving changes leaves out. */
+/** A form with XFA data (an Adobe-only format), which a save keeps only while the fields are untouched. */
 export function XfaBanner() {
   const xfa = useStore((s) => s.xfa);
   const closed = useStore((s) => s.xfaNoticeClosed);
@@ -67,8 +67,8 @@ export function XfaBanner() {
     <div className="doc-banner warn">
       <Info size={16} />
       {t(xfa === 'pure'
-        ? 'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here, and saving changes removes them.'
-        : 'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; saving changes removes the XFA part.')}
+        ? 'This is an XFA form, a format only Adobe programs fully support: its fields cannot be shown or filled here. Saving keeps them unless you change the form fields.'
+        : 'This form also contains XFA data, a format only Adobe programs use. PDF-Xploder fills the standard form fields; filling or changing them removes the XFA part on save.')}
       <button onClick={() => useStore.setState({ xfaNoticeClosed: true })}>{t('OK')}</button>
     </div>
   );

@@ -128,8 +128,8 @@ export function Ribbon({ showProps, toggleProps }: { showProps: boolean; toggleP
           <button title={`${t('Open')} (Ctrl+O)`} onClick={cmd.openFromDialog}><FolderOpen size={16} /></button>
           <button title={`${t('Save')} (Ctrl+S)`} disabled={noDoc} onClick={cmd.save}><Save size={16} /></button>
           <button title={`${t('Print')} (Ctrl+P)`} disabled={!canPrint} onClick={cmd.print}><Printer size={16} /></button>
-          <button title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => S().run('Undoing…', () => S().undo())}><Undo2 size={16} /></button>
-          <button title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={() => S().run('Redoing…', () => S().redo())}><Redo2 size={16} /></button>
+          <button title={t('Undo (Ctrl+Z)')} disabled={!canUndo} onClick={() => S().run('Undoing…', () => S().undo())}><Undo2 size={16} /></button>
+          <button title={t('Redo (Ctrl+Y)')} disabled={!canRedo} onClick={() => S().run('Redoing…', () => S().redo())}><Redo2 size={16} /></button>
         </div>
         <div className="doc-title">{fileName ? `${fileName}${dirty ? ' •' : ''}` : ''}{hasDoc && !editable ? ' (read-only)' : ''}</div>
       </div>

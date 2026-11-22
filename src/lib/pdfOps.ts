@@ -8,12 +8,16 @@ import {
   PDFDict,
   PDFDocument,
   PDFDropdown,
+  PDFHexString,
   PDFName,
   PDFOptionList,
+  PDFObjectCopier,
   PDFPage,
   PDFRadioGroup,
   PDFRef,
+  PDFString,
   PDFTextField,
+  type PDFField,
   degrees,
   drawObject,
   popGraphicsState,
@@ -23,41 +27,77 @@ import { hexToRgb } from './color';
 import { normRot, viewRectToPdf, viewSize, viewToPdf, type VRect } from './geometry';
 import type { Annotation, PageGeom, Pt } from './types';
 import { buildAppearance, type DrawContext, type TextEngine } from './appearance';
-import { createTextEngine, loadFontBytes, loadFontkit } from './fonts';
+import { createTextEngine, fontCovering, loadFontBytes, loadFontkit, type FontKey } from './fonts';
+import { subsetFont } from './subset';
 import { importAnnotations, writeNativeAnnotation } from './annotIO';
+import { copyPages } from './pageCopy';
+import { tf } from './i18n';
 
 export async function load(bytes: Uint8Array): Promise<PDFDocument> {
   return loadForEdit(bytes);
 }
 
 /**
- * `dest.copyPages(src, indices)`, with each copied annotation's /P pointing at its new page.
- * pdf-lib follows /P to the source page and writes a second, orphaned copy of it, so the
- * annotations (3D models, form fields, …) would belong to a page that is not in the document.
+ * Copy pages into `dest` without the pages they refer to: see pageCopy.ts. The fields of
+ * copied form widgets are registered in `dest`'s form, links to pages left behind are cut.
  */
-export async function copyPages(dest: PDFDocument, src: PDFDocument, indices: number[]): Promise<PDFPage[]> {
-  const pages = await dest.copyPages(src, indices);
-  const P = PDFName.of('P');
-  for (const page of pages) {
-    for (const ref of page.node.Annots()?.asArray() ?? []) {
-      const annot = dest.context.lookup(ref);
-      if (annot instanceof PDFDict && annot.has(P)) annot.set(P, page.ref);
-    }
-  }
-  return pages;
+export { copyPages };
+import { clearSignatures } from './staleSignatures';
+
+/** A rewritten signed document: its signatures, which no longer match, become empty fields. */
+export async function dropStaleSignatures(bytes: Uint8Array): Promise<Uint8Array> {
+  const doc = await load(bytes);
+  return clearSignatures(doc) ? save(doc) : bytes;
 }
 
 async function save(doc: PDFDocument): Promise<Uint8Array> {
   return saveDoc(doc);
 }
 
+/**
+ * The page as pdf.js displays it (the reference is Page.view/Page.rotate in pdf.js's core):
+ * the intersection of crop and media box — the media box when they do not overlap — and a
+ * /Rotate that is not a multiple of 90 read as 0. Edits must work on the box that is shown,
+ * or stamps and crops land somewhere else than they were placed. normRot stays in use for
+ * the rotate command, whose delta arithmetic rounds to the nearest quarter turn.
+ */
 export function geomOf(page: PDFPage): PageGeom {
-  const b = page.getCropBox();
-  return { view: [b.x, b.y, b.x + b.width, b.y + b.height], rotation: normRot(page.getRotation().angle) };
+  const m = page.getMediaBox();
+  // pdf.js ignores an empty media box and falls back to Letter.
+  const media = m.width > 0 && m.height > 0 ? m : { x: 0, y: 0, width: 612, height: 792 };
+  const c = page.getCropBox();
+  const x0 = Math.max(media.x, c.x);
+  const y0 = Math.max(media.y, c.y);
+  const x1 = Math.min(media.x + media.width, c.x + c.width);
+  const y1 = Math.min(media.y + media.height, c.y + c.height);
+  const view: PageGeom['view'] = x1 > x0 && y1 > y0 ? [x0, y0, x1, y1] : [media.x, media.y, media.x + media.width, media.y + media.height];
+  return { view, rotation: displayedRotation(page.getRotation().angle) };
+}
+
+/** /Rotate the way pdf.js reads it: a value that is not a multiple of 90 counts as 0. */
+function displayedRotation(angle: number): number {
+  if (angle % 90 !== 0) return 0;
+  if (angle >= 360) return angle % 360;
+  if (angle < 0) return (angle % 360 + 360) % 360;
+  return angle;
+}
+
+/**
+ * Fresh documents: the app as Producer and a trailer /ID (two random 16-byte strings, the
+ * way the fork's convertToPDFA writes one), not the defaults PDFDocument.create fills in.
+ */
+export function stampNewDocument(doc: PDFDocument): void {
+  doc.setProducer('PDF-Xploder');
+  const ctx = doc.context;
+  if (!ctx.lookup(ctx.trailerInfo.ID)) {
+    const id = PDFHexString.fromBytes(crypto.getRandomValues(new Uint8Array(16)));
+    ctx.trailerInfo.ID = ctx.obj([id, id]);
+  }
 }
 
 export async function createBlankDocument(width = 595.28, height = 841.89): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  stampNewDocument(doc);
   doc.addPage([width, height]);
   return save(doc);
 }
@@ -130,8 +170,18 @@ export async function duplicatePages(bytes: Uint8Array, indices: number[]): Prom
 export async function extractPages(source: Uint8Array | PDFDocument, indices: number[]): Promise<Uint8Array> {
   const src = source instanceof Uint8Array ? await load(source) : source;
   const out = await PDFDocument.create();
+  stampNewDocument(out);
   const pages = await copyPages(out, src, indices);
   pages.forEach((p) => out.addPage(p));
+  // The part is a document of its own: keep the settings that describe it. It has no XMP
+  // of its own (the fresh catalog carries none), so the Info title cannot get out of sync.
+  const title = src.getTitle();
+  if (title) out.setTitle(title);
+  const lang = src.catalog.lookup(PDFName.of('Lang'));
+  if (lang instanceof PDFString || lang instanceof PDFHexString) out.setLanguage(lang.decodeText());
+  // Looked up without lookupMaybe, which throws on the wrong type (broken files).
+  const preferences = src.catalog.lookup(PDFName.of('ViewerPreferences'));
+  if (preferences instanceof PDFDict) out.catalog.set(PDFName.of('ViewerPreferences'), PDFObjectCopier.for(src.context, out.context).copy(preferences) as PDFDict);
   return save(out);
 }
 
@@ -187,7 +237,7 @@ export async function cropPages(bytes: Uint8Array, indices: number[], m: Margins
       width: vs.width - m.left - m.right,
       height: vs.height - m.top - m.bottom,
     };
-    if (v.width < 10 || v.height < 10) throw new Error(`Margins are larger than page ${i + 1}.`);
+    if (v.width < 10 || v.height < 10) throw new Error(tf('Margins are larger than page {page}.', { page: i + 1 }));
     const r = viewRectToPdf(g, v);
     page.setCropBox(r.x, r.y, r.w, r.h);
   }
@@ -349,7 +399,7 @@ export async function setMetadata(bytes: Uint8Array, m: Metadata): Promise<Uint8
 
 export { getFormFields, type FieldInfo } from './forms';
 import type { FieldValue } from './forms';
-import { saveDoc } from './pdfSave';
+import { dropXfa, saveDoc } from './pdfSave';
 import { addInsertedFileBookmark, copiedOutline, outlineOf } from './outline';
 import { loadForEdit } from './pageTree';
 export type { FieldValue };
@@ -361,6 +411,8 @@ export async function setFormValues(
 ): Promise<Uint8Array> {
   const doc = await load(bytes);
   const form = doc.getForm();
+  // Values now live in the standard fields: XFA data would disagree with them.
+  dropXfa(doc);
   for (const [name, value] of Object.entries(values)) {
     const f = form.getField(name);
     if (f instanceof PDFTextField) f.setText(String(value));
@@ -375,8 +427,41 @@ export async function setFormValues(
     const fontBytes = await loadFontBytes('sans');
     if (fontBytes) {
       doc.registerFontkit(await loadFontkit());
-      // Not subset: the font must contain every glyph a later edit of the field may need.
-      form.updateFieldAppearances(await doc.embedFont(fontBytes, { subset: false }));
+      // Not subset while the fields stay fillable: the font must contain every glyph a
+      // later edit may need. A flattened form keeps only the glyphs it shows.
+      let sansBytes = fontBytes;
+      if (opts.flatten) {
+        const shown = form.getFields().flatMap((f) => (f instanceof PDFTextField ? [f.getText() ?? ''] : f instanceof PDFDropdown || f instanceof PDFOptionList ? f.getSelected() : []));
+        try {
+          sansBytes = await subsetFont(fontBytes, new Set([...shown.join(''), ' ', '?'].map((c) => c.codePointAt(0)!)));
+        } catch {
+          /* the whole font */
+        }
+      }
+      form.updateFieldAppearances(await doc.embedFont(sansBytes, { subset: false }));
+      // Values Noto Sans cannot show (✓, Chinese, Japanese, Korean…) get the first font
+      // that has all their characters, cut down to the characters of the values using it.
+      const byFont = new Map<FontKey, { bytes: Uint8Array; fields: PDFField[]; text: string }>();
+      for (const [name, value] of Object.entries(values)) {
+        const text = [value].flat().filter((x): x is string => typeof x === 'string').join('');
+        const field = form.getFieldMaybe(name);
+        if (!text || !(field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList)) continue;
+        const pick = await fontCovering(text);
+        if (!pick || pick.key === 'sans') continue;
+        const e = byFont.get(pick.key) ?? byFont.set(pick.key, { bytes: pick.bytes, fields: [], text: '' }).get(pick.key)!;
+        e.fields.push(field);
+        e.text += text;
+      }
+      for (const { bytes, fields, text } of byFont.values()) {
+        let sub = bytes;
+        try {
+          sub = await subsetFont(bytes, new Set([...text, ' ', '?'].map((c) => c.codePointAt(0)!)));
+        } catch {
+          /* the whole font */
+        }
+        const font = await doc.embedFont(sub, { subset: false });
+        for (const f of fields) (f as PDFTextField).updateAppearances(font);
+      }
     }
   }
   if (opts.flatten) form.flatten();
@@ -388,6 +473,8 @@ export async function flattenFormFields(bytes: Uint8Array): Promise<Uint8Array> 
   const doc = await load(bytes);
   const form = doc.getForm();
   if (!form.getFields().length) return bytes;
+  // The values burn into the pages; XFA data would still carry them as editable fields.
+  dropXfa(doc);
   form.flatten({ updateFieldAppearances: false });
   return save(doc);
 }
@@ -401,6 +488,8 @@ export interface ExportOptions {
   burnRedactions?: boolean;
   /** The acting user, written as the /T of the review status annotations (see annotIO). */
   author?: string;
+  /** false: annotations get only standard keys, no private model (after Sanitize). */
+  privateData?: boolean;
 }
 
 /** Text drawn by an annotation, used to decide which fonts to embed. */
@@ -439,7 +528,7 @@ export async function exportWithAnnotations(
     for (const a of annotationsByPage[i] ?? []) {
       const flatten = opts.flatten || (opts.burnRedactions && a.type === 'redact');
       if (!flatten) {
-        await writeNativeAnnotation(ctx, page, g, a, { author: opts.author });
+        await writeNativeAnnotation(ctx, page, g, a, { author: opts.author, privateData: opts.privateData });
         continue;
       }
       if (a.type === 'redact' && !opts.burnRedactions) continue;
@@ -471,35 +560,50 @@ export async function replacePagesWithImages(
   images: { index: number; png: Uint8Array }[],
 ): Promise<{ bytes: Uint8Array; removedFields: string[] }> {
   const doc = await load(bytes);
-  // Form fields with a widget on a redacted page go entirely: their values would survive
-  // in the form data even though the page is now an image.
   const redacted = new Set(images.map(({ index }) => doc.getPage(index).ref.toString()));
+  const onRedactedPage = (w: { P(): PDFRef | undefined; dict: PDFDict }) => {
+    const p = w.P();
+    if (p && redacted.has(p.toString())) return true;
+    // Widgets without /P: look them up in the pages' annotation arrays.
+    const ref = doc.context.getObjectRef(w.dict);
+    return images.some(({ index }) => !!doc.getPage(index).node.Annots()?.asArray().some((a) => a === ref));
+  };
+  // A field whose every widget is on a redacted page goes entirely: its value would survive
+  // in the form data although the page is now an image. A field that also shows on other
+  // pages keeps its value (it is visible there anyway) and loses only those widgets.
   const removedFields: string[] = [];
   const form = doc.getForm();
+  let fieldRemoved = false;
   for (const field of form.getFields()) {
-    const onRedacted = field.acroField.getWidgets().some((w) => {
-      const p = w.P();
-      if (p && redacted.has(p.toString())) return true;
-      // Widgets without /P: look them up in the pages' annotation arrays.
-      return images.some(({ index }) => {
-        const annots = doc.getPage(index).node.Annots();
-        return !!annots && annots.asArray().some((a) => a === doc.context.getObjectRef(w.dict));
-      });
-    });
-    if (onRedacted) {
+    const widgets = field.acroField.getWidgets();
+    const hit = widgets.map(onRedactedPage);
+    if (!hit.some(Boolean)) continue;
+    if (hit.every(Boolean)) {
       removedFields.push(field.getName());
       form.removeField(field);
+      // The field's value is gone from the form; XFA datasets would still carry it.
+      fieldRemoved = true;
+    } else {
+      for (let k = widgets.length - 1; k >= 0; k--) if (hit[k]) field.acroField.removeWidget(k);
     }
   }
   for (const { index, png } of images) {
-    const old = doc.getPage(index);
-    const vs = viewSize(geomOf(old));
-    doc.removePage(index);
-    const page = doc.insertPage(index, [vs.width, vs.height]);
+    const page = doc.getPage(index);
+    const vs = viewSize(geomOf(page));
+    // The same page object with new content, so bookmarks, links and named destinations
+    // that point at the page keep working. Every other entry goes: thumbnails, actions,
+    // piece info and the annotations (links, widgets) could all leak what was on it.
+    const node = page.node;
+    for (const [key] of node.entries()) if (key !== PDFName.of('Type') && key !== PDFName.of('Parent')) node.delete(key);
+    node.set(PDFName.of('MediaBox'), doc.context.obj([0, 0, vs.width, vs.height]));
+    // Its own resources: inherited ones are shared with other pages.
+    node.set(PDFName.of('Resources'), doc.context.obj({}));
+    // pdf-lib remembers the old content stream and normalisation per page: start afresh.
+    (node as unknown as { normalized: boolean }).normalized = false;
+    Object.assign(page as unknown as Record<string, unknown>, { contentStream: undefined, contentStreamRef: undefined });
     const img = await doc.embedPng(png);
     page.drawImage(img, { x: 0, y: 0, width: vs.width, height: vs.height });
   }
-  // Strip any per-page annotations (links, widgets) that might leak hidden data on the new pages.
-  for (const { index } of images) doc.getPage(index).node.delete(PDFName.of('Annots'));
+  if (fieldRemoved) dropXfa(doc);
   return { bytes: await save(doc), removedFields };
 }

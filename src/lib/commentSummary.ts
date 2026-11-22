@@ -6,18 +6,32 @@
  */
 import { ANNOT_LABELS } from './annotGeom';
 import type { Annotation, AnnotType, ReviewStatus } from './types';
+import { csvCell } from './csv';
 
 export interface CommentSummaryOptions {
   /** Threads shown as indented sub-items (off: the comment itself only). */
   includeReplies: boolean;
 }
 
-/** Backslash-escape the Markdown syntax characters in a comment, so they render literally. */
+/**
+ * A comment as literal Markdown text: every ASCII punctuation character is
+ * backslash-escaped (Markdown allows that for all of them), so no emphasis, list or
+ * heading marker, fence (~~~), entity (&amp;) or bare URL (https\://) takes effect.
+ */
 export function escapeMarkdownText(s: string): string {
-  // The list and heading markers at a line start ("- ", "+ ", "1. ") would start a
-  // block of their own, so they are escaped too.
-  const chars = s.replace(/[#*_[\]`!<>|\\]/g, (m) => `\\${m}`);
-  return chars.split('\n').map((line) => line.replace(/^(\s*)([-+]|\d+[.)])(\s)/, '$1\\$2$3')).join('\n');
+  return s.replace(/[!-/:-@[-`{-~]/g, (m) => `\\${m}`);
+}
+
+/**
+ * Escaped comment text as the continuation of a list item: every line indented to the
+ * item's content, line breaks as hard breaks, so a blank line, a "---" or a fence in a
+ * comment cannot end the item and swallow the rest of the summary.
+ */
+function itemText(s: string, indent: string): string {
+  return escapeMarkdownText(s.replace(/\r\n?/g, '\n').trim())
+    .split('\n')
+    .map((line) => line.trim())
+    .join(`\\\n${indent}`);
 }
 
 /** The words of the generated document; the interface language chooses the column. */
@@ -57,11 +71,11 @@ export function commentSummaryMarkdown(docName: string, byPage: { page: number; 
     for (const a of list) {
       const status = a.status ? ` · ${w.states[a.status]}` : '';
       lines.push(`- **${w.types[a.type]}** · ${escapeMarkdownText(a.author)} · ${date.format(a.createdAt)}${status}`);
-      const body = escapeMarkdownText(commentBody(a));
+      const body = itemText(commentBody(a), '  ');
       if (body) lines.push(`  ${body}`);
       if (o.includeReplies) {
         for (const r of a.replies ?? []) {
-          lines.push(`  - ${escapeMarkdownText(r.author)}: ${escapeMarkdownText(r.text)}`);
+          lines.push(`  - ${escapeMarkdownText(r.author)}: ${itemText(r.text, '    ')}`);
         }
       }
     }
@@ -72,14 +86,7 @@ export function commentSummaryMarkdown(docName: string, byPage: { page: number; 
 /** The comments as CSV for spreadsheets, RFC 4180: fields with separators, quotes or line breaks are quoted, quotes doubled, CRLF line endings. */
 export function commentsCsv(rows: { page: number; type: string; author: string; date: string; status: string; text: string }[], lang: 'en' | 'de'): string {
   const sep = lang === 'de' ? ';' : ',';
-  // A cell that starts like a formula (=, +, -, @, or a tab or carriage return before one)
-  // would be run by Excel and LibreOffice: comment text and author names come from other
-  // people's files, so such a cell gets a leading apostrophe and stays plain text.
-  const defuse = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
-  const esc = (raw: string) => {
-    const s = defuse(raw);
-    return s.includes(sep) || /["\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+  const esc = (raw: string) => csvCell(raw, sep);
   const head = ['page', 'type', 'author', 'date', 'status', 'text'];
   const lines = rows.map((r) => [String(r.page), r.type, r.author, r.date, r.status, r.text].map(esc).join(sep));
   return [head.join(sep), ...lines].join('\r\n');

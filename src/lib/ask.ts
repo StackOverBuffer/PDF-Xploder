@@ -46,8 +46,33 @@ export const ask = (q: Question | string) => enqueue(typeof q === 'string' ? { m
 /** A line of text, or null when cancelled. */
 export const askText = (q: Question) => enqueue(q, true) as Promise<string | null>;
 
+const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:', 'ftp:']);
+
+/**
+ * The link as an address that is safe to open, or undefined. Links in PDFs can hold any
+ * URL: `javascript:` would run in a window of the app's own origin (with access to the
+ * saved sessions and initials), `data:` and `file:` can show anything as if from here.
+ * Only web, mail, phone and FTP addresses are opened; "www.…" without a scheme as https.
+ */
+export function safeLinkUrl(raw: string | undefined): string | undefined {
+  const url = raw?.trim();
+  if (!url) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(/^www\./i.test(url) ? `https://${url}` : url);
+  } catch {
+    return undefined;
+  }
+  return SAFE_PROTOCOLS.has(parsed.protocol) ? parsed.href : undefined;
+}
+
 /** Open a web link from the document after asking (links in PDFs can point anywhere). */
-export async function openLinkAfterAsking(url: string): Promise<void> {
+export async function openLinkAfterAsking(raw: string): Promise<void> {
   const { tr } = await import('./i18n');
+  const url = safeLinkUrl(raw);
+  if (!url) {
+    await ask({ title: 'Open link', message: `${tr('This link is not opened: only web, e-mail and phone addresses are.')}\n\n${raw.slice(0, 300)}`, ok: 'OK' });
+    return;
+  }
   if (await ask({ title: 'Open link', message: `${tr('Open this link in a new tab?')}\n\n${url}`, ok: 'Open' })) window.open(url, '_blank', 'noopener,noreferrer');
 }

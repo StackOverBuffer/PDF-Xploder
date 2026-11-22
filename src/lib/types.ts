@@ -35,6 +35,27 @@ export interface Reply {
 /** The review states of a comment, as Acrobat's StateModel 'Review' knows them. */
 export type ReviewStatus = 'Accepted' | 'Rejected' | 'Cancelled' | 'Completed' | 'Reopened';
 
+/** One review status change: who set which state when ('None' clears the status). */
+export interface StatusEntry {
+  id: string;
+  state: ReviewStatus | 'None';
+  author: string;
+  at: number;
+}
+
+/**
+ * An imported annotation's own dictionary keys, in PDF syntax, and (when our drawing
+ * would differ) its own appearance. Written back as they were while the annotation is
+ * unchanged (`of` is the model at import), so a save keeps what the model does not hold.
+ */
+export interface ForeignKeys {
+  keys: Record<string, string>;
+  of: string;
+  /** Its drawing as a one-page PDF (base64), shown in `rect`. */
+  ap?: string;
+  rect?: Rect;
+}
+
 interface AnnotBase {
   id: string;
   color: string;
@@ -43,6 +64,10 @@ interface AnnotBase {
   createdAt: number;
   /** Review status, stored as a /State reply annotation in the file — see annotIO. */
   status?: ReviewStatus;
+  /** Every status change, oldest first, as the file's /State replies hold it. */
+  statusLog?: StatusEntry[];
+  /** The annotation as another program (or an earlier save) wrote it — see foreignKeys. */
+  foreign?: ForeignKeys;
   /** Optional comment attached to any annotation. */
   comment?: string;
   /** The title other editors give a comment (/Subj, e.g. a stamp's name), kept as is. */

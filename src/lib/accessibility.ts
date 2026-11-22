@@ -3,6 +3,7 @@ import { PDFBool, PDFDict, PDFHexString, PDFName, PDFString } from '@cantoo/pdf-
 import { load } from './pdfOps';
 import { tf, tr } from './i18n';
 import { saveDoc } from './pdfSave';
+import { asciiString } from './pdfStrings';
 
 export type CheckStatus = 'pass' | 'fail' | 'warn';
 export type FixId = 'title' | 'lang' | 'displayTitle';
@@ -68,7 +69,7 @@ function summarise(pages: number[]): string {
 
 export async function applyAccessibilityFix(bytes: Uint8Array, fix: FixId, value = ''): Promise<Uint8Array> {
   const doc = await load(bytes);
-  if (fix === 'lang') doc.catalog.set(PDFName.of('Lang'), PDFString.of(value));
+  if (fix === 'lang') doc.catalog.set(PDFName.of('Lang'), asciiString(value.trim()));
   if (fix === 'title') doc.setTitle(value, { showInWindowTitleBar: true });
   if (fix === 'displayTitle') doc.catalog.getOrCreateViewerPreferences().setDisplayDocTitle(true);
   return saveDoc(doc);
