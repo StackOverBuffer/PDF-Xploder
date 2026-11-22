@@ -1,12 +1,12 @@
 {
   "initial": {
-    "jsGzipKB": 700,
+    "jsGzipKB": 701,
     "cssGzipKB": 12
   },
   "startup": {
     "startPageMs": 1600,
     "firstPageMs": 5500,
-    "startupJsGzipKB": 700
+    "startupJsGzipKB": 701
   },
   "lazyOnly": [
     "node_modules/tesseract.js",

@@ -13,16 +13,6 @@
 import { PDFDocument, PDFFont, StandardFonts } from '@cantoo/pdf-lib';
 import { singleFontEngine, type TextEngine } from './appearance';
 import { subsetFont } from './subset';
-// The handwriting fonts of typed signatures (signatureFonts.css): their bytes load on demand,
-// the ?url imports only carry the build asset path.
-import dancingLatinUrl from '@fontsource/dancing-script/files/dancing-script-latin-400-normal.woff?url';
-import dancingLatinExtUrl from '@fontsource/dancing-script/files/dancing-script-latin-ext-400-normal.woff?url';
-import greatVibesLatinUrl from '@fontsource/great-vibes/files/great-vibes-latin-400-normal.woff?url';
-import greatVibesLatinExtUrl from '@fontsource/great-vibes/files/great-vibes-latin-ext-400-normal.woff?url';
-import caveatLatinUrl from '@fontsource/caveat/files/caveat-latin-400-normal.woff?url';
-import caveatLatinExtUrl from '@fontsource/caveat/files/caveat-latin-ext-400-normal.woff?url';
-import alluraLatinUrl from '@fontsource/allura/files/allura-latin-400-normal.woff?url';
-import alluraLatinExtUrl from '@fontsource/allura/files/allura-latin-ext-400-normal.woff?url';
 
 export type FontKey =
   | 'sans'
@@ -47,7 +37,7 @@ export type FontSource = (key: FontKey) => Promise<Uint8Array | null>;
 
 const CDN = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts';
 
-const FILES: Record<FontKey, string> = {
+const FILES: Partial<Record<FontKey, string>> = {
   sans: 'fonts/NotoSans-Regular.ttf',
   sansBold: 'fonts/NotoSans-Bold.ttf',
   symbols: 'fonts/NotoSansSymbols2-Regular.ttf',
@@ -55,18 +45,17 @@ const FILES: Record<FontKey, string> = {
   cjkBold: `${CDN}/noto-sans-sc@0.4.3/700Bold/NotoSansSC_700Bold.ttf`,
   kr: `${CDN}/noto-sans-kr@0.4.3/400Regular/NotoSansKR_400Regular.ttf`,
   krBold: `${CDN}/noto-sans-kr@0.4.3/700Bold/NotoSansKR_700Bold.ttf`,
-  dancingLatin: dancingLatinUrl,
-  dancingLatinExt: dancingLatinExtUrl,
-  greatVibesLatin: greatVibesLatinUrl,
-  greatVibesLatinExt: greatVibesLatinExtUrl,
-  caveatLatin: caveatLatinUrl,
-  caveatLatinExt: caveatLatinExtUrl,
-  alluraLatin: alluraLatinUrl,
-  alluraLatinExt: alluraLatinExtUrl,
+};
+
+/** Where a donor font's bytes come from; the donor table loads on demand (fontDonors.ts). */
+const donorUrl = async (key: FontKey): Promise<string | undefined> => {
+  const d = (await import('./fontDonors')) as { DONOR_URLS: Partial<Record<FontKey, string>> };
+  return d.DONOR_URLS[key];
 };
 
 const fetchSource: FontSource = async (key) => {
-  const file = FILES[key];
+  const file = FILES[key] ?? (await donorUrl(key));
+  if (!file) return null;
   // Bundled paths under public/ need the base URL; ?url assets and CDN addresses do not.
   const url = /^(https?:|\/)/.test(file) ? file : `${import.meta.env.BASE_URL ?? '/'}${file}`;
   try {
@@ -143,14 +132,6 @@ const CHAINS: Record<'regular' | 'bold', FontKey[]> = {
   bold: ['sansBold', 'symbols', 'cjkBold', 'cjk', 'krBold', 'kr'],
 };
 
-/** Last-resort glyph donors, in the order the signature feature lists them (Dialogs.tsx):
- * consulted only when no chain font covers a character, loading bytes as the search
- * reaches each entry. */
-const LAST_RESORT: FontKey[] = [
-  'dancingLatin', 'dancingLatinExt', 'greatVibesLatin', 'greatVibesLatinExt',
-  'caveatLatin', 'caveatLatinExt', 'alluraLatin', 'alluraLatinExt',
-];
-
 /** The first font of the fallback chain that has every character of `text`. */
 export async function fontCovering(text: string): Promise<{ key: FontKey; bytes: Uint8Array } | undefined> {
   const cps = [...text].map((c) => c.codePointAt(0)!).filter((cp) => !isSpace(cp));
@@ -186,13 +167,17 @@ export async function createTextEngine(doc: PDFDocument, texts: string[], weight
   }
 
   // Characters no chain font covers (offline the CJK fonts cannot be fetched): the bundled
-  // handwriting fonts are the last resort before a character degrades to '?'.
-  for (const key of LAST_RESORT) {
-    if (!missing.length) break;
-    const f = await parsed(key);
-    if (!f || !missing.some(f.has)) continue;
-    chain.push({ key, ...f });
-    missing = missing.filter((cp) => !f.has(cp));
+  // handwriting fonts are the last resort before a character degrades to '?'. Their table
+  // (and woff URLs) loads on demand, keeping it out of the start-up bundle.
+  if (missing.length) {
+    const donors = await import('./fontDonors');
+    for (const key of donors.DONOR_ORDER) {
+      if (!missing.length) break;
+      const f = await parsed(key);
+      if (!f || !missing.some(f.has)) continue;
+      chain.push({ key, ...f });
+      missing = missing.filter((cp) => !f.has(cp));
+    }
   }
 
   // Decide each character's font up front.
