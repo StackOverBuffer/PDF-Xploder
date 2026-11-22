@@ -1,13 +1,16 @@
 /**
  * Markdown and plain text to PDF: lays out the parsed document on pages with
- * the bundled Noto fonts (any script), Courier for code, clickable links,
- * bookmarks for the headings and links to them (#anchor) that work.
+ * the bundled Noto fonts (any script), clickable links, bookmarks for the
+ * headings and links to them (#anchor) that work. The output is tagged
+ * (structure tree, /Lang) so screen readers can follow the document's semantics.
  */
-import { PDFArray, PDFDocument, PDFName, PDFNull, PDFNumber, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNull, PDFNumber, PDFOperator, PDFOperatorNames, beginText, degrees, endMarkedContent, endText, rgb, rotateAndSkewTextRadiansAndTranslate, setFillingColor, setFontAndSize, showText, toRadians, type PDFDict, type PDFFont, type PDFImage, type PDFPage, type PDFRef, type RGB } from '@cantoo/pdf-lib';
 import { createTextEngine } from './fonts';
+import { useLang, type Lang } from './i18n';
 import type { TextEngine } from './appearance';
 import { inlineText, parseMarkdown, slug, type Align, type Block, type Inline } from './markdown';
 import { setOutline, type OutlineNode } from './outline';
+import { stampNewDocument } from './pdfOps';
 import { saveDoc } from './pdfSave';
 import { asciiString } from './pdfStrings';
 
@@ -20,6 +23,8 @@ export interface TextPdfOptions {
   margin?: number;
   /** Body text size in points (default 11). */
   fontSize?: number;
+  /** Document language (default: the interface language, like sample.ts). */
+  lang?: Lang;
 }
 
 const A4: [number, number] = [595.28, 841.89];
@@ -175,6 +180,178 @@ function wrap(fonts: Fonts, frags: Frag[], size: number, maxWidth: number): Line
   return lines;
 }
 
+// ---------------------------------------------------------------- tagged structure
+
+interface SElem {
+  /** The structure type (/S): Document, P, H1…, Code, L, LI, Lbl, LBody, Link, … */
+  s: string;
+  parent: SElem | null;
+  /** Marked content, child elements and (for links) annotation references, in order. */
+  kids: ({ page: PDFRef; mcid: number } | { objr: PDFRef; page: PDFRef } | SElem)[];
+  /** Alternative text (figures). */
+  alt?: string;
+  /** Keep the element even when it holds nothing (table cells keep the grid aligned). */
+  keepEmpty?: boolean;
+  /** The annotation a Link element stands for (set when the annotation is created). */
+  annot?: { ref: PDFRef; dict: PDFDict; page: PDFRef };
+}
+
+/**
+ * Builds the structure tree while the pages are laid out: every line of text is drawn as
+ * one marked-content sequence whose id belongs to the innermost open element, and
+ * setStructTree writes the tree out once the document is complete.
+ */
+class Tagger {
+  root: SElem;
+  private stack: SElem[];
+  /** Content ids handed out so far, per page (they count per page). */
+  private mcids = new Map<PDFPage, number>();
+  /** The Link elements created so far, in document order. */
+  links: SElem[] = [];
+  /** The link element the pieces drawn so far on this line belong to. */
+  link: { href: string; node: SElem } | null = null;
+
+  constructor(private doc: PDFDocument) {
+    this.root = { s: 'Document', parent: null, kids: [] };
+    this.stack = [this.root];
+  }
+
+  get top(): SElem {
+    return this.stack[this.stack.length - 1];
+  }
+
+  /** Open an element: it owns everything drawn until it is closed. */
+  push(s: string, keepEmpty = false): SElem {
+    const node: SElem = { s, parent: this.top, kids: [], keepEmpty };
+    this.top.kids.push(node);
+    this.stack.push(node);
+    return node;
+  }
+
+  pop(): void {
+    this.stack.pop();
+    this.link = null;
+  }
+
+  /** An element outside the stack order (a list label is drawn with the line that follows it). */
+  child(s: string): SElem {
+    const node: SElem = { s, parent: this.top, kids: [] };
+    this.top.kids.push(node);
+    return node;
+  }
+
+  /** The element for the link pieces drawn now: one element per run of link text on a line. */
+  linkNode(href: string): SElem {
+    if (this.link?.href === href) return this.link.node;
+    const node: SElem = { s: 'Link', parent: this.top, kids: [] };
+    this.top.kids.push(node);
+    this.links.push(node);
+    this.link = { href, node };
+    return node;
+  }
+
+  /** Open a marked-content sequence owned by `owner`: emit it, draw, then emit `close()`. */
+  open(page: PDFPage, owner: SElem): PDFOperator {
+    const mcid = this.mcids.get(page) ?? 0;
+    this.mcids.set(page, mcid + 1);
+    owner.kids.push({ page: page.ref, mcid });
+    return PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [
+      PDFName.of(owner.s),
+      // A properties dictionary is a legal BDC operand; the fork's arg type omits it.
+      this.doc.context.obj({ MCID: PDFNumber.of(mcid) }) as never,
+    ]);
+  }
+
+  close(): PDFOperator {
+    return endMarkedContent();
+  }
+}
+
+/**
+ * Write the recorded structure into the document: pruned of the elements nothing was drawn
+ * in, with the parent tree that leads pages and link annotations back to their elements,
+ * and /MarkInfo, so the file counts as tagged. Marked-content ids count per page, so items
+ * an element holds on another page than its /Pg go in as MCR references.
+ */
+function setStructTree(doc: PDFDocument, tag: Tagger): void {
+  // A link's annotation joins its element as an object reference, like tagAnnots writes them.
+  for (const n of tag.links) if (n.annot) n.kids.push({ objr: n.annot.ref, page: n.annot.page });
+  const prune = (n: SElem): boolean => {
+    n.kids = n.kids.filter((k) => !('s' in k) || !prune(k));
+    return !n.kids.length && !n.keepEmpty && !n.annot;
+  };
+  prune(tag.root);
+
+  const ctx = doc.context;
+  const refs = new Map<SElem, PDFRef>();
+  const assign = (n: SElem): void => {
+    refs.set(n, ctx.nextRef());
+    for (const k of n.kids) if ('s' in k) assign(k);
+  };
+  const rootRef = ctx.nextRef();
+  assign(tag.root);
+
+  // The page the content of an element starts on (for /Pg).
+  const firstPage = (n: SElem): PDFRef | undefined => {
+    for (const k of n.kids) {
+      if (!('s' in k)) return k.page;
+      const p = firstPage(k);
+      if (p) return p;
+    }
+    return undefined;
+  };
+  /** Per page: the element each marked-content id belongs to (the parent tree's arrays). */
+  const owners = new Map<PDFRef, SElem[]>();
+  const build = (n: SElem, parent: PDFRef): void => {
+    for (const k of n.kids) if ('s' in k) build(k, refs.get(n)!);
+    const pg = firstPage(n);
+    const kids = n.kids.map((k) =>
+      's' in k ? refs.get(k)
+        : 'objr' in k ? ctx.obj({ Type: 'OBJR', Obj: k.objr, Pg: k.page })
+        : k.page === pg ? PDFNumber.of(k.mcid)
+        : ctx.obj({ Type: 'MCR', Pg: k.page, MCID: PDFNumber.of(k.mcid) }));
+    ctx.assign(refs.get(n)!, ctx.obj({
+      Type: 'StructElem', S: n.s, P: parent,
+      ...(pg ? { Pg: pg } : {}),
+      ...(n.alt ? { Alt: PDFHexString.fromText(n.alt) } : {}),
+      K: kids.length === 1 ? kids[0] : ctx.obj(kids),
+    }));
+    for (const k of n.kids) {
+      if ('s' in k || 'objr' in k) continue;
+      let list = owners.get(k.page);
+      if (!list) owners.set(k.page, (list = []));
+      list[k.mcid] = n;
+    }
+  };
+  build(tag.root, rootRef);
+
+  // The parent tree: per page, one element per marked-content id; per link annotation, its
+  // element. Pages without marked content need no key.
+  const nums: (PDFNumber | PDFRef)[] = [];
+  let nextKey = 0;
+  for (const page of doc.getPages()) {
+    const list = owners.get(page.ref);
+    if (!list) continue;
+    page.node.set(PDFName.of('StructParents'), PDFNumber.of(nextKey));
+    nums.push(PDFNumber.of(nextKey), ctx.register(ctx.obj(list.map((e) => refs.get(e)!))));
+    nextKey++;
+  }
+  for (const n of tag.links) {
+    if (!n.annot) continue;
+    n.annot.dict.set(PDFName.of('StructParent'), PDFNumber.of(nextKey));
+    nums.push(PDFNumber.of(nextKey), ctx.register(ctx.obj([refs.get(n)!])));
+    nextKey++;
+  }
+  ctx.assign(rootRef, ctx.obj({
+    Type: 'StructTreeRoot',
+    K: [refs.get(tag.root)!],
+    ParentTree: ctx.register(ctx.obj({ Nums: ctx.obj(nums) })),
+    ParentTreeNextKey: PDFNumber.of(nextKey),
+  }));
+  doc.catalog.set(PDFName.of('StructTreeRoot'), rootRef);
+  doc.catalog.set(PDFName.of('MarkInfo'), ctx.obj({ Marked: true }));
+}
+
 // ---------------------------------------------------------------- page writer
 
 type Marker = { kind: 'bullet'; depth: number } | { kind: 'number'; text: string } | { kind: 'task'; checked: boolean };
@@ -190,21 +367,27 @@ interface PendingLink {
   page: number;
   rect: [number, number, number, number];
   href: string;
+  /** The link's structure element (missing for pieces with no text of their own). */
+  node?: SElem;
 }
 
 class Writer {
   pages: PDFPage[] = [];
   page!: PDFPage;
   y = 0;
+  readonly tag: Tagger;
   readonly top: number;
   readonly bottom: number;
   /** Active block quotes: bar position and where the bar started on this page. */
   quotes: { x: number; from: number }[] = [];
-  marker: { marker: Marker; x: number; size: number } | null = null;
+  marker: { marker: Marker; x: number; size: number; lbl?: SElem } | null = null;
   headings: Heading[] = [];
   links: PendingLink[] = [];
+  /** Font resource keys per page, so a font is registered once however often it is drawn. */
+  private fontKeys = new Map<PDFPage, Map<PDFFont, PDFName>>();
 
   constructor(readonly doc: PDFDocument, readonly fonts: Fonts, readonly w: number, readonly h: number, readonly margin: number, readonly base: number) {
+    this.tag = new Tagger(doc);
     this.top = h - margin;
     this.bottom = margin;
     this.newPage();
@@ -237,6 +420,15 @@ class Writer {
     if (q.from - to > 0.5) this.page.drawRectangle({ x: q.x, y: to, width: 2.5, height: q.from - to, color: RULE });
   }
 
+  /** The resource name of `font` on `page`, registering it on first use (drawText does this itself). */
+  private fontOf(page: PDFPage, font: PDFFont): PDFName {
+    let keys = this.fontKeys.get(page);
+    if (!keys) this.fontKeys.set(page, (keys = new Map()));
+    let key = keys.get(font);
+    if (!key) keys.set(font, (key = page.node.newFontDictionary(font.name, font.ref)));
+    return key;
+  }
+
   /** Draw a pending list marker next to a line whose baseline is `baseline`. */
   drawMarker(baseline: number) {
     const m = this.marker;
@@ -252,7 +444,7 @@ class Writer {
       else if (d === 1) this.page.drawCircle({ x: cx, y: mid, size: r, borderColor: TEXT, borderWidth: 0.7 });
       else this.page.drawRectangle({ x: cx - r, y: mid - r, width: 2 * r, height: 2 * r, color: TEXT });
     } else if (m.marker.kind === 'number') {
-      this.text(this.fonts.regular, m.marker.text, m.x, baseline, s, TEXT);
+      this.text(this.fonts.regular, m.marker.text, m.x, baseline, s, TEXT, false, m.lbl);
     } else {
       const b = s * 0.72;
       const x = m.x;
@@ -265,33 +457,80 @@ class Writer {
     }
   }
 
-  text(engine: TextEngine, text: string, x: number, baseline: number, size: number, color: RGB, italic = false): number {
+  text(engine: TextEngine, text: string, x: number, baseline: number, size: number, color: RGB, italic = false, owner?: SElem): number {
+    // The text becomes marked content of the element it belongs to (space alone is no content).
+    const o = owner ?? this.tag.top;
+    const open = /\S/.test(text) ? this.tag.open(this.page, o) : null;
+    if (open) this.page.pushOperators(open);
     let dx = 0;
     for (const run of engine.runs(text)) {
       this.page.drawText(run.text, { x: x + dx, y: baseline, size, font: run.font, color, ...(italic ? { ySkew: OBLIQUE } : {}) });
       dx += run.font.widthOfTextAtSize(run.text, size);
     }
+    if (open) this.page.pushOperators(this.tag.close());
     return dx;
   }
 
   /** Draw a laid-out line with its baseline at `baseline`. */
   drawLine(line: Line, x: number, baseline: number, size: number, color: RGB = this.quotes.length ? MUTED : TEXT) {
     this.drawMarker(baseline);
+    // A link's element does not reach across lines.
+    this.tag.link = null;
+    // One content item and one text object per line, owned by the block element: the runs
+    // join into one findable, replaceable line, and marked-content sequences must not nest,
+    // so a link's element holds its annotation, not its text.
+    const content = line.pieces.some((p) => /\S/.test(p.text));
     let dx = 0;
+    // Code backgrounds go under the whole line, before any text is drawn.
     for (const p of line.pieces) {
-      const s = p.style;
-      const fs = sizeOf(s, size);
-      const px = x + dx;
-      if (s.code) this.page.drawRectangle({ x: px - 1.5, y: baseline - size * 0.27, width: p.w + 3, height: size * 1.12, color: CODE_BG });
-      const c = s.href ? LINK : s.muted ? MUTED : color;
-      this.text(engineOf(this.fonts, s), p.text, px, baseline, fs, c, s.italic);
-      if (s.href) {
-        if (p.text.trim()) this.page.drawLine({ start: { x: px, y: baseline - size * 0.13 }, end: { x: px + p.w, y: baseline - size * 0.13 }, thickness: 0.5, color: LINK });
-        this.links.push({ page: this.pages.length - 1, rect: [px, baseline - size * 0.3, px + p.w, baseline + size * 0.9], href: s.href });
-      }
-      if (s.strike) this.page.drawLine({ start: { x: px, y: baseline + size * 0.3 }, end: { x: px + p.w, y: baseline + size * 0.3 }, thickness: 0.6, color: c });
+      if (p.style.code) this.page.drawRectangle({ x: x + dx - 1.5, y: baseline - size * 0.27, width: p.w + 3, height: size * 1.12, color: CODE_BG });
       dx += p.w;
     }
+    const open = content ? this.tag.open(this.page, this.tag.top) : null;
+    if (open) this.page.pushOperators(open);
+    if (content) {
+      // Font, size and colour change only when they must, so the runs of a line stay one
+      // text object for search and replacement.
+      const ops: PDFOperator[] = [beginText()];
+      let font: PDFFont | undefined;
+      let sizeAt = 0;
+      let fill: RGB | undefined;
+      dx = 0;
+      for (const p of line.pieces) {
+        const fs = sizeOf(p.style, size);
+        const c = p.style.href ? LINK : p.style.muted ? MUTED : color;
+        for (const run of engineOf(this.fonts, p.style).runs(p.text)) {
+          if (!run.text) continue;
+          if (run.font !== font || fs !== sizeAt) {
+            font = run.font;
+            sizeAt = fs;
+            ops.push(setFontAndSize(this.fontOf(this.page, run.font), fs));
+          }
+          if (c !== fill) {
+            fill = c;
+            ops.push(setFillingColor(c));
+          }
+          ops.push(rotateAndSkewTextRadiansAndTranslate(0, 0, p.style.italic ? toRadians(OBLIQUE) : 0, x + dx, baseline));
+          ops.push(showText(run.font.encodeText(run.text)));
+          dx += run.font.widthOfTextAtSize(run.text, fs);
+        }
+      }
+      ops.push(endText());
+      this.page.pushOperators(...ops);
+    }
+    dx = 0;
+    for (const p of line.pieces) {
+      const s = p.style;
+      const px = x + dx;
+      if (s.href) {
+        const owner = this.tag.linkNode(s.href);
+        if (p.text.trim()) this.page.drawLine({ start: { x: px, y: baseline - size * 0.13 }, end: { x: px + p.w, y: baseline - size * 0.13 }, thickness: 0.5, color: LINK });
+        this.links.push({ page: this.pages.length - 1, rect: [px, baseline - size * 0.3, px + p.w, baseline + size * 0.9], href: s.href, node: owner });
+      }
+      if (s.strike) this.page.drawLine({ start: { x: px, y: baseline + size * 0.3 }, end: { x: px + p.w, y: baseline + size * 0.3 }, thickness: 0.6, color: s.href ? LINK : s.muted ? MUTED : color });
+      dx += p.w;
+    }
+    if (open) this.page.pushOperators(this.tag.close());
   }
 
   /** Lay out a paragraph of styled text, breaking pages between lines. */
@@ -353,12 +592,14 @@ class Layout {
         const at = { page: wr.pages.length - 1, y: Math.min(wr.top, wr.y + size * 0.3) };
         this.anchors.set(s, at);
         if (title) wr.headings.push({ level: b.level, title, ...at });
+        wr.tag.push(`H${b.level}`);
         wr.paragraph(flatten(b.content, { bold: true, muted: b.level === 6 }), x, width, size, 1.3);
         if (b.level <= 2) {
           wr.y -= size * 0.15;
           wr.page.drawLine({ start: { x, y: wr.y }, end: { x: x + width, y: wr.y }, thickness: b.level === 1 ? 0.8 : 0.5, color: RULE });
         }
         wr.y -= base * 0.35;
+        wr.tag.pop();
         return;
       }
       case 'paragraph': {
@@ -372,21 +613,27 @@ class Layout {
           });
           return;
         }
+        wr.tag.push('P');
         wr.paragraph(flatten(b.content, {}), x, width, base);
+        wr.tag.pop();
         return;
       }
       case 'code': {
         this.gap(first, depth.tight);
+        wr.tag.push('Code');
         this.code(b.text, x, width);
+        wr.tag.pop();
         return;
       }
       case 'quote': {
         this.gap(first, depth.tight);
         const q = { x: x + 1, from: wr.y };
         wr.quotes.push(q);
+        wr.tag.push('BlockQuote');
         const inner = base * 1.1;
         // Quoted text is drawn in grey (see drawLine).
         this.blocks(b.children, x + inner, width - inner, { ...depth, tight: false });
+        wr.tag.pop();
         wr.quotes.pop();
         wr.quoteBar(q, wr.y + base * 0.3);
         return;
@@ -396,29 +643,38 @@ class Layout {
         const last = b.start + b.items.length - 1;
         const numW = b.ordered ? wr.fonts.regular.width(`${last}.`, base) : 0;
         const indent = Math.max(base * 1.6, numW + base * 0.6);
+        wr.tag.push('L');
         b.items.forEach((item, k) => {
           if (k) wr.space(b.tight ? base * 0.2 : base * 0.6);
+          wr.tag.push('LI');
           const marker: Marker = item.checked !== null ? { kind: 'task', checked: item.checked } : b.ordered ? { kind: 'number', text: `${b.start + k}.` } : { kind: 'bullet', depth: depth.list };
-          wr.marker = { marker, x, size: base };
+          // Only an ordered marker is text; bullets and check boxes are graphics without content.
+          wr.marker = { marker, x, size: base, lbl: marker.kind === 'number' ? wr.tag.child('Lbl') : undefined };
           if (!item.children.length) {
             wr.ensure(base * 1.45);
             wr.drawMarker(wr.y - base * 1.05);
             wr.y -= base * 1.45;
-            return;
+          } else {
+            const firstChild = item.children[0];
+            if (firstChild.type !== 'paragraph' && firstChild.type !== 'heading' && firstChild.type !== 'code') {
+              wr.ensure(base * 1.45);
+              wr.drawMarker(wr.y - base * 1.05);
+            }
+            wr.tag.push('LBody');
+            this.blocks(item.children, x + indent, width - indent, { list: depth.list + 1, tight: b.tight });
+            wr.tag.pop();
           }
-          const firstChild = item.children[0];
-          if (firstChild.type !== 'paragraph' && firstChild.type !== 'heading' && firstChild.type !== 'code') {
-            wr.ensure(base * 1.45);
-            wr.drawMarker(wr.y - base * 1.05);
-          }
-          this.blocks(item.children, x + indent, width - indent, { list: depth.list + 1, tight: b.tight });
+          wr.tag.pop();
           wr.marker = null;
         });
+        wr.tag.pop();
         return;
       }
       case 'table': {
         this.gap(first, depth.tight);
+        wr.tag.push('Table');
         this.table(b, x, width);
+        wr.tag.pop();
         return;
       }
       case 'hr': {
@@ -480,7 +736,12 @@ class Layout {
     h *= k;
     wr.ensure(h);
     wr.drawMarker(wr.y - wr.base);
+    const fig = wr.tag.push('Figure');
+    if (n.alt) fig.alt = n.alt;
+    wr.page.pushOperators(wr.tag.open(wr.page, fig));
     wr.page.drawImage(img, { x, y: wr.y - h, width: w, height: h });
+    wr.page.pushOperators(wr.tag.close());
+    wr.tag.pop();
     wr.y -= h;
   }
 
@@ -527,16 +788,23 @@ class Layout {
     const paint = (row: ReturnType<typeof drawRow>) => {
       const top = wr.y;
       if (row.header) wr.page.drawRectangle({ x, y: top - row.h, width: tableW, height: row.h, color: CODE_BG });
+      wr.tag.push('TR');
       let cx = x;
       row.wrapped.forEach((lines, c) => {
+        // Cells stay in the tree even when empty, so the table keeps its grid.
+        wr.tag.push(row.header ? 'TH' : 'TD', true);
+        wr.tag.push('P');
         lines.forEach((line, j) => {
           const free = colW[c] - 2 * padX - line.width;
           const al: Align = b.align[c];
           const dx = al === 'right' ? free : al === 'center' ? free / 2 : 0;
           wr.drawLine(line, cx + padX + Math.max(0, dx), top - padY - j * lh - size * 1.0, size);
         });
+        wr.tag.pop();
+        wr.tag.pop();
         cx += colW[c];
       });
+      wr.tag.pop();
       const border = { thickness: 0.5, color: RULE };
       wr.page.drawLine({ start: { x, y: top }, end: { x: x + tableW, y: top }, ...border });
       wr.page.drawLine({ start: { x, y: top - row.h }, end: { x: x + tableW, y: top - row.h }, ...border });
@@ -594,34 +862,13 @@ function collectText(blocks: Block[], out: { regular: string[]; bold: string[]; 
 async function makeFonts(doc: PDFDocument, blocks: Block[]): Promise<Fonts> {
   const texts = { regular: [] as string[], bold: [] as string[], code: [] as string[] };
   collectText(blocks, texts);
-  let courier: PDFFont | null = null;
-  let courierSet: Set<number> | null = null;
-  if (texts.code.length) {
-    courier = await doc.embedFont(StandardFonts.Courier);
-    courierSet = new Set(courier.getCharacterSet());
-    // Characters Courier cannot encode are drawn with Noto Sans.
-    for (const t of texts.code) texts.regular.push([...t].filter((ch) => !courierSet!.has(ch.codePointAt(0)!)).join(''));
-  }
-  const regular = await createTextEngine(doc, texts.regular.filter(Boolean));
+  // Code used to be drawn in Courier, a standard font: those are not embedded, which breaks
+  // PDF/A and renders differently across viewers, and no monospaced font is bundled. So code
+  // is drawn with the embedded Noto Sans engine like the rest of the text (a proportional
+  // look — the trade-off for a file that carries all its fonts).
+  const regular = await createTextEngine(doc, [...texts.regular, ...texts.code].filter(Boolean));
   const bold = await createTextEngine(doc, texts.bold.filter(Boolean), 'bold');
-  const monoRuns = (text: string) => {
-    const out: { font: PDFFont; text: string }[] = [];
-    const push = (font: PDFFont, t: string) => {
-      const last = out[out.length - 1];
-      if (last && last.font === font) last.text += t;
-      else out.push({ font, text: t });
-    };
-    for (const ch of text) {
-      if (courier && courierSet!.has(ch.codePointAt(0)!)) push(courier, ch);
-      else for (const r of regular.runs(ch)) push(r.font, r.text);
-    }
-    return out;
-  };
-  const mono: TextEngine = {
-    runs: monoRuns,
-    width: (text, size) => monoRuns(text).reduce((w, r) => w + r.font.widthOfTextAtSize(r.text, size), 0),
-  };
-  return { regular, bold, mono };
+  return { regular, bold, mono: regular };
 }
 
 // ---------------------------------------------------------------- links, bookmarks, entry points
@@ -631,8 +878,10 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
   const merged: PendingLink[] = [];
   for (const l of wr.links) {
     const last = merged[merged.length - 1];
-    if (last && last.page === l.page && last.href === l.href && Math.abs(last.rect[1] - l.rect[1]) < 0.5 && Math.abs(last.rect[2] - l.rect[0]) < 1) last.rect[2] = l.rect[2];
-    else merged.push({ ...l, rect: [...l.rect] });
+    if (last && last.page === l.page && last.href === l.href && Math.abs(last.rect[1] - l.rect[1]) < 0.5 && Math.abs(last.rect[2] - l.rect[0]) < 1) {
+      last.rect[2] = l.rect[2];
+      last.node ??= l.node;
+    } else merged.push({ ...l, rect: [...l.rect] });
   }
   for (const l of merged) {
     let target: Record<string, unknown>;
@@ -650,7 +899,11 @@ function addLinks(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: num
       target = { A: { Type: 'Action', S: 'URI', URI: asciiString(l.href) } };
     } else continue; // Relative links have nothing to point to in a PDF.
     const page = wr.pages[l.page];
-    const ref = doc.context.register(doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], F: 4, ...target }));
+    const annot = doc.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], F: 4, ...target }) as PDFDict;
+    const ref = doc.context.register(annot);
+    // The link's structure element gets the annotation as an object reference, and a
+    // parent-tree key for it, when the structure tree is written (setStructTree).
+    if (l.node) l.node.annot = { ref, dict: annot, page: page.ref };
     const annots = page.node.lookup(PDFName.of('Annots'));
     if (annots instanceof PDFArray) annots.push(ref);
     else page.node.set(PDFName.of('Annots'), doc.context.obj([ref as PDFRef]));
@@ -670,9 +923,13 @@ function bookmarks(headings: Heading[]): OutlineNode[] {
   return roots;
 }
 
+/** The document language, the way sample.ts sets it: the interface language as a BCP 47 tag. */
+const docLanguage = (lang: Lang = useLang.getState().lang): string => (lang === 'de' ? 'de-DE' : 'en-GB');
+
 async function finishDoc(doc: PDFDocument, wr: Writer, anchors: Map<string, { page: number; y: number }>, title: string | undefined): Promise<Uint8Array> {
   addLinks(doc, wr, anchors);
   if (wr.headings.length) setOutline(doc, bookmarks(wr.headings));
+  setStructTree(doc, wr.tag);
   const docTitle = title || wr.headings[0]?.title;
   if (docTitle) doc.setTitle(docTitle, { showInWindowTitleBar: true });
   doc.setCreator('PDF-Xploder');
@@ -705,6 +962,9 @@ async function embedImages(doc: PDFDocument, blocks: Block[], layout: Layout) {
 export async function markdownToPdf(markdown: string, o: TextPdfOptions = {}): Promise<Uint8Array> {
   const blocks = parseMarkdown(substituteSymbols(markdown));
   const doc = await PDFDocument.create();
+  // The stamp and the language the other documents the app creates get (see pdfOps, sample.ts).
+  stampNewDocument(doc);
+  doc.setLanguage(docLanguage(o.lang));
   const fonts = await makeFonts(doc, blocks);
   const [w, h] = o.pageSize ?? A4;
   const wr = new Writer(doc, fonts, w, h, o.margin ?? 56.7, o.fontSize ?? 11);
@@ -727,6 +987,8 @@ export async function textToPdf(text: string, o: TextPdfOptions = {}): Promise<U
   });
   while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
   const doc = await PDFDocument.create();
+  stampNewDocument(doc);
+  doc.setLanguage(docLanguage(o.lang));
   const fonts = await makeFonts(doc, [{ type: 'code', lang: '', text: lines.join('\n') }]);
   const [w, h] = o.pageSize ?? A4;
   const size = o.fontSize ?? 10;
@@ -743,11 +1005,14 @@ export async function textToPdf(text: string, o: TextPdfOptions = {}): Promise<U
       wr.y -= lh;
       continue;
     }
+    // Each source line reads as its own paragraph (plain text keeps its line structure).
+    wr.tag.push('P');
     for (const line of wrapped) {
       wr.ensure(lh);
       wr.drawLine(line, wr.margin + indentW, wr.y - size, size);
       wr.y -= lh;
     }
+    wr.tag.pop();
   }
   return finishDoc(doc, wr, new Map(), o.title);
 }
