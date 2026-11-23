@@ -7,7 +7,7 @@ import { ALL_PERMISSIONS, allPermissionsGranted, type Algorithm, type Permission
 import { createTestCertificate, readP12, type Identity } from '../lib/signature';
 import { downloadBlob, fileBytes } from '../lib/download';
 import type { Rect } from '../lib/types';
-import { Modal, useDialog } from './Dialogs';
+import { Modal } from './Dialogs';
 import { tf, tr, useT } from '../lib/i18n';
 
 function UnlockForm({ onDone }: { onDone: () => void }) {
@@ -139,7 +139,8 @@ function apply(next: SecuritySettings | null, close: () => void) {
   close();
 }
 
-export function PermissionsDialog({ close }: { close: () => void }) {
+/** `onApplied` runs after Apply (not after Cancel), e.g. for the password dialog that opened this one. */
+export function PermissionsDialog({ close, onApplied }: { close: () => void; onApplied?: (next: SecuritySettings | null) => void }) {
   const ownerAccess = useStore((s) => s.ownerAccess && s.editable);
   const signed = useStore((s) => s.signatures.length > 0);
   const initial = currentSettings();
@@ -149,14 +150,18 @@ export function PermissionsDialog({ close }: { close: () => void }) {
   const restricting = !allPermissionsGranted(perms);
   const t = useT();
 
+  const done = (next: SecuritySettings | null) => apply(next, () => {
+    onApplied?.(next);
+    close();
+  });
   const submit = () => {
     if (!restricting) {
       // Nothing restricted: keep only an open password, if there is one.
-      return apply(initial.userPassword ? { ...initial, ownerPassword: initial.userPassword, permissions: ALL_PERMISSIONS } : null, close);
+      return done(initial.userPassword ? { ...initial, ownerPassword: initial.userPassword, permissions: ALL_PERMISSIONS } : null);
     }
     if (!ownerPw) return setError(tr('Set a permissions password: it is needed to change these settings later.'));
     if (ownerPw === initial.userPassword) return setError(tr('The permissions password must differ from the open password.'));
-    apply({ ...initial, ownerPassword: ownerPw, permissions: perms }, close);
+    done({ ...initial, ownerPassword: ownerPw, permissions: perms });
   };
 
   return (
@@ -200,11 +205,23 @@ export function SecurityDialog({ close }: { close: () => void }) {
   const [ownerPw, setOwnerPw] = useState(initial.ownerPassword && initial.ownerPassword !== initial.userPassword ? initial.ownerPassword : '');
   const [algorithm, setAlgorithm] = useState<Algorithm>(initial.algorithm);
   const [error, setError] = useState('');
+  // The permissions editor opens in place of this dialog and comes back to it (Cancel included),
+  // so what was typed here is kept.
+  const [editingPermissions, setEditingPermissions] = useState(false);
   const restricted = !allPermissionsGranted(initial.permissions);
   const t = useT();
 
   if (!ownerAccess) {
     return <Modal title={t('Password security')} onClose={close}><UnlockForm onDone={close} /></Modal>;
+  }
+  if (editingPermissions) {
+    return (
+      <PermissionsDialog
+        close={() => setEditingPermissions(false)}
+        // Restrictions just set come with their permissions password: keep it here, or Apply would ask for it again.
+        onApplied={(next) => next && !allPermissionsGranted(next.permissions) && setOwnerPw(next.ownerPassword)}
+      />
+    );
   }
 
   const submit = () => {
@@ -240,7 +257,7 @@ export function SecurityDialog({ close }: { close: () => void }) {
       <label className="row"><span>{t('Permissions password')}</span><input type="password" value={ownerPw} onChange={(e) => setOwnerPw(e.target.value)} autoComplete="new-password" placeholder={t(restricted ? 'required' : 'optional')} /></label>
       <div className="row"><span>{t('Permissions')}</span>
         <span className="small">{t(restricted ? 'Some actions are restricted.' : 'Everything is allowed.')}</span>
-        <button onClick={() => { close(); useDialog.getState().show('permissions'); }}>{t('Edit permissions…')}</button>
+        <button onClick={() => setEditingPermissions(true)}>{t('Edit permissions…')}</button>
       </div>
       <label className="row"><span>{t('Encryption')}</span>
         <select value={algorithm} onChange={(e) => setAlgorithm(e.target.value as Algorithm)}>

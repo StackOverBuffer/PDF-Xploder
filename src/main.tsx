@@ -10,7 +10,10 @@ import { useStore } from './store/store';
 import { loadRecent, restoreSession, startAutosave } from './store/session';
 
 // German strings come in their own chunk; render once the interface language is available.
-loadLanguage(useLang.getState().lang).finally(() =>
+// Everything that shows a message at startup waits for it too: a toast or busy label is
+// translated when it is created, so made earlier it would stay in English.
+const languageReady = loadLanguage(useLang.getState().lang).catch(() => undefined);
+void languageReady.then(() =>
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />
@@ -28,13 +31,17 @@ idle(() => {
 
 // Reopen the last session's tabs (files handed over by the system open after them).
 loadRecent();
-void useStore.getState().run('Restoring the last session…', async () => {
-  await restoreSession();
-});
-startAutosave();
+const sessionRestored = languageReady.then(() =>
+  useStore.getState().run('Restoring the last session…', async () => {
+    await restoreSession();
+  }),
+);
+// Only after the restore: an autosave of the still empty start page must not replace the stored session.
+void sessionRestored.then(startAutosave);
 
 setupPwa({
-  openFiles,
+  // Files the system hands over open after the restored tabs, so they end up active.
+  openFiles: (files, handles) => void sessionRestored.then(() => openFiles(files, handles)),
   onReady: () => useStore.getState().notify('PDF-Xploder is ready to work offline.'),
 });
 

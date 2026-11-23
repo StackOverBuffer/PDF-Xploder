@@ -132,7 +132,9 @@ describe.skipIf(!hasCanvas)('OCR text styles', () => {
     const mb = measureWord(bold.r, bold.line, bold.word);
     const mi = measureWord(italic.r, italic.line, italic.word);
     expect(mb.stroke / mr.stroke).toBeGreaterThan(1.5);
-    expect(Math.abs(mr.slant)).toBeLessThan(0.05);
+    // Upright glyphs still measure a little slant, which depends on the font build
+    // (about -0.035 on Linux, 0.058 on Windows); italics measure over 0.2.
+    expect(Math.abs(mr.slant)).toBeLessThan(0.1);
     expect(mi.slant).toBeGreaterThan(0.15);
     expect(mr.underline).toBeNull();
     expect(mr.strikeout).toBeNull();
