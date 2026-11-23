@@ -114,13 +114,19 @@ export function PrintDialog({ close }: { close: () => void }) {
     close();
     printWithOptions(options);
   };
+  // Saving hands the file to the browser's download, like Print hands it to the printer: the dialog is done.
+  const save = () => {
+    storeSettings(o);
+    close();
+    void savePrintPdf(options);
+  };
 
   return (
     <Modal
       title={t('Print')}
       wide
       onClose={close}
-      footer={<><span className="muted small print-hint">{t('Printer, copies and two-sided printing are chosen in the browser’s print dialog.')}</span><button onClick={close}>{t('Cancel')}</button><button disabled={!pages.length} onClick={() => savePrintPdf(options)}>{t('Save as PDF…')}</button><button className="primary" disabled={!pages.length} onClick={ok}>{t('Print…')}</button></>}
+      footer={<><span className="muted small print-hint">{t('Printer, copies and two-sided printing are chosen in the browser’s print dialog.')}</span><button onClick={close}>{t('Cancel')}</button><button disabled={!pages.length} onClick={save}>{t('Save as PDF…')}</button><button className="primary" disabled={!pages.length} onClick={ok}>{t('Print…')}</button></>}
     >
       <div className="print-layout">
         <div className="print-options">

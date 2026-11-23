@@ -469,7 +469,9 @@ export const useStore = create<Store>()((set, get) => {
       selectedPages: cur.selectedPages.filter((i) => i < n),
       currentPage: Math.min(cur.currentPage, n - 1),
       dirty: true,
-      search: { ...cur.search, hits: [], index: -1 },
+      // Hits are positions in the page text: only a change of the bytes moves them (the search
+      // pane then searches again). Undoing comments, e.g. redaction marks, keeps them.
+      ...(doc.bytes ? { search: { ...cur.search, hits: [], index: -1 } } : {}),
     });
   }
 

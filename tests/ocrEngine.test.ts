@@ -4,7 +4,7 @@
  * written back in all three output types.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, symlink } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { inflateSync } from 'node:zlib';
@@ -81,7 +81,9 @@ describe.skipIf(!available)('OCR end to end (tesseract.js)', () => {
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'ocr-lang-'));
-    for (const l of ['deu', 'eng']) await symlink(langDir(l), join(dir, `${l}.traineddata.gz`));
+    // Windows allows symbolic links only with Developer Mode (EPERM otherwise): copy there.
+    const link = process.platform === 'win32' ? copyFile : symlink;
+    for (const l of ['deu', 'eng']) await link(langDir(l), join(dir, `${l}.traineddata.gz`));
     engine = await createEngine({ langs: ['deu', 'eng'], threads: 2, dpi: DPI, langPath: dir });
     img = scan();
     source = await scannedPdf(img);
