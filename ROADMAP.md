@@ -10,11 +10,17 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 
 1. ✅ **Interleave duplex scans and booklet printing**: done (Organize › Interleave Pages… combines a front-sides and a back-sides scan, in reverse order too, for stacks that were re-fed; Print › Imposition: Booklet orders the pages so two-sided printing folds them into a saddle-stitched booklet; Poster tiles a page over several sheets with an overlap for gluing; Save as PDF stores every print layout — N-up, booklet, poster — as a file).
 2. ✅ **Optimize / compress documents**: done (File › Compress, Share › Compress): presets plus custom quality and resolution, images downsampled by their resolution on the page, CMYK/JPEG 2000 images converted through pdf.js (except for the print preset), duplicate fonts and images merged, unused objects, thumbnails and metadata removed, object streams; size before and after with Undo. Still open: subsetting fully embedded fonts.
-3. **Compare documents**: side by side, with changed text and changed areas marked.
-4. ✅ **Fill & Sign and dynamic stamps**: done (Comment › Fill & Sign: check, cross, date and initials tools for forms without fields; Stamp menu: dynamic variants of Approved, Reviewed and Received that fill in author and date when placed).
-5. 🟡 **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (review status, comment summary and CSV export done; FDF/XFDF still open).
-6. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions.
-7. ✅ **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize), extract all images (Convert › Extract images, as a ZIP), rasterize pages (Convert › Rasterize) and export pages as PNG/JPEG/WebP/TIFF (Convert › To image) are done.
+3. **Compare documents**: side by side, with a word-level text diff from the text layer, a raster-difference overlay for changed areas, and a change list that jumps between edits.
+4. **Pattern-based redaction**: find and redact personal data by pattern — IBAN and credit-card numbers with checksum validation, phone numbers, email addresses, custom regex — review the matches on the page, then apply them like Find & Redact; plus redaction code sets and blurred/pixelated overlays.
+5. ✅ **Fill & Sign and dynamic stamps**: done (Comment › Fill & Sign: check, cross, date and initials tools for forms without fields; Stamp menu: dynamic variants of Approved, Reviewed and Received that fill in author and date when placed).
+6. 🟡 **Comment workflow**: review status (accepted, rejected…), comment summary, FDF/XFDF import and export (review status, comment summary and CSV export done; FDF/XFDF still open).
+7. **Batch processing**: one action (OCR, watermark, compress, Bates numbers) on many files, results as a ZIP; later, a saved chain of several actions. The same DOM-free editing code also becomes a Node command-line tool and an opt-in MCP server over stdio (Stirling-PDF's pipelines, REST API and MCP server show the demand for exactly this).
+8. ✅ **Whole-document outputs**: greyscale (Convert › Greyscale), sanitize (Protect › Sanitize), extract all images (Convert › Extract images, as a ZIP), rasterize pages (Convert › Rasterize) and export pages as PNG/JPEG/WebP/TIFF (Convert › To image) are done.
+9. **Auto-detect form fields**: propose text fields, check boxes and signature fields from a page's text, lines and rulings for one-click accept ("form field recognition" in Acrobat, Foxit and Nitro).
+10. **Scan cleanup and auto-rotate**: detect each page's orientation and turn it upright, plus binarize, denoise and contrast adjustments to prepare scans for OCR.
+11. **Export to Word and Excel, extract tables**: best-effort .docx (headings, paragraphs, lists, tables) from the text layer — good enough to keep editing, not a pixel-perfect reproduction — and extract tables from digital pages and OCR output into .xlsx/.csv.
+12. **More interface languages**: French, Spanish and Dutch first, from community translations of the existing locale files.
+13. **Smaller jobs**: divide pages (cut scanned double-page spreads back into single pages), multi-page TIFF, HEIC and SVG as imported pages, emails (EML) to PDF, and full-screen reading with autoscroll.
 
 ## 1. New in recent PDF-XChange versions
 
@@ -106,7 +112,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 
 | Feature | Status |
 |---|---|
-| PDF to Word / Excel / PowerPoint | ⬜ |
+| PDF to Word / Excel / PowerPoint | ⬜ best-effort export from the text layer: .docx with headings, paragraphs, lists and tables, and tables — digital or from OCR — to .xlsx/.csv; to keep editing and reuse the data, not a pixel-perfect reproduction |
 | PDF to PDF/A / PDF/X | ⬜ |
 | PDF to Plain Text | ⬜ |
 | Export PDFs to WebP / TIFF Images | ✅ Convert › To image: PNG, JPEG, WebP or TIFF, one page or a ZIP of several |
@@ -140,6 +146,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Create/Edit Fillable Forms | ✅ Edit form mode with properties (read-only, required, locked, tooltip…) |
 | Highlight Form Fields | ✅ |
 | Fields Pane | ✅ |
+| Identify Forms Automatically | ⬜ propose text fields, check boxes and signature fields from text, lines and rulings for one-click accept |
 | Reset Forms | 🟡 discard unsaved form edits |
 | Rename Duplicated Form Fields | ⬜ |
 | Identify Forms Automatically | ⬜ |
@@ -154,7 +161,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 |---|---|
 | Ribbon UI | ✅ PDF-XChange style tabs, groups, split buttons and menus |
 | Quick Launch / search for commands | ✅ search box beside the ribbon tabs (Ctrl+K): finds every ribbon button and menu entry in English or German, shows where it lives and its shortcut, recently used first |
-| Set the UI Language | ✅ German/English throughout, following the browser; ⬜ more languages (French, Spanish, …) |
+| Set the UI Language | ✅ German/English throughout, following the browser; ⬜ more languages — French, Spanish and Dutch first, from community translations of the per-language locale files |
 | Dark Page Mode | ✅ dark interface (View → Theme: same as system, light, dark) and inverted page colours |
 | Page Display Options / Default Page Layouts | ✅ single page, continuous, facing, continuous facing, cover page (View → Page layout; remembered) |
 | Right-to-Left Page Layout | ⬜ |
@@ -205,9 +212,9 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Split Pages by Guide Lines | ⬜ |
 | Select Pages Options for Thumbnails | 🟡 multi-select with Ctrl/Shift |
 | Redact Documents | ✅ |
-| Find and Redact, Redaction Code Sets, Blurred/Pixelated Overlays | 🟡 find and redact (exact boxes around every match); ⬜ code sets, blurred/pixelated overlays |
+| Find and Redact, Redaction Code Sets, Blurred/Pixelated Overlays | 🟡 find and redact (exact boxes around every match); ⬜ pattern-based redaction (IBAN, credit card with checksum validation, email, phone, custom regex) with a review list; ⬜ code sets; ⬜ blurred/pixelated overlays |
 | Sanitize Documents | ✅ scripts (JavaScript, launch actions, XFA), form submission and remote actions, attachments, metadata, thumbnails and private data, each optional |
-| Compare Documents | ⬜ |
+| Compare Documents | ⬜ side by side, word-level text diff plus a raster-difference overlay; change list jumps between edits |
 | Layers Pane, Add/Edit/Merge/Remove/Reorder Layers, Links to Layers, Flatten Layers | 🟡 objects can be moved to existing or new layers; ⬜ layers pane |
 | Attachments, Comments, Signatures, Thumbnails, Properties Panes | ✅ |
 | Content, Destinations, Links, History, 3D Model Tree Panes | ⬜ |
@@ -233,7 +240,7 @@ Roughly in order of everyday usefulness versus effort (callouts are still open f
 | Add Barcodes | ✅ QR code, Code 128, EAN-13 (placed like a stamp) |
 | Add JavaScript | ⬜ |
 | Convert Document Colours | 🟡 greyscale: page content, forms, comment appearances, gradients and images; ⬜ other colour conversions, spot colours |
-| Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance |
+| Deskew / Enhance Scanned Pages | 🟡 deskew with OCR; ⬜ enhance (binarize, denoise, contrast) and auto-rotate (detect each page's orientation and turn it upright) |
 | Rasterize Pages | ✅ Convert › Rasterize (comments are burnt into the image first) |
 | Recompress Document Images | ✅ whole document (File › Compress) or one image (context menu) |
 | View/Edit Document Properties | ✅ |
